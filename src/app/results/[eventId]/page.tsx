@@ -62,11 +62,11 @@ export default async function PublicResultsPage({
     : normalized
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
+    <div className="feis-bg-texture min-h-screen">
+      <header className="bg-feis-green border-b border-feis-green-700">
         <div className="max-w-3xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold">{event.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-serif text-3xl font-bold text-white">{event.name}</h1>
+          <p className="text-sm text-white/70">
             {event.start_date} {event.location && `· ${event.location}`}
           </p>
         </div>
@@ -92,7 +92,7 @@ export default async function PublicResultsPage({
               )
               return (
                 <div key={comp.id}>
-                  <h2 className="font-bold text-lg mb-1">
+                  <h2 className="font-bold text-lg mb-1 text-feis-charcoal">
                     {comp.code && `${comp.code} — `}{comp.name}
                   </h2>
                   <p className="text-sm text-muted-foreground mb-2">
@@ -105,7 +105,7 @@ export default async function PublicResultsPage({
           </div>
         )}
 
-        <footer className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground">
+        <footer className="mt-12 pt-6 border-t text-center text-xs font-serif text-feis-green/40">
           Powered by FeisTab
         </footer>
       </main>

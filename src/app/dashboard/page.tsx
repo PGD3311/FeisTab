@@ -16,14 +16,17 @@ export default async function DashboardPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Events</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Events</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage your feiseanna</p>
+        </div>
         <Link href="/dashboard/events/new">
           <Button>Create Event</Button>
         </Link>
       </div>
 
       {(!events || events.length === 0) ? (
-        <Card>
+        <Card className="feis-card">
           <CardContent className="py-12 text-center text-muted-foreground">
             No events yet. Create your first event to get started.
           </CardContent>
@@ -32,7 +35,7 @@ export default async function DashboardPage() {
         <div className="grid gap-4">
           {events.map(event => (
             <Link key={event.id} href={`/dashboard/events/${event.id}`}>
-              <Card className="hover:border-gray-400 transition-colors cursor-pointer">
+              <Card className="feis-card cursor-pointer">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{event.name}</CardTitle>

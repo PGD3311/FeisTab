@@ -34,24 +34,24 @@ export default async function CompetitionsPage({ params }: { params: Promise<{ e
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Competition Control</h1>
+          <h1 className="text-3xl font-bold">Competition Control</h1>
           <p className="text-sm text-muted-foreground">{event.name}</p>
         </div>
       </div>
 
-      <div className="border rounded-md overflow-hidden">
+      <div className="feis-card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="feis-thead">
             <tr>
-              <th className="px-4 py-3 text-left font-medium">Code</th>
-              <th className="px-4 py-3 text-left font-medium">Competition</th>
-              <th className="px-4 py-3 text-left font-medium">Age/Level</th>
-              <th className="px-4 py-3 text-center font-medium">Dancers</th>
-              <th className="px-4 py-3 text-center font-medium">Scores</th>
-              <th className="px-4 py-3 text-center font-medium">Status</th>
+              <th className="text-left font-medium">Code</th>
+              <th className="text-left font-medium">Competition</th>
+              <th className="text-left font-medium">Age/Level</th>
+              <th className="text-center font-medium">Dancers</th>
+              <th className="text-center font-medium">Scores</th>
+              <th className="text-center font-medium">Status</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="feis-tbody">
             {competitions?.map(comp => {
               const totalScores = comp.rounds?.reduce(
                 (sum: number, r: { score_entries: { count: number }[] }) =>
@@ -59,12 +59,12 @@ export default async function CompetitionsPage({ params }: { params: Promise<{ e
               ) ?? 0
 
               return (
-                <tr key={comp.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs">{comp.code}</td>
+                <tr key={comp.id} className="border-t">
+                  <td className="px-4 py-3 font-mono text-xs text-feis-green/70">{comp.code}</td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/dashboard/events/${eventId}/competitions/${comp.id}`}
-                      className="font-medium hover:underline"
+                      className="font-medium text-feis-green hover:underline"
                     >
                       {comp.name}
                     </Link>

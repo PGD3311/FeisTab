@@ -49,26 +49,26 @@ export default function NewEventPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-6">Create Event</h1>
-      <Card>
+      <h1 className="text-3xl font-bold mb-6">Create Event</h1>
+      <Card className="feis-card">
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="name">Event Name</Label>
+              <Label htmlFor="name" className="font-medium text-sm text-feis-charcoal">Event Name</Label>
               <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start">Start Date</Label>
+                <Label htmlFor="start" className="font-medium text-sm text-feis-charcoal">Start Date</Label>
                 <Input id="start" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="end">End Date</Label>
+                <Label htmlFor="end" className="font-medium text-sm text-feis-charcoal">End Date</Label>
                 <Input id="end" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
             <div>
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="font-medium text-sm text-feis-charcoal">Location</Label>
               <Input id="location" value={location} onChange={e => setLocation(e.target.value)} />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}

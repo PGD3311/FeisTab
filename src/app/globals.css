@@ -7,7 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -45,75 +46,58 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* FeisTab custom palette */
+  --color-feis-green: #0B4D2C;
+  --color-feis-green-600: #0E6B3A;
+  --color-feis-green-700: #0A3F24;
+  --color-feis-green-light: #E8F5EE;
+  --color-feis-cream: #FDFBF7;
+  --color-feis-cream-dark: #F5F3EE;
+  --color-feis-orange: #D4652A;
+  --color-feis-orange-light: #FEF3EC;
+  --color-feis-gold: #C59D5F;
+  --color-feis-charcoal: #1A1F16;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* Irish FeisTab — Deep emerald meets warm parchment */
+  --background: #FDFBF7;
+  --foreground: #1A1F16;
+  --card: #FFFFFF;
+  --card-foreground: #1A1F16;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1F16;
+  --primary: #0B4D2C;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E8F5EE;
+  --secondary-foreground: #0B4D2C;
+  --muted: #F5F3EE;
+  --muted-foreground: #6B7264;
+  --accent: #E8F5EE;
+  --accent-foreground: #0B4D2C;
+  --destructive: #B91C1C;
+  --border: #D6D3CB;
+  --input: #D6D3CB;
+  --ring: #0B4D2C;
+  --chart-1: #0B4D2C;
+  --chart-2: #0E6B3A;
+  --chart-3: #D4652A;
+  --chart-4: #C59D5F;
+  --chart-5: #1A1F16;
+  --radius: 0.5rem;
+  --sidebar: #0B4D2C;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #E8F5EE;
+  --sidebar-primary-foreground: #0B4D2C;
+  --sidebar-accent: #0A3F24;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #0A3F24;
+  --sidebar-ring: #C59D5F;
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Font families — set by next/font in layout.tsx */
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
@@ -122,8 +106,125 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   html {
     @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Serif headings — editorial gravitas */
+  h1, h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--feis-charcoal, #1A1F16);
+  }
+  h1 { font-weight: 700; }
+}
+
+@layer components {
+  /* Celtic-inspired accent bar for nav */
+  .feis-nav-accent {
+    position: relative;
+  }
+  .feis-nav-accent::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      #0B4D2C 0%,
+      #0E6B3A 20%,
+      #FFFFFF 40%,
+      #FFFFFF 60%,
+      #D4652A 80%,
+      #C59D5F 100%
+    );
+    opacity: 0.85;
+  }
+
+  /* Warm card shadow — not flat, not aggressive */
+  .feis-card {
+    box-shadow:
+      0 1px 2px rgba(26, 31, 22, 0.04),
+      0 4px 12px rgba(26, 31, 22, 0.06);
+    border: 1px solid rgba(214, 211, 203, 0.6);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .feis-card:hover {
+    box-shadow:
+      0 2px 4px rgba(26, 31, 22, 0.06),
+      0 8px 24px rgba(26, 31, 22, 0.08);
+    border-color: rgba(11, 77, 44, 0.2);
+  }
+
+  /* Left accent border for featured cards */
+  .feis-accent-left {
+    border-left: 3px solid #0B4D2C;
+  }
+
+  /* Orange accent for active/important states */
+  .feis-accent-orange {
+    border-left: 3px solid #D4652A;
+  }
+
+  /* Subtle parchment texture background */
+  .feis-bg-texture {
+    background-color: #FDFBF7;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(232, 245, 238, 0.3) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(254, 243, 236, 0.3) 0%, transparent 50%);
+  }
+
+  /* Competitor number styling */
+  .feis-number {
+    font-family: var(--font-body);
+    font-weight: 700;
+    color: #0B4D2C;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Gold medal styling for 1st place */
+  .feis-place-1 { color: #C59D5F; font-weight: 800; }
+  .feis-place-2 { color: #8A8A8A; font-weight: 700; }
+  .feis-place-3 { color: #A0674B; font-weight: 700; }
+
+  /* Table header — emerald bar */
+  .feis-thead {
+    background-color: #0B4D2C;
+    color: #FFFFFF;
+  }
+  .feis-thead th {
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Alternating table rows — warm */
+  .feis-tbody tr:nth-child(even) {
+    background-color: rgba(253, 251, 247, 0.6);
+  }
+  .feis-tbody tr {
+    transition: background-color 0.15s ease;
+  }
+  .feis-tbody tr:hover {
+    background-color: #E8F5EE;
+  }
+
+  /* Stat card — big number display */
+  .feis-stat {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1;
+    color: #0B4D2C;
   }
 }

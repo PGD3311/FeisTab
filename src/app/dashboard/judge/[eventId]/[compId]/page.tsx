@@ -93,10 +93,10 @@ export default function JudgeEntryPage({
   const totalDancers = registrations.length
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <Card className="mb-6">
+    <div className="max-w-2xl mx-auto p-6">
+      <Card className="feis-card feis-accent-left mb-6">
         <CardHeader className="pb-3">
-          <CardTitle className="text-xl">{comp.code && `${comp.code} — `}{comp.name}</CardTitle>
+          <CardTitle className="text-2xl">{comp.code && `${comp.code} — `}{comp.name}</CardTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Round {round?.round_number}</span>
             <Badge variant="outline">{scoredCount}/{totalDancers} scored</Badge>
@@ -108,7 +108,7 @@ export default function JudgeEntryPage({
                 <button
                   key={j.id}
                   onClick={() => { setJudgeId(j.id); loadData(j.id) }}
-                  className={`px-2 py-1 text-xs rounded border ${judgeId === j.id ? 'bg-gray-900 text-white' : ''}`}
+                  className={`px-2 py-1 text-xs rounded border ${judgeId === j.id ? 'bg-feis-green text-white' : ''}`}
                 >
                   {j.first_name} {j.last_name}
                 </button>
@@ -119,9 +119,9 @@ export default function JudgeEntryPage({
       </Card>
 
       {submitted ? (
-        <Card>
+        <Card className="feis-card">
           <CardContent className="py-12 text-center">
-            <p className="text-lg font-medium text-green-700">Scores submitted and locked.</p>
+            <p className="text-lg font-medium text-feis-green">Scores submitted and locked.</p>
             <p className="text-sm text-muted-foreground mt-2">
               Contact the tabulator if you need to make changes.
             </p>
@@ -151,7 +151,7 @@ export default function JudgeEntryPage({
           <Button
             onClick={handleFinalSubmit}
             disabled={scoredCount < totalDancers}
-            className="w-full"
+            className="w-full text-lg font-semibold"
             size="lg"
           >
             {scoredCount < totalDancers

@@ -62,25 +62,25 @@ export default function ResultsPublishingPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Results Publishing</h1>
+      <h1 className="text-3xl font-bold mb-6">Results Publishing</h1>
 
       <div className="flex items-center gap-4 mb-6">
         <span className="text-sm text-muted-foreground">
           Public results page:
         </span>
-        <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+        <code className="text-sm bg-feis-cream-dark px-2 py-1 rounded">
           /results/{eventId}
         </code>
       </div>
 
       {publishable.length > 0 && (
-        <Card className="mb-6">
+        <Card className="feis-card mb-6">
           <CardHeader>
             <CardTitle className="text-lg">Ready to Publish ({publishable.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {publishable.map(c => (
-              <div key={c.id} className="flex items-center justify-between p-3 border rounded-md">
+              <div key={c.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-feis-green-light/30 transition-colors">
                 <div>
                   <span className="font-medium">{c.code && `${c.code} — `}{c.name}</span>
                   <span className="ml-2 text-sm text-muted-foreground">
@@ -95,13 +95,13 @@ export default function ResultsPublishingPage({
       )}
 
       {published.length > 0 && (
-        <Card>
+        <Card className="feis-card">
           <CardHeader>
             <CardTitle className="text-lg">Published ({published.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {published.map(c => (
-              <div key={c.id} className="flex items-center justify-between p-3 border rounded-md">
+              <div key={c.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-feis-green-light/30 transition-colors">
                 <div>
                   <span className="font-medium">{c.code && `${c.code} — `}{c.name}</span>
                   <CompetitionStatusBadge status={c.status} />

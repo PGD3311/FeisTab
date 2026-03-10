@@ -13,7 +13,7 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
   return (
     <div className="space-y-4">
       {errors.length > 0 && (
-        <div className="border border-red-200 rounded-md p-3 bg-red-50">
+        <div className="border border-destructive/30 rounded-md p-3 bg-red-50">
           <p className="font-medium text-red-800 text-sm mb-2">Errors ({errors.length})</p>
           {errors.map((e, i) => (
             <p key={i} className="text-sm text-red-700">Row {e.row}: {e.message}</p>
@@ -22,10 +22,10 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
       )}
 
       {warnings.length > 0 && (
-        <div className="border border-yellow-200 rounded-md p-3 bg-yellow-50">
-          <p className="font-medium text-yellow-800 text-sm mb-2">Warnings ({warnings.length})</p>
+        <div className="border border-feis-orange/30 rounded-md p-3 bg-feis-orange-light">
+          <p className="font-medium text-feis-orange text-sm mb-2">Warnings ({warnings.length})</p>
           {warnings.map((w, i) => (
-            <p key={i} className="text-sm text-yellow-700">Row {w.row}: {w.message}</p>
+            <p key={i} className="text-sm text-feis-orange">Row {w.row}: {w.message}</p>
           ))}
         </div>
       )}
@@ -37,7 +37,7 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
         {valid.length > 0 && (
           <div className="border rounded-md overflow-auto max-h-80">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="feis-thead sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left">#</th>
                   <th className="px-3 py-2 text-left">Name</th>
@@ -47,7 +47,7 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
                   <th className="px-3 py-2 text-left">Competition</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="feis-tbody">
                 {valid.map((row, i) => (
                   <tr key={i} className="border-t">
                     <td className="px-3 py-2">{row.competitor_number}</td>

@@ -1,16 +1,16 @@
 import { type CompetitionStatus } from '@/lib/competition-states'
 
 const statusColors: Record<CompetitionStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  imported: 'bg-blue-100 text-blue-700',
-  ready_for_day_of: 'bg-indigo-100 text-indigo-700',
-  in_progress: 'bg-yellow-100 text-yellow-700',
-  awaiting_scores: 'bg-orange-100 text-orange-700',
-  ready_to_tabulate: 'bg-purple-100 text-purple-700',
-  recalled_round_pending: 'bg-pink-100 text-pink-700',
-  complete_unpublished: 'bg-emerald-100 text-emerald-700',
-  published: 'bg-green-100 text-green-700',
-  locked: 'bg-gray-200 text-gray-600',
+  draft: 'bg-feis-cream-dark text-feis-charcoal/60',
+  imported: 'bg-feis-green-light text-feis-green',
+  ready_for_day_of: 'bg-feis-green-light text-feis-green-600',
+  in_progress: 'bg-feis-orange-light text-feis-orange',
+  awaiting_scores: 'bg-feis-orange-light text-feis-orange',
+  ready_to_tabulate: 'bg-amber-50 text-amber-700',
+  recalled_round_pending: 'bg-feis-orange-light text-feis-orange',
+  complete_unpublished: 'bg-feis-green-light text-feis-green',
+  published: 'bg-feis-green text-white',
+  locked: 'bg-feis-cream-dark text-feis-charcoal/50',
 }
 
 const statusLabels: Record<CompetitionStatus, string> = {
@@ -28,7 +28,7 @@ const statusLabels: Record<CompetitionStatus, string> = {
 
 export function CompetitionStatusBadge({ status }: { status: CompetitionStatus }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColors[status]}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide ${statusColors[status]}`}>
       {statusLabels[status]}
     </span>
   )

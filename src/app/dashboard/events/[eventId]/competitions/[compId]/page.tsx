@@ -161,14 +161,14 @@ export default function CompetitionDetailPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
+          <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
           <p className="text-sm text-muted-foreground">{comp.age_group} · {comp.level}</p>
         </div>
         <CompetitionStatusBadge status={comp.status} />
       </div>
 
       {/* Roster */}
-      <Card>
+      <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">
             Roster ({registrations.length} dancers)
@@ -177,9 +177,9 @@ export default function CompetitionDetailPage({
         <CardContent>
           <div className="space-y-1">
             {registrations.map(reg => (
-              <div key={reg.id} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+              <div key={reg.id} className="flex items-center justify-between p-2 rounded hover:bg-feis-green-light/50 transition-colors">
                 <span>
-                  <span className="font-mono text-sm mr-3">{reg.competitor_number}</span>
+                  <span className="feis-number font-mono text-sm mr-3">{reg.competitor_number}</span>
                   {reg.dancers?.first_name} {reg.dancers?.last_name}
                 </span>
                 <Badge variant="outline">{reg.status}</Badge>
@@ -190,7 +190,7 @@ export default function CompetitionDetailPage({
       </Card>
 
       {/* Rounds & Scores */}
-      <Card>
+      <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">
             Rounds ({rounds.length})
@@ -216,7 +216,7 @@ export default function CompetitionDetailPage({
       </Card>
 
       {/* Actions */}
-      <Card>
+      <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">Actions</CardTitle>
         </CardHeader>
@@ -239,24 +239,24 @@ export default function CompetitionDetailPage({
 
       {/* Results Preview */}
       {results.length > 0 && (
-        <Card>
+        <Card className="feis-card">
           <CardHeader>
             <CardTitle className="text-lg">Results</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
+                <thead className="feis-thead">
                   <tr>
                     <th className="px-4 py-2 text-left">Place</th>
                     <th className="px-4 py-2 text-left">Dancer</th>
                     <th className="px-4 py-2 text-right">Score</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="feis-tbody">
                   {results.map(r => (
                     <tr key={r.id} className="border-t">
-                      <td className="px-4 py-2 font-bold">{r.final_rank}</td>
+                      <td className={`px-4 py-2 font-bold ${r.final_rank === 1 ? 'feis-place-1' : r.final_rank === 2 ? 'feis-place-2' : r.final_rank === 3 ? 'feis-place-3' : ''}`}>{r.final_rank}</td>
                       <td className="px-4 py-2">
                         {r.dancers?.first_name} {r.dancers?.last_name}
                       </td>

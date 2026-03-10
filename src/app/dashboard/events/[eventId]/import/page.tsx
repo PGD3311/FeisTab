@@ -165,9 +165,9 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Import Registrations</h1>
+      <h1 className="text-3xl font-bold mb-6">Import Registrations</h1>
 
-      <Card className="mb-6">
+      <Card className="feis-card mb-6">
         <CardHeader>
           <CardTitle className="text-lg">Upload CSV</CardTitle>
         </CardHeader>
@@ -185,7 +185,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       </Card>
 
       {preview && (
-        <Card className="mb-6">
+        <Card className="feis-card mb-6">
           <CardHeader>
             <CardTitle className="text-lg">Preview</CardTitle>
           </CardHeader>
@@ -209,8 +209,8 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       )}
 
       {done && (
-        <div className="border border-green-200 rounded-md p-4 bg-green-50">
-          <p className="text-green-800 font-medium">Import complete.</p>
+        <div className="border border-feis-green/30 rounded-md p-4 bg-feis-green-light">
+          <p className="text-feis-green font-medium">Import complete.</p>
           <Button
             variant="outline"
             className="mt-2"
@@ -221,7 +221,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
+      {error && <p className="text-sm text-destructive mt-4">{error}</p>}
     </div>
   )
 }

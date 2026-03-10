@@ -83,7 +83,7 @@ export default function StageManagerPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Stage Manager</h1>
+      <h1 className="text-3xl font-bold mb-6">Stage Manager</h1>
 
       <div className="flex gap-2 flex-wrap mb-6">
         {competitions.map(c => (
@@ -91,7 +91,7 @@ export default function StageManagerPage({
             key={c.id}
             onClick={() => setSelectedComp(c.id)}
             className={`px-3 py-2 rounded-md text-sm border ${
-              selectedComp === c.id ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'
+              selectedComp === c.id ? 'bg-feis-green text-white' : 'hover:bg-feis-green-light'
             }`}
           >
             {c.code || c.name}

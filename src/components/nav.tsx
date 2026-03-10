@@ -16,22 +16,33 @@ export function Nav() {
   }
 
   return (
-    <header className="border-b bg-white">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="font-bold text-lg">
-            FeisTab
+    <header className="feis-nav-accent bg-feis-green">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span className="font-serif text-2xl font-bold text-white tracking-tight">
+              FeisTab
+            </span>
           </Link>
-          <nav className="flex gap-4 text-sm">
+          <nav className="flex gap-6">
             <Link
               href="/dashboard"
-              className={pathname === '/dashboard' ? 'font-medium' : 'text-muted-foreground'}
+              className={`text-sm font-medium transition-colors ${
+                pathname === '/dashboard'
+                  ? 'text-white'
+                  : 'text-white/60 hover:text-white/90'
+              }`}
             >
               Events
             </Link>
           </nav>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          className="text-white/70 hover:text-white hover:bg-white/10"
+        >
           Sign out
         </Button>
       </div>

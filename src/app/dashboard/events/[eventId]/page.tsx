@@ -35,7 +35,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">{event.name}</h1>
+          <h1 className="text-3xl font-bold">{event.name}</h1>
           <p className="text-muted-foreground text-sm">
             {event.start_date} {event.location && `· ${event.location}`}
           </p>
@@ -46,39 +46,39 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <Card>
+        <Card className="feis-card">
           <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold">{competitions?.length ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Competitions</p>
+            <p className="feis-stat">{competitions?.length ?? 0}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Competitions</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="feis-card">
           <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold">{stages?.length ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Stages</p>
+            <p className="feis-stat">{stages?.length ?? 0}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stages</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="feis-card">
           <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold">
+            <p className="feis-stat">
               {competitions?.filter(c => c.status === 'published').length ?? 0}
             </p>
-            <p className="text-xs text-muted-foreground">Published</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Published</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="feis-card">
           <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold">
+            <p className="feis-stat">
               {competitions?.filter(c => !['published', 'locked', 'draft'].includes(c.status)).length ?? 0}
             </p>
-            <p className="text-xs text-muted-foreground">In Progress</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">In Progress</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex gap-3 mb-6">
         <Link href={`/dashboard/events/${eventId}/import`}>
-          <Button variant="outline">Import Registrations</Button>
+          <Button variant="default">Import Registrations</Button>
         </Link>
         <Link href={`/dashboard/events/${eventId}/competitions`}>
           <Button variant="outline">Competition Control</Button>
@@ -91,7 +91,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
         </Link>
       </div>
 
-      <Card>
+      <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">Competitions</CardTitle>
         </CardHeader>
@@ -106,7 +106,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
                 <Link
                   key={comp.id}
                   href={`/dashboard/events/${eventId}/competitions/${comp.id}`}
-                  className="flex items-center justify-between p-3 rounded-md border hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-md border hover:bg-feis-green-light/50 transition-colors"
                 >
                   <div>
                     <span className="font-medium">{comp.code && `${comp.code} — `}{comp.name}</span>

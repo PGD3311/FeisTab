@@ -44,8 +44,8 @@ export function ScoreEntryForm({
   const hasError = score !== '' && !isValid
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-md border hover:bg-gray-50">
-      <span className="font-mono text-2xl font-bold w-16 text-center">{competitorNumber}</span>
+    <div className="flex items-center gap-3 p-3 rounded-md border hover:bg-feis-green-light/50 transition-colors">
+      <span className="feis-number font-mono text-2xl font-bold w-16 text-center text-feis-green">{competitorNumber}</span>
       <span className="flex-1 text-sm">{dancerName}</span>
       <div className="flex items-center gap-2">
         <Input
@@ -55,7 +55,7 @@ export function ScoreEntryForm({
           step="0.1"
           value={score}
           onChange={e => { setScore(e.target.value); setSaved(false) }}
-          className={`w-24 text-center text-lg ${hasError ? 'border-red-400' : ''}`}
+          className={`w-24 text-center text-lg ${hasError ? 'border-destructive' : ''}`}
           disabled={locked}
         />
         <Button
@@ -63,7 +63,7 @@ export function ScoreEntryForm({
           onClick={handleSave}
           disabled={!isValid || saving || locked}
         >
-          {saving ? '...' : saved ? 'Saved' : 'Save'}
+          {saving ? '...' : saved ? '\u2713 Saved' : 'Save'}
         </Button>
       </div>
     </div>

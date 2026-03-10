@@ -6,12 +6,12 @@ const statuses = ['registered', 'checked_in', 'present', 'scratched', 'no_show',
 type DancerStatus = typeof statuses[number]
 
 const statusColors: Record<DancerStatus, string> = {
-  registered: 'bg-gray-100',
-  checked_in: 'bg-blue-100',
-  present: 'bg-green-100',
-  scratched: 'bg-red-100',
-  no_show: 'bg-orange-100',
-  danced: 'bg-emerald-200',
+  registered: 'bg-feis-cream-dark border-feis-cream-dark',
+  checked_in: 'bg-feis-green-light border-feis-green-light',
+  present: 'bg-feis-green-light border-feis-green/30',
+  scratched: 'bg-red-50 border-red-200',
+  no_show: 'bg-feis-orange-light border-feis-orange/30',
+  danced: 'bg-feis-green-light border-feis-green/40',
 }
 
 interface DancerStatusToggleProps {
@@ -29,7 +29,7 @@ export function DancerStatusToggle({
 }: DancerStatusToggleProps) {
   return (
     <div className={`flex items-center gap-3 p-3 rounded-md border ${statusColors[currentStatus]}`}>
-      <span className="font-mono text-lg font-bold w-14 text-center">{competitorNumber}</span>
+      <span className="feis-number font-mono text-lg font-bold w-14 text-center text-feis-green">{competitorNumber}</span>
       <span className="flex-1 text-sm font-medium">{dancerName}</span>
       <div className="flex gap-1">
         {(['present', 'scratched', 'no_show', 'danced'] as DancerStatus[]).map(s => (
