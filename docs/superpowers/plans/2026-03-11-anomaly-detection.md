@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a 12-check anomaly detection pipeline that runs continuously during scoring, gates sign-off and tabulation when blockers exist, and surfaces warnings for organizer review.
+**Goal:** Build a 12-check anomaly detection pipeline that recomputes on page load / data refresh, gates sign-off and tabulation when blockers exist, and surfaces warnings for organizer review.
 
-**Architecture:** Pure engine functions in `src/lib/engine/anomalies/`, one file per check, orchestrated by `detectAnomalies()`. Each check takes typed input, returns `Anomaly[]`. No Supabase imports — the page fetches data and passes it in. TDD: tests first, then implementation.
+**Architecture:** Pure engine functions in `src/lib/engine/anomalies/`, one file per check, orchestrated by `detectAnomalies()`. Checks are split into competition-wide (run once) and round-scoped (run per round) to avoid duplicate emissions. Each check takes typed input, returns `Anomaly[]`. No Supabase imports — the page fetches data and passes it in. TDD: tests first, then implementation.
+
+**Detection model:** This is recompute-on-load detection, not true continuous detection. Anomalies recompute when `loadData()` runs (page load, after mutations). True continuous detection (recompute after every score keystroke) is a future enhancement.
 
 **Tech Stack:** TypeScript, Vitest, existing engine types from `src/lib/engine/`
 
@@ -48,6 +50,7 @@ export interface Anomaly {
   entity_ids: Record<string, string>
   message: string
   blocking: boolean
+  dedupe_key: string  // e.g. 'duplicate_score_entry|r1|j1|d1' — prevents duplicate UI rendering
 }
 
 export interface ScoreEntry {
@@ -61,12 +64,27 @@ export interface ScoreEntry {
   flag_reason: string | null
 }
 
+export type RegistrationStatus =
+  | 'registered' | 'checked_in' | 'present' | 'scratched'
+  | 'no_show' | 'danced' | 'recalled' | 'disqualified'
+  | 'finalized' | 'did_not_complete' | 'medical'
+
+export type StatusReason =
+  | 'withdrawn' | 'absent' | 'disqualified' | 'did_not_complete'
+  | 'medical' | 'admin_hold' | 'other'
+
+/** Statuses that mean the dancer should NOT have scores */
+export const NON_ACTIVE_STATUSES: RegistrationStatus[] = [
+  'scratched', 'no_show', 'disqualified', 'did_not_complete', 'medical',
+]
+
 export interface Registration {
   id: string
   dancer_id: string
   competition_id: string
   competitor_number: string | null
-  status: string
+  status: RegistrationStatus
+  status_reason: StatusReason | null  // explanatory code, separate from workflow status
 }
 
 export interface Round {
@@ -115,12 +133,12 @@ git commit -m "feat: add anomaly detection type definitions"
 **Files:**
 - Create: `supabase/migrations/005_anomaly_support.sql`
 
-Note: `score_entries` already has `submitted_at` and `unique(round_id, dancer_id, judge_id)`. `registrations.status` already includes `scratched`, `no_show`, `disqualified`. We only need `updated_at` on score_entries for edit tracking, and to add `did_not_complete` and `medical` to registration status options.
+Note: `score_entries` already has `submitted_at` and `unique(round_id, dancer_id, judge_id)`. `registrations.status` already includes `scratched`, `no_show`, `disqualified`. We need: (1) `updated_at` on score_entries for edit tracking, (2) extend status enum with `did_not_complete` and `medical`, (3) add `status_reason` as a separate column from `status` — status is workflow state, status_reason is explanatory exception code.
 
 - [ ] **Step 1: Create migration file**
 
 ```sql
--- Anomaly detection support: edit tracking + extended registration status
+-- Anomaly detection support: edit tracking, extended status, status_reason
 
 -- Track score edits for audit trail
 ALTER TABLE score_entries
@@ -140,6 +158,14 @@ ALTER TABLE registrations
     'registered', 'checked_in', 'present', 'scratched',
     'no_show', 'danced', 'recalled', 'disqualified', 'finalized',
     'did_not_complete', 'medical'
+  ));
+
+-- Separate explanatory reason from workflow status
+ALTER TABLE registrations
+  ADD COLUMN IF NOT EXISTS status_reason text
+  CHECK (status_reason IS NULL OR status_reason IN (
+    'withdrawn', 'absent', 'disqualified',
+    'did_not_complete', 'medical', 'admin_hold', 'other'
   ));
 ```
 
@@ -249,6 +275,7 @@ export function detectDuplicateScoreEntries(
         },
         message: `Duplicate score entry for dancer ${s.dancer_id} by judge ${s.judge_id} in round ${s.round_id}`,
         blocking: true,
+        dedupe_key: `duplicate_score_entry|${s.round_id}|${s.judge_id}|${s.dancer_id}`,
       })
     }
     seen.set(key, s)
@@ -292,7 +319,7 @@ const score = (dancer_id: string): ScoreEntry => ({
 
 const reg = (dancer_id: string): Registration => ({
   id: '1', dancer_id, competition_id: 'c1',
-  competitor_number: '100', status: 'registered',
+  competitor_number: '100', status: 'registered', status_reason: null,
 })
 
 describe('detectScoresForNonRosterDancers', () => {
@@ -365,6 +392,7 @@ export function detectScoresForNonRosterDancers(
         },
         message: `Score exists for dancer ${s.dancer_id} who is not registered in this competition`,
         blocking: true,
+        dedupe_key: `score_for_non_roster_dancer|${s.round_id}|${s.dancer_id}`,
       })
     }
   }
@@ -407,7 +435,7 @@ const score = (dancer_id: string, judge_id: string, round_id = 'r1'): ScoreEntry
 
 const reg = (dancer_id: string): Registration => ({
   id: dancer_id, dancer_id, competition_id: 'c1',
-  competitor_number: '100', status: 'registered',
+  competitor_number: '100', status: 'registered', status_reason: null,
 })
 
 describe('detectMissingRequiredScores', () => {
@@ -486,6 +514,7 @@ export function detectMissingRequiredScores(
         entity_ids: { dancer_id, round_id, competition_id },
         message: `Dancer ${dancer_id} is missing scores from ${missing.length} judge(s): ${missing.join(', ')}`,
         blocking: true,
+        dedupe_key: `missing_required_score|${round_id}|${dancer_id}`,
       })
     }
   }
@@ -528,7 +557,7 @@ const score = (dancer_id: string, judge_id: string): ScoreEntry => ({
 
 const reg = (dancer_id: string): Registration => ({
   id: dancer_id, dancer_id, competition_id: 'c1',
-  competitor_number: '100', status: 'registered',
+  competitor_number: '100', status: 'registered', status_reason: null,
 })
 
 describe('detectIncompleteJudgePackets', () => {
@@ -573,7 +602,7 @@ Expected: FAIL
 
 ```ts
 // src/lib/engine/anomalies/detect-incomplete-packets.ts
-import { type Anomaly, type ScoreEntry, type Registration } from './types'
+import { type Anomaly, type ScoreEntry, type Registration, NON_ACTIVE_STATUSES } from './types'
 
 export function detectIncompleteJudgePackets(
   scores: ScoreEntry[],
@@ -585,7 +614,13 @@ export function detectIncompleteJudgePackets(
   if (judge_ids.length === 0 || registrations.length === 0) return []
 
   const roundScores = scores.filter(s => s.round_id === round_id)
-  const registeredDancerIds = new Set(registrations.map(r => r.dancer_id))
+  // Only count active/score-eligible dancers — exclude scratched, no_show, etc.
+  const activeDancerIds = new Set(
+    registrations
+      .filter(r => !NON_ACTIVE_STATUSES.includes(r.status))
+      .map(r => r.dancer_id)
+  )
+  if (activeDancerIds.size === 0) return []
   const anomalies: Anomaly[] = []
 
   // Build map: judge_id → set of dancer_ids they scored
@@ -596,15 +631,16 @@ export function detectIncompleteJudgePackets(
   }
 
   for (const [judge_id, scoredDancers] of judgeDancers) {
-    const missing = [...registeredDancerIds].filter(d => !scoredDancers.has(d))
+    const missing = [...activeDancerIds].filter(d => !scoredDancers.has(d))
     if (missing.length > 0) {
       anomalies.push({
         type: 'incomplete_judge_packet',
         severity: 'blocker',
         scope: 'judge_packet',
         entity_ids: { judge_id, round_id, competition_id },
-        message: `Judge ${judge_id} has not scored ${missing.length} of ${registeredDancerIds.size} registered dancers`,
+        message: `Judge ${judge_id} has not scored ${missing.length} of ${activeDancerIds.size} active dancers`,
         blocking: true,
+        dedupe_key: `incomplete_judge_packet|${round_id}|${judge_id}`,
       })
     }
   }
@@ -720,6 +756,7 @@ export function detectInvalidScoringReason(
         },
         message: `Score for dancer ${s.dancer_id} is flagged but has no reason specified`,
         blocking: true,
+        dedupe_key: `invalid_scoring_reason|${s.round_id}|${s.judge_id}|${s.dancer_id}|flagged`,
       })
     }
 
@@ -737,6 +774,7 @@ export function detectInvalidScoringReason(
         },
         message: `Score of 0 for dancer ${s.dancer_id} without a flag or reason — is this a penalty, error, or did-not-complete?`,
         blocking: true,
+        dedupe_key: `invalid_scoring_reason|${s.round_id}|${s.judge_id}|${s.dancer_id}|zero`,
       })
     }
   }
@@ -772,13 +810,13 @@ import { detectRecallMismatch } from '@/lib/engine/anomalies/detect-recall-misma
 
 describe('detectRecallMismatch', () => {
   it('returns empty when recall count matches rule', () => {
-    // 10 dancers, 50% recall = 5 expected. 5 recalled = match.
+    // 10 active dancers, 50% recall = 5 expected. 5 recalled = match.
     const recalls = ['d1', 'd2', 'd3', 'd4', 'd5'].map(d => ({ dancer_id: d, round_id: 'r1' }))
     expect(detectRecallMismatch(recalls, 10, 50, 'r1', 'c1')).toEqual([])
   })
 
   it('detects recall count mismatch', () => {
-    // 10 dancers, 50% = 5 expected. Only 3 recalled.
+    // 10 active dancers, 50% = 5 expected. Only 3 recalled.
     const recalls = ['d1', 'd2', 'd3'].map(d => ({ dancer_id: d, round_id: 'r1' }))
     const result = detectRecallMismatch(recalls, 10, 50, 'r1', 'c1')
     expect(result).toHaveLength(1)
@@ -788,7 +826,7 @@ describe('detectRecallMismatch', () => {
   })
 
   it('allows tie-bubble expansion (more than expected)', () => {
-    // 10 dancers, 50% = 5. 6 recalled (tie bubble) = allowed.
+    // 10 active dancers, 50% = 5. 6 recalled (tie bubble) = allowed.
     const recalls = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'].map(d => ({ dancer_id: d, round_id: 'r1' }))
     expect(detectRecallMismatch(recalls, 10, 50, 'r1', 'c1')).toEqual([])
   })
@@ -801,6 +839,10 @@ describe('detectRecallMismatch', () => {
     expect(detectRecallMismatch([], 0, 0, 'r1', 'c1')).toEqual([])
   })
 })
+
+// Note: activeDancerCount is passed by the orchestrator, which filters out
+// non-active statuses (scratched, no_show, disqualified, etc.) before
+// passing the count. This is NOT registrations.length.
 ```
 
 - [ ] **Step 2: Run tests — verify fail**
@@ -836,6 +878,7 @@ export function detectRecallMismatch(
       entity_ids: { round_id, competition_id },
       message: `Recall count mismatch: ${actualCount} recalled but rule expects at least ${expectedCount} (${recallTopPercent}% of ${totalDancers})`,
       blocking: true,
+      dedupe_key: `recall_mismatch|${round_id}`,
     }]
   }
 
@@ -972,6 +1015,7 @@ export function detectNonReproducibleResults(
         entity_ids: { competition_id },
         message: `Stored results do not match re-tabulation. Example: dancer ${dancer_id} stored as rank ${storedRank} but recomputes as rank ${recomputedRank}`,
         blocking: true,
+        dedupe_key: `non_reproducible_results|${competition_id}`,
       }]
     }
   }
@@ -1018,7 +1062,7 @@ const score = (dancer_id: string): ScoreEntry => ({
 
 const reg = (dancer_id: string, status = 'registered'): Registration => ({
   id: dancer_id, dancer_id, competition_id: 'c1',
-  competitor_number: '100', status,
+  competitor_number: '100', status, status_reason: null,
 })
 
 describe('detectUnexplainedNoScores', () => {
@@ -1078,6 +1122,7 @@ export function detectUnexplainedNoScores(
         entity_ids: { dancer_id: reg.dancer_id, round_id, competition_id },
         message: `Dancer ${reg.dancer_id} is registered (status: ${reg.status}) but has no scores and no explanation`,
         blocking: false,
+        dedupe_key: `unexplained_no_scores|${round_id}|${reg.dancer_id}`,
       })
     }
   }
@@ -1116,7 +1161,7 @@ const score = (dancer_id: string): ScoreEntry => ({
 
 const reg = (dancer_id: string, status: string): Registration => ({
   id: dancer_id, dancer_id, competition_id: 'c1',
-  competitor_number: '100', status,
+  competitor_number: '100', status, status_reason: null,
 })
 
 describe('detectStatusScoreMismatch', () => {
@@ -1177,6 +1222,7 @@ export function detectStatusScoreMismatch(
         entity_ids: { dancer_id: reg.dancer_id, round_id, competition_id },
         message: `Dancer ${reg.dancer_id} is marked "${reg.status}" but has score entries`,
         blocking: false,
+        dedupe_key: `status_score_mismatch|${round_id}|${reg.dancer_id}`,
       })
     }
   }
@@ -1281,6 +1327,7 @@ export function detectLargeScoreSpread(
         entity_ids: { dancer_id, round_id, competition_id },
         message: `Score spread of ${spread} points across judges for dancer ${dancer_id} (threshold: ${threshold})`,
         blocking: false,
+        dedupe_key: `large_score_spread|${round_id}|${dancer_id}`,
       })
     }
   }
@@ -1379,6 +1426,7 @@ export function detectJudgeFlaggedAll(
         entity_ids: { judge_id, round_id, competition_id },
         message: `Judge ${judge_id} flagged all ${judgeScores.length} dancers in this round`,
         blocking: false,
+        dedupe_key: `judge_flagged_all|${round_id}|${judge_id}`,
       })
     }
   }
@@ -1474,6 +1522,7 @@ export function detectJudgeFlatScores(
         entity_ids: { judge_id, round_id, competition_id },
         message: `Judge ${judge_id} gave identical score (${judgeScores[0]}) to all ${judgeScores.length} dancers`,
         blocking: false,
+        dedupe_key: `judge_flat_scores|${round_id}|${judge_id}`,
       })
     }
   }
@@ -1518,8 +1567,8 @@ const cleanInput: AnomalyInput = {
     { id: '4', round_id: 'r1', competition_id: 'c1', dancer_id: 'd2', judge_id: 'j2', raw_score: 75, flagged: false, flag_reason: null },
   ],
   registrations: [
-    { id: 'r1', dancer_id: 'd1', competition_id: 'c1', competitor_number: '101', status: 'registered' },
-    { id: 'r2', dancer_id: 'd2', competition_id: 'c1', competitor_number: '102', status: 'registered' },
+    { id: 'r1', dancer_id: 'd1', competition_id: 'c1', competitor_number: '101', status: 'registered', status_reason: null },
+    { id: 'r2', dancer_id: 'd2', competition_id: 'c1', competitor_number: '102', status: 'registered', status_reason: null },
   ],
   rounds: [{ id: 'r1', competition_id: 'c1', round_number: 1, round_type: 'standard', judge_sign_offs: {} }],
   judge_ids: ['j1', 'j2'],
@@ -1577,11 +1626,13 @@ Run: `npx vitest run tests/engine/anomalies/index.test.ts`
 
 - [ ] **Step 3: Write orchestrator**
 
+**IMPORTANT: Checks are split into competition-wide (run once) and round-scoped (run per round) to avoid duplicate anomaly emissions.**
+
 ```ts
 // src/lib/engine/anomalies/index.ts
 export type { Anomaly, AnomalyType, AnomalyInput, ScoreEntry, Registration, Round, StoredResult } from './types'
 
-import { type Anomaly, type AnomalyInput } from './types'
+import { type Anomaly, type AnomalyInput, NON_ACTIVE_STATUSES } from './types'
 import { detectDuplicateScoreEntries } from './detect-duplicate-entries'
 import { detectScoresForNonRosterDancers } from './detect-non-roster-scores'
 import { detectMissingRequiredScores } from './detect-missing-scores'
@@ -1601,18 +1652,26 @@ export function detectAnomalies(input: AnomalyInput): Anomaly[] {
   const { competition_id, scores, registrations, rounds, judge_ids, results, rules, recalls } = input
   const anomalies: Anomaly[] = []
 
-  // Run checks in deterministic order per round
+  // === COMPETITION-WIDE CHECKS (run once, not per round) ===
+  anomalies.push(...detectDuplicateScoreEntries(scores, competition_id))
+  anomalies.push(...detectScoresForNonRosterDancers(scores, registrations, competition_id))
+  anomalies.push(...detectInvalidScoringReason(scores, competition_id))
+  anomalies.push(...detectNonReproducibleResults(scores, results, rounds[rounds.length - 1]?.id ?? '', competition_id))
+
+  // === ROUND-SCOPED CHECKS (run per round) ===
   for (const round of rounds) {
+    // Count active dancers for this round (exclude scratched/no_show/etc.)
+    const activeDancerCount = registrations.filter(
+      r => !NON_ACTIVE_STATUSES.includes(r.status)
+    ).length
+    const roundRecalls = recalls.filter(rc => rc.round_id === round.id)
+
     // Integrity blockers
-    anomalies.push(...detectDuplicateScoreEntries(scores, competition_id))
-    anomalies.push(...detectScoresForNonRosterDancers(scores, registrations, competition_id))
     anomalies.push(...detectMissingRequiredScores(scores, registrations, judge_ids, round.id, competition_id))
     anomalies.push(...detectIncompleteJudgePackets(scores, registrations, judge_ids, round.id, competition_id))
 
     // Rules blockers
-    anomalies.push(...detectInvalidScoringReason(scores, competition_id))
-    anomalies.push(...detectRecallMismatch(recalls, registrations.length, rules.recall_top_percent, round.id, competition_id))
-    anomalies.push(...detectNonReproducibleResults(scores, results, round.id, competition_id))
+    anomalies.push(...detectRecallMismatch(roundRecalls, activeDancerCount, rules.recall_top_percent, round.id, competition_id))
 
     // Warnings
     anomalies.push(...detectUnexplainedNoScores(scores, registrations, round.id, competition_id))
@@ -1722,6 +1781,7 @@ if (latestRound && judgesRes.data) {
       competition_id: r.competition_id,
       competitor_number: r.competitor_number,
       status: r.status,
+      status_reason: r.status_reason ?? null,
     })),
     rounds: [{ id: latestRound.id, competition_id: compId, round_number: latestRound.round_number, round_type: latestRound.round_type, judge_sign_offs: latestRound.judge_sign_offs ?? {} }],
     judge_ids: judgesRes.data.map((j: { id: string }) => j.id),

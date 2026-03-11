@@ -47,6 +47,7 @@ interface Anomaly {
   entity_ids: Record<string, string>
   message: string
   blocking: boolean
+  dedupe_key: string  // e.g. 'duplicate_score_entry|r1|j1|d1' — prevents duplicate UI rendering
 }
 ```
 
