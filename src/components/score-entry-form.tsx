@@ -9,9 +9,11 @@ interface ScoreEntryFormProps {
   dancerName: string
   competitorNumber: string
   existingScore?: number | null
+  existingFlagged?: boolean
+  existingFlagReason?: string | null
   scoreMin: number
   scoreMax: number
-  onSubmit: (dancerId: string, score: number) => Promise<void>
+  onSubmit: (dancerId: string, score: number, flagged: boolean, flagReason: string | null) => Promise<void>
   locked?: boolean
 }
 
@@ -20,6 +22,8 @@ export function ScoreEntryForm({
   dancerName,
   competitorNumber,
   existingScore,
+  existingFlagged,
+  existingFlagReason,
   scoreMin,
   scoreMax,
   onSubmit,
@@ -28,12 +32,14 @@ export function ScoreEntryForm({
   const [score, setScore] = useState(existingScore?.toString() ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [flagged, setFlagged] = useState(existingFlagged ?? false)
+  const [flagReason, setFlagReason] = useState(existingFlagReason ?? '')
 
   async function handleSave() {
     const num = parseFloat(score)
     if (isNaN(num) || num < scoreMin || num > scoreMax) return
     setSaving(true)
-    await onSubmit(dancerId, num)
+    await onSubmit(dancerId, num, flagged, flagged ? flagReason || null : null)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -44,7 +50,11 @@ export function ScoreEntryForm({
   const hasError = score !== '' && !isValid
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-md border hover:bg-feis-green-light/50 transition-colors">
+    <div className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
+      flagged
+        ? 'border-feis-orange/60 bg-feis-orange/5'
+        : 'hover:bg-feis-green-light/50'
+    }`}>
       <span className="feis-number font-mono text-2xl font-bold w-16 text-center text-feis-green">{competitorNumber}</span>
       <span className="flex-1 text-sm">{dancerName}</span>
       <div className="flex items-center gap-2">
@@ -58,6 +68,29 @@ export function ScoreEntryForm({
           className={`w-24 text-center text-lg ${hasError ? 'border-destructive' : ''}`}
           disabled={locked}
         />
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={flagged}
+            onChange={e => setFlagged(e.target.checked)}
+            disabled={locked}
+            className="accent-feis-orange"
+          />
+          <span className="text-xs text-muted-foreground">Flag</span>
+        </label>
+        {flagged && (
+          <select
+            value={flagReason}
+            onChange={e => setFlagReason(e.target.value)}
+            disabled={locked}
+            className="text-xs border rounded px-1 py-0.5"
+          >
+            <option value="">Reason...</option>
+            <option value="early_start">Early Start</option>
+            <option value="did_not_complete">Did Not Complete</option>
+            <option value="other">Other</option>
+          </select>
+        )}
         <Button
           size="sm"
           onClick={handleSave}
