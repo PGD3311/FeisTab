@@ -4,6 +4,7 @@ export interface ScoreInput {
   dancer_id: string
   judge_id: string
   raw_score: number
+  flagged?: boolean
 }
 
 export interface TabulationResult {
