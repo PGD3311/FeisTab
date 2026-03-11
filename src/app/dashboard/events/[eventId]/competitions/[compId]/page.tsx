@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
-import { tabulate, type ScoreInput, type TabulationResult } from '@/lib/engine/tabulate'
+import { tabulate, type ScoreInput } from '@/lib/engine/tabulate'
 import { generateRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
@@ -24,15 +24,17 @@ export default function CompetitionDetailPage({
   const [scores, setScores] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
+  const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [loading, setLoading] = useState(true)
 
   async function loadData() {
-    const [compRes, regRes, roundRes, scoreRes, resultRes] = await Promise.all([
+    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
       supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number'),
       supabase.from('score_entries').select('*').eq('competition_id', compId),
       supabase.from('results').select('*, dancers(*)').eq('competition_id', compId).order('final_rank'),
+      supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
     ])
 
     setComp(compRes.data)
@@ -41,6 +43,7 @@ export default function CompetitionDetailPage({
     setScores(scoreRes.data ?? [])
     setResults(resultRes.data ?? [])
     setRuleset(compRes.data?.rule_sets?.config as RuleSetConfig | null ?? null)
+    setJudges(judgesRes.data ?? [])
     setLoading(false)
   }
 
@@ -61,9 +64,10 @@ export default function CompetitionDetailPage({
         dancer_id: s.dancer_id,
         judge_id: s.judge_id,
         raw_score: Number(s.raw_score),
+        flagged: s.flagged ?? false,
       }))
 
-    const tabulationResults: TabulationResult[] = tabulate(roundScores, ruleset)
+    const tabulationResults = tabulate(roundScores, ruleset)
 
     for (const r of tabulationResults) {
       await supabase.from('results').upsert(
@@ -72,7 +76,10 @@ export default function CompetitionDetailPage({
           dancer_id: r.dancer_id,
           final_rank: r.final_rank,
           display_place: String(r.final_rank),
-          calculated_payload: r,
+          calculated_payload: {
+            total_points: r.total_points,
+            individual_ranks: r.individual_ranks,
+          },
         },
         { onConflict: 'competition_id,dancer_id' }
       )
@@ -108,7 +115,7 @@ export default function CompetitionDetailPage({
 
   async function handleGenerateRecalls() {
     if (!ruleset || !comp) return
-    if (!ruleset.recall_top_n) return
+    if (!ruleset.recall_top_percent) return
 
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'recalled_round_pending')) return
@@ -122,10 +129,11 @@ export default function CompetitionDetailPage({
         dancer_id: s.dancer_id,
         judge_id: s.judge_id,
         raw_score: Number(s.raw_score),
+        flagged: s.flagged ?? false,
       }))
 
-    const tabulationResults: TabulationResult[] = tabulate(roundScores, ruleset)
-    const recalled: TabulationResult[] = generateRecalls(tabulationResults, ruleset.recall_top_n)
+    const tabulationResults = tabulate(roundScores, ruleset)
+    const recalled = generateRecalls(tabulationResults, ruleset.recall_top_percent)
 
     for (const r of recalled) {
       await supabase.from('recalls').upsert(
@@ -154,6 +162,10 @@ export default function CompetitionDetailPage({
     loadData()
   }
 
+  const latestRound = rounds[rounds.length - 1]
+  const allSignedOff = latestRound && judges.length > 0 &&
+    judges.every(j => latestRound.judge_sign_offs?.[j.id])
+
   if (loading) return <p className="text-muted-foreground">Loading...</p>
   if (!comp) return <p>Competition not found.</p>
 
@@ -164,7 +176,23 @@ export default function CompetitionDetailPage({
           <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
           <p className="text-sm text-muted-foreground">{comp.age_group} · {comp.level}</p>
         </div>
-        <CompetitionStatusBadge status={comp.status} />
+        <div className="flex items-center gap-2">
+          <CompetitionStatusBadge status={comp.status} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const newValue = !comp.numbers_released
+              await supabase
+                .from('competitions')
+                .update({ numbers_released: newValue })
+                .eq('id', compId)
+              loadData()
+            }}
+          >
+            {comp.numbers_released ? '✓ Numbers Released' : 'Release Numbers'}
+          </Button>
+        </div>
       </div>
 
       {/* Roster */}
@@ -209,6 +237,16 @@ export default function CompetitionDetailPage({
                     {roundScores.length} score entries
                   </span>
                 </div>
+                <div className="flex gap-1 flex-wrap mt-1">
+                  {judges.map(j => {
+                    const signedOff = round.judge_sign_offs?.[j.id]
+                    return (
+                      <span key={j.id} className={`text-xs px-2 py-0.5 rounded ${signedOff ? 'bg-feis-green-light text-feis-green' : 'bg-gray-100 text-gray-500'}`}>
+                        {j.first_name}: {signedOff ? 'Signed off' : 'Pending'}
+                      </span>
+                    )
+                  })}
+                </div>
               </div>
             )
           })}
@@ -221,12 +259,12 @@ export default function CompetitionDetailPage({
           <CardTitle className="text-lg">Actions</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-2 flex-wrap">
-          <Button onClick={handleTabulate} variant="default">
-            Run Tabulation
+          <Button onClick={handleTabulate} variant="default" disabled={!allSignedOff}>
+            {allSignedOff ? 'Run Tabulation' : 'Waiting for judge sign-offs...'}
           </Button>
-          {ruleset && ruleset.recall_top_n > 0 && (
+          {ruleset && ruleset.recall_top_percent > 0 && (
             <Button onClick={handleGenerateRecalls} variant="outline">
-              Generate Recalls (Top {ruleset.recall_top_n})
+              Generate Recalls (Top {ruleset.recall_top_percent}%)
             </Button>
           )}
           {results.length > 0 && comp.status !== 'published' && (
@@ -250,7 +288,7 @@ export default function CompetitionDetailPage({
                   <tr>
                     <th className="px-4 py-2 text-left">Place</th>
                     <th className="px-4 py-2 text-left">Dancer</th>
-                    <th className="px-4 py-2 text-right">Score</th>
+                    <th className="px-4 py-2 text-right">Points</th>
                   </tr>
                 </thead>
                 <tbody className="feis-tbody">
@@ -261,7 +299,7 @@ export default function CompetitionDetailPage({
                         {r.dancers?.first_name} {r.dancers?.last_name}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {r.calculated_payload?.average_score?.toFixed(1)}
+                        {r.calculated_payload?.total_points ?? '—'}
                       </td>
                     </tr>
                   ))}
