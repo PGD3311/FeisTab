@@ -1,69 +1,90 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-export default function JudgeEntryPage({
+interface JudgeSession {
+  judge_id: string
+  event_id: string
+  name: string
+}
+
+export default function JudgeScoringPage({
   params,
 }: {
   params: Promise<{ eventId: string; compId: string }>
 }) {
   const { eventId, compId } = use(params)
   const supabase = useSupabase()
+  const router = useRouter()
+  const [session, setSession] = useState<JudgeSession | null>(null)
   const [comp, setComp] = useState<any>(null)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [round, setRound] = useState<any>(null)
   const [scores, setScores] = useState<any[]>([])
-  const [judgeId, setJudgeId] = useState<string | null>(null)
-  const [judges, setJudges] = useState<any[]>([])
   const [ruleConfig, setRuleConfig] = useState<any>(null)
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  async function loadData(selectedJudgeId?: string) {
-    const [compRes, regRes, roundRes, judgesRes] = await Promise.all([
+  useEffect(() => {
+    const stored = localStorage.getItem('judge_session')
+    if (!stored) {
+      router.push('/judge')
+      return
+    }
+    const parsed: JudgeSession = JSON.parse(stored)
+    if (parsed.event_id !== eventId) {
+      router.push('/judge')
+      return
+    }
+    setSession(parsed)
+    loadData(parsed.judge_id)
+  }, [])
+
+  async function loadData(judgeId: string) {
+    const [compRes, regRes, roundRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
-      supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId),
+      supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId).order('competitor_number'),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number', { ascending: false }).limit(1).single(),
-      supabase.from('judges').select('*').eq('event_id', eventId),
     ])
 
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
     setRound(roundRes.data)
     setRuleConfig(compRes.data?.rule_sets?.config)
-    setJudges(judgesRes.data ?? [])
 
-    // Use selected judge or first available
-    const jId = selectedJudgeId || judgeId || judgesRes.data?.[0]?.id
-    if (jId && roundRes.data) {
-      setJudgeId(jId)
+    if (roundRes.data) {
+      // Check if this judge already signed off
+      if (roundRes.data.judge_sign_offs?.[judgeId]) {
+        setSubmitted(true)
+      }
+
       const { data: existingScores } = await supabase
         .from('score_entries')
         .select('*')
         .eq('round_id', roundRes.data.id)
-        .eq('judge_id', jId)
+        .eq('judge_id', judgeId)
       setScores(existingScores ?? [])
     }
 
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
-
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
-    if (!judgeId || !round) return
+    if (!session || !round) return
 
     await supabase.from('score_entries').upsert(
       {
         round_id: round.id,
         competition_id: compId,
         dancer_id: dancerId,
-        judge_id: judgeId,
+        judge_id: session.judge_id,
         raw_score: score,
         flagged,
         flag_reason: flagReason,
@@ -71,31 +92,31 @@ export default function JudgeEntryPage({
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
 
-    loadData()
+    loadData(session.judge_id)
   }
 
   async function handleSignOff() {
-    if (!judgeId || !round) return
+    if (!session || !round) return
 
     // Lock all scores for this judge/round
     await supabase
       .from('score_entries')
       .update({ locked_at: new Date().toISOString() })
       .eq('round_id', round.id)
-      .eq('judge_id', judgeId)
+      .eq('judge_id', session.judge_id)
 
     // Record sign-off in round's judge_sign_offs jsonb
     const currentSignOffs = round.judge_sign_offs || {}
     const updatedSignOffs = {
       ...currentSignOffs,
-      [judgeId]: new Date().toISOString(),
+      [session.judge_id]: new Date().toISOString(),
     }
     await supabase
       .from('rounds')
       .update({ judge_sign_offs: updatedSignOffs })
       .eq('id', round.id)
 
-    // Check if all judges have now signed off — if so, advance competition to ready_to_tabulate
+    // Check if all judges have now signed off
     const { data: allJudges } = await supabase
       .from('judges')
       .select('id')
@@ -129,7 +150,13 @@ export default function JudgeEntryPage({
   const totalDancers = registrations.length
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div>
+      <div className="mb-4">
+        <Link href={`/judge/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
+          &larr; Back to competitions
+        </Link>
+      </div>
+
       <Card className="feis-card feis-accent-left mb-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-2xl">{comp.code && `${comp.code} — `}{comp.name}</CardTitle>
@@ -137,20 +164,9 @@ export default function JudgeEntryPage({
             <span>Round {round?.round_number}</span>
             <Badge variant="outline">{scoredCount}/{totalDancers} scored</Badge>
           </div>
-          {/* Judge selector — prototype only, replace with auth later */}
-          {judges.length > 0 && (
-            <div className="flex gap-2 mt-2">
-              {judges.map(j => (
-                <button
-                  key={j.id}
-                  onClick={() => { setJudgeId(j.id); loadData(j.id) }}
-                  className={`px-2 py-1 text-xs rounded border ${judgeId === j.id ? 'bg-feis-green text-white' : ''}`}
-                >
-                  {j.first_name} {j.last_name}
-                </button>
-              ))}
-            </div>
-          )}
+          <p className="text-sm text-muted-foreground mt-1">
+            Scoring as <span className="font-medium text-feis-green">{session?.name}</span>
+          </p>
         </CardHeader>
       </Card>
 
@@ -161,6 +177,9 @@ export default function JudgeEntryPage({
             <p className="text-sm text-muted-foreground mt-2">
               Contact the tabulator if you need to make changes.
             </p>
+            <Link href={`/judge/${eventId}`}>
+              <Button variant="outline" className="mt-4">Back to Competitions</Button>
+            </Link>
           </CardContent>
         </Card>
       ) : (

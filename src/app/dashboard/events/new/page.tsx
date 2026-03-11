@@ -15,6 +15,7 @@ export default function NewEventPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [location, setLocation] = useState('')
+  const [registrationCode, setRegistrationCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function NewEventPage() {
         start_date: startDate,
         end_date: endDate || null,
         location: location || null,
+        registration_code: registrationCode.toUpperCase() || null,
         created_by: user?.id,
       })
       .select()
@@ -67,9 +69,15 @@ export default function NewEventPage() {
                 <Input id="end" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
-            <div>
-              <Label htmlFor="location" className="font-medium text-sm text-feis-charcoal">Location</Label>
-              <Input id="location" value={location} onChange={e => setLocation(e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="location" className="font-medium text-sm text-feis-charcoal">Location</Label>
+                <Input id="location" value={location} onChange={e => setLocation(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="regCode" className="font-medium text-sm text-feis-charcoal">Registration Code</Label>
+                <Input id="regCode" value={registrationCode} onChange={e => setRegistrationCode(e.target.value.toUpperCase())} placeholder="e.g. SPRING26" className="font-mono tracking-widest" />
+              </div>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-2">

@@ -1,9 +1,9 @@
-INSERT INTO events (id, name, start_date, end_date, location, status) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'Spring Feis 2026', '2026-03-15', '2026-03-15', 'Boston Convention Center', 'active');
+INSERT INTO events (id, name, start_date, end_date, location, status, registration_code) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Spring Feis 2026', '2026-03-15', '2026-03-15', 'Boston Convention Center', 'active', 'SPRING26');
 
-INSERT INTO judges (id, event_id, first_name, last_name) VALUES
-  ('aaaa1111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Siobhan', 'Murphy'),
-  ('aaaa2222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Padraig', 'O''Brien');
+INSERT INTO judges (id, event_id, first_name, last_name, access_code) VALUES
+  ('aaaa1111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Siobhan', 'Murphy', 'MURPHY-1234'),
+  ('aaaa2222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Padraig', 'O''Brien', 'OBRIEN-5678');
 
 INSERT INTO dancers (id, first_name, last_name, school_name) VALUES
   ('dddd1111-1111-1111-1111-111111111111', 'Aoife', 'Kelly', 'Scoil Rince Ni Bhriain'),

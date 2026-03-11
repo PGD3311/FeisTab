@@ -11,15 +11,7 @@ ALTER TABLE rounds ADD COLUMN IF NOT EXISTS judge_sign_offs jsonb NOT NULL DEFAU
 
 -- Update default rule_set config
 UPDATE rule_sets
-SET config = '{
-  "score_min": 0,
-  "score_max": 100,
-  "scoring_method": "irish_points",
-  "tie_breaker": "countback",
-  "recall_top_percent": 50,
-  "drop_high": false,
-  "drop_low": false
-}'::jsonb,
+SET config = '{"score_min":0,"score_max":100,"scoring_method":"irish_points","tie_breaker":"countback","recall_top_percent":50,"drop_high":false,"drop_low":false}'::jsonb,
 scoring_method = 'irish_points'
 WHERE name = 'Default - Raw Score Average';
 
