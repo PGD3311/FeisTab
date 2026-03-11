@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { tabulate, type ScoreInput } from '@/lib/engine/tabulate'
 import { generateRecalls } from '@/lib/engine/recalls'
@@ -213,6 +215,9 @@ export default function CompetitionDetailPage({
 
   return (
     <div className="space-y-6">
+      <Link href={`/dashboard/events/${eventId}/competitions`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1">
+        <ChevronLeft className="h-4 w-4" /> Competitions
+      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>

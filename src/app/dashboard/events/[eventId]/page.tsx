@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
   return (
     <div>
+      <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
+        <ChevronLeft className="h-4 w-4" /> Events
+      </Link>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">{event.name}</h1>

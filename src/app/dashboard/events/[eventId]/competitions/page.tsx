@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 
@@ -32,6 +33,9 @@ export default async function CompetitionsPage({ params }: { params: Promise<{ e
 
   return (
     <div>
+      <Link href={`/dashboard/events/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
+        <ChevronLeft className="h-4 w-4" /> Event
+      </Link>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Competition Control</h1>

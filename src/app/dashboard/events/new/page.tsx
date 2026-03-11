@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,6 +53,9 @@ export default function NewEventPage() {
 
   return (
     <div className="max-w-xl">
+      <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
+        <ChevronLeft className="h-4 w-4" /> Events
+      </Link>
       <h1 className="text-3xl font-bold mb-6">Create Event</h1>
       <Card className="feis-card">
         <CardContent className="pt-6">

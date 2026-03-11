@@ -2,6 +2,8 @@
 
 import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { parseRegistrationCSV, type ImportRow, type ImportResult } from '@/lib/csv/import'
 import { CSVPreviewTable } from '@/components/csv-preview-table'
@@ -165,6 +167,9 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
 
   return (
     <div>
+      <Link href={`/dashboard/events/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
+        <ChevronLeft className="h-4 w-4" /> Event
+      </Link>
       <h1 className="text-3xl font-bold mb-6">Import Registrations</h1>
 
       <Card className="feis-card mb-6">
