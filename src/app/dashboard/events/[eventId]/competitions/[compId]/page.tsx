@@ -5,6 +5,8 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { tabulate, type ScoreInput } from '@/lib/engine/tabulate'
 import { generateRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
+import { detectAnomalies, type Anomaly, type AnomalyInput } from '@/lib/engine/anomalies'
+import { DEFAULT_RULES } from '@/lib/engine/rules'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +28,7 @@ export default function CompetitionDetailPage({
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
   const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -44,6 +47,44 @@ export default function CompetitionDetailPage({
     setResults(resultRes.data ?? [])
     setRuleset(compRes.data?.rule_sets?.config as RuleSetConfig | null ?? null)
     setJudges(judgesRes.data ?? [])
+
+    const latestRound = roundRes.data?.[roundRes.data.length - 1]
+    if (latestRound && judgesRes.data) {
+      const anomalyInput: AnomalyInput = {
+        competition_id: compId,
+        scores: (scoreRes.data ?? []).map(s => ({
+          id: s.id,
+          round_id: s.round_id,
+          competition_id: s.competition_id,
+          dancer_id: s.dancer_id,
+          judge_id: s.judge_id,
+          raw_score: Number(s.raw_score),
+          flagged: s.flagged ?? false,
+          flag_reason: s.flag_reason ?? null,
+        })),
+        registrations: (regRes.data ?? []).map(r => ({
+          id: r.id,
+          dancer_id: r.dancer_id,
+          competition_id: r.competition_id,
+          competitor_number: r.competitor_number,
+          status: r.status,
+          status_reason: r.status_reason ?? null,
+        })),
+        rounds: [{ id: latestRound.id, competition_id: compId, round_number: latestRound.round_number, round_type: latestRound.round_type, judge_sign_offs: latestRound.judge_sign_offs ?? {} }],
+        judge_ids: judgesRes.data.map((j: { id: string }) => j.id),
+        results: (resultRes.data ?? []).map(r => ({
+          dancer_id: r.dancer_id,
+          final_rank: r.final_rank,
+          calculated_payload: r.calculated_payload ?? { total_points: 0, individual_ranks: [] },
+        })),
+        rules: compRes.data?.rule_sets?.config as RuleSetConfig ?? DEFAULT_RULES,
+        recalls: [],
+      }
+      setAnomalies(detectAnomalies(anomalyInput))
+    } else {
+      setAnomalies([])
+    }
+
     setLoading(false)
   }
 
@@ -254,14 +295,69 @@ export default function CompetitionDetailPage({
         </CardContent>
       </Card>
 
+      {/* Anomaly Checks */}
+      {anomalies.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Pre-Tabulation Checks ({anomalies.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {anomalies.filter(a => a.blocking).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-destructive">Blockers — must resolve before tabulation</p>
+                {anomalies.filter(a => a.blocking).map((a, i) => (
+                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-red-50 border border-red-200 text-red-800">
+                    {a.message}
+                  </div>
+                ))}
+              </div>
+            )}
+            {anomalies.filter(a => a.severity === 'warning').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-feis-orange">Warnings — review recommended</p>
+                {anomalies.filter(a => a.severity === 'warning').map((a, i) => (
+                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-orange-50 border border-orange-200 text-orange-800">
+                    {a.message}
+                  </div>
+                ))}
+              </div>
+            )}
+            {anomalies.filter(a => a.severity === 'info').length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground font-medium">
+                  Review signals ({anomalies.filter(a => a.severity === 'info').length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {anomalies.filter(a => a.severity === 'info').map((a, i) => (
+                    <div key={a.dedupe_key} className="p-2 rounded bg-muted text-muted-foreground">
+                      {a.message}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Actions */}
       <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">Actions</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-2 flex-wrap">
-          <Button onClick={handleTabulate} variant="default" disabled={!allSignedOff}>
-            {allSignedOff ? 'Run Tabulation' : 'Waiting for judge sign-offs...'}
+          <Button
+            onClick={handleTabulate}
+            variant="default"
+            disabled={!allSignedOff || anomalies.some(a => a.blocking)}
+          >
+            {anomalies.some(a => a.blocking)
+              ? 'Resolve blockers before tabulation'
+              : !allSignedOff
+                ? 'Waiting for judge sign-offs...'
+                : 'Run Tabulation'}
           </Button>
           {ruleset && ruleset.recall_top_percent > 0 && (
             <Button onClick={handleGenerateRecalls} variant="outline">
