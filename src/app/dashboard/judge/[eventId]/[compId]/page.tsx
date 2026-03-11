@@ -55,7 +55,7 @@ export default function JudgeEntryPage({
 
   useEffect(() => { loadData() }, [])
 
-  async function handleScoreSubmit(dancerId: string, score: number) {
+  async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
     if (!judgeId || !round) return
 
     await supabase.from('score_entries').upsert(
@@ -65,6 +65,8 @@ export default function JudgeEntryPage({
         dancer_id: dancerId,
         judge_id: judgeId,
         raw_score: score,
+        flagged,
+        flag_reason: flagReason,
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
@@ -72,14 +74,48 @@ export default function JudgeEntryPage({
     loadData()
   }
 
-  async function handleFinalSubmit() {
+  async function handleSignOff() {
     if (!judgeId || !round) return
 
+    // Lock all scores for this judge/round
     await supabase
       .from('score_entries')
       .update({ locked_at: new Date().toISOString() })
       .eq('round_id', round.id)
       .eq('judge_id', judgeId)
+
+    // Record sign-off in round's judge_sign_offs jsonb
+    const currentSignOffs = round.judge_sign_offs || {}
+    const updatedSignOffs = {
+      ...currentSignOffs,
+      [judgeId]: new Date().toISOString(),
+    }
+    await supabase
+      .from('rounds')
+      .update({ judge_sign_offs: updatedSignOffs })
+      .eq('id', round.id)
+
+    // Check if all judges have now signed off — if so, advance competition to ready_to_tabulate
+    const { data: allJudges } = await supabase
+      .from('judges')
+      .select('id')
+      .eq('event_id', eventId)
+    const allJudgeIds = allJudges?.map(j => j.id) ?? []
+    const allDone = allJudgeIds.length > 0 && allJudgeIds.every(id => updatedSignOffs[id])
+
+    if (allDone) {
+      const { data: currentComp } = await supabase
+        .from('competitions')
+        .select('status')
+        .eq('id', compId)
+        .single()
+      if (currentComp?.status === 'awaiting_scores') {
+        await supabase
+          .from('competitions')
+          .update({ status: 'ready_to_tabulate' })
+          .eq('id', compId)
+      }
+    }
 
     setSubmitted(true)
   }
@@ -121,7 +157,7 @@ export default function JudgeEntryPage({
       {submitted ? (
         <Card className="feis-card">
           <CardContent className="py-12 text-center">
-            <p className="text-lg font-medium text-feis-green">Scores submitted and locked.</p>
+            <p className="text-lg font-medium text-feis-green">Round signed off. Scores locked.</p>
             <p className="text-sm text-muted-foreground mt-2">
               Contact the tabulator if you need to make changes.
             </p>
@@ -139,6 +175,8 @@ export default function JudgeEntryPage({
                   dancerName={`${reg.dancers?.first_name} ${reg.dancers?.last_name}`}
                   competitorNumber={reg.competitor_number}
                   existingScore={existing?.raw_score}
+                  existingFlagged={existing?.flagged ?? false}
+                  existingFlagReason={existing?.flag_reason}
                   scoreMin={scoreMin}
                   scoreMax={scoreMax}
                   onSubmit={handleScoreSubmit}
@@ -149,14 +187,14 @@ export default function JudgeEntryPage({
           </div>
 
           <Button
-            onClick={handleFinalSubmit}
+            onClick={handleSignOff}
             disabled={scoredCount < totalDancers}
             className="w-full text-lg font-semibold"
             size="lg"
           >
             {scoredCount < totalDancers
-              ? `Score all dancers to submit (${scoredCount}/${totalDancers})`
-              : 'Submit All Scores'}
+              ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
+              : 'Sign Off Round'}
           </Button>
         </>
       )}
