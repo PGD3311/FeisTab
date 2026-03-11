@@ -218,20 +218,36 @@ git commit -m "feat: add EventTabs segmented control component"
 ### Task 4: Create EventContextCards component
 
 **Files:**
+- Modify: `src/lib/competition-states.ts`
 - Create: `src/components/event-context-cards.tsx`
 
-The context cards component receives competition data and computes the 4 metrics. Uses the status-based heuristic for the "Blocked" count per the spec.
+The context cards component receives competition data and computes the 4 metrics. Status groupings are centralized in `competition-states.ts` so they stay co-located with the status definitions.
 
-- [ ] **Step 1: Create the component**
+- [ ] **Step 1: Add status grouping helpers to `competition-states.ts`**
+
+Append to the end of `src/lib/competition-states.ts`:
+
+```ts
+/** Statuses where a competition is actively being worked on */
+export const ACTIVE_STATUSES: CompetitionStatus[] = [
+  'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'recalled_round_pending',
+]
+
+/** Statuses where operator action is needed to unblock progress */
+export const BLOCKED_STATUSES: CompetitionStatus[] = [
+  'ready_to_tabulate', 'recalled_round_pending',
+]
+```
+
+- [ ] **Step 2: Create the component**
 
 ```tsx
 'use client'
 
-const ACTIVE_STATUSES = ['in_progress', 'awaiting_scores', 'ready_to_tabulate', 'recalled_round_pending']
-const BLOCKED_STATUSES = ['ready_to_tabulate', 'recalled_round_pending']
+import { type CompetitionStatus, ACTIVE_STATUSES, BLOCKED_STATUSES } from '@/lib/competition-states'
 
 interface Competition {
-  status: string
+  status: CompetitionStatus
 }
 
 interface EventContextCardsProps {
@@ -276,8 +292,8 @@ Expected: Build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/components/event-context-cards.tsx
-git commit -m "feat: add EventContextCards component with status metrics"
+git add src/lib/competition-states.ts src/components/event-context-cards.tsx
+git commit -m "feat: add EventContextCards with centralized status groupings"
 ```
 
 ---
@@ -336,7 +352,7 @@ export default function EventLayout({
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData() }, [eventId])
 
   if (loading) {
     return <p className="text-muted-foreground">Loading...</p>
