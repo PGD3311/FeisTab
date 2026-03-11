@@ -79,6 +79,7 @@ export default function CompetitionDetailPage({
           calculated_payload: {
             total_points: r.total_points,
             individual_ranks: r.individual_ranks,
+            rules_snapshot: ruleset,
           },
         },
         { onConflict: 'competition_id,dancer_id' }
