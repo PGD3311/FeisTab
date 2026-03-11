@@ -21,9 +21,14 @@ No screen should allow manually entering a placement. If you need results, run t
 All competition status changes MUST go through `canTransition()` in `src/lib/competition-states.ts`.
 Never update `competitions.status` directly without checking the transition is valid.
 
-### Integer math for scores
-The tabulation engine uses integer arithmetic (multiply by 1000) to avoid floating point comparison bugs.
-Never compare score averages with `===` or `!==` on raw floats. Use the integer representations.
+### Irish Points scoring is the standard
+The tabulation engine converts raw scores to ranks per judge, then to Irish Points
+via the standard lookup table (1st=100, 2nd=75, 3rd=65... 50th=1).
+Tied ranks get averaged points. All comparisons use integer math (×1000).
+
+### Judge sign-off before tabulation
+Tabulation cannot run until all judges have signed off their scores for the round.
+Sign-offs are stored in `rounds.judge_sign_offs` as a JSON map of judge_id → timestamp.
 
 ### Supabase client usage
 - **Server components / route handlers:** use `createClient()` from `src/lib/supabase/server.ts`
