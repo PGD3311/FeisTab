@@ -1,4 +1,5 @@
 import { type RuleSetConfig } from './rules'
+import { rankByJudge } from './rank-judges'
 
 export interface ScoreInput {
   dancer_id: string
@@ -10,97 +11,115 @@ export interface ScoreInput {
 export interface TabulationResult {
   dancer_id: string
   final_rank: number
-  average_score: number
-  individual_scores: number[]
-  highest_individual: number
+  total_points: number
+  individual_ranks: { judge_id: string; rank: number; irish_points: number }[]
 }
 
-// Precision multiplier — all math done in integer thousandths
+// Precision multiplier for integer comparisons
 const PRECISION = 1000
 
-function toInt(n: number): number {
-  return Math.round(n * PRECISION)
-}
-
-function fromInt(n: number): number {
-  return n / PRECISION
-}
-
+/**
+ * Tabulate competition results using Irish Points.
+ *
+ * Pipeline:
+ * 1. Each judge's raw scores → rank dancers → convert to Irish Points
+ * 2. Sum Irish Points across all judges per dancer
+ * 3. Rank by total; break ties via countback (most 1st places, then 2nd, etc.)
+ */
 export function tabulate(
   scores: ScoreInput[],
   rules: RuleSetConfig
 ): TabulationResult[] {
   if (scores.length === 0) return []
 
-  // Group scores by dancer
-  const byDancer = new Map<string, number[]>()
-  for (const s of scores) {
-    if (!byDancer.has(s.dancer_id)) byDancer.set(s.dancer_id, [])
-    byDancer.get(s.dancer_id)!.push(s.raw_score)
+  // Step 1: Get per-judge rankings with Irish Points
+  const judgeRankings = rankByJudge(scores)
+
+  // Step 2: Aggregate per dancer
+  const dancerMap = new Map<string, {
+    total: number
+    ranks: { judge_id: string; rank: number; irish_points: number }[]
+  }>()
+
+  for (const [judgeId, rankings] of judgeRankings) {
+    for (const r of rankings) {
+      if (!dancerMap.has(r.dancer_id)) {
+        dancerMap.set(r.dancer_id, { total: 0, ranks: [] })
+      }
+      const entry = dancerMap.get(r.dancer_id)!
+      entry.total += r.irish_points
+      entry.ranks.push({
+        judge_id: judgeId,
+        rank: r.rank,
+        irish_points: r.irish_points,
+      })
+    }
   }
 
-  // Calculate aggregates using integer math
-  const aggregated: { result: TabulationResult; intAvg: number; intHighest: number }[] = []
-  for (const [dancer_id, rawScores] of byDancer) {
-    let sorted = [...rawScores].sort((a, b) => a - b)
-
-    // Drop high and low simultaneously — only if enough scores remain
-    const dropCount = (rules.drop_low ? 1 : 0) + (rules.drop_high ? 1 : 0)
-    if (dropCount > 0 && sorted.length > dropCount) {
-      if (rules.drop_low) sorted = sorted.slice(1)
-      if (rules.drop_high) sorted = sorted.slice(0, -1)
-    }
-
-    // Integer arithmetic for aggregate
-    const intScores = sorted.map(toInt)
-    const intSum = intScores.reduce((a, b) => a + b, 0)
-    const intAvg = rules.aggregation === 'sum'
-      ? intSum
-      : Math.round(intSum / sorted.length)
-
-    const intHighest = toInt(Math.max(...sorted))
-
+  // Build result array
+  const aggregated: { result: TabulationResult; intTotal: number }[] = []
+  for (const [dancer_id, data] of dancerMap) {
     aggregated.push({
       result: {
         dancer_id,
         final_rank: 0,
-        average_score: fromInt(intAvg),
-        individual_scores: rawScores,
-        highest_individual: Math.max(...sorted),
+        total_points: data.total,
+        individual_ranks: data.ranks,
       },
-      intAvg,
-      intHighest,
+      intTotal: Math.round(data.total * PRECISION),
     })
   }
 
-  // Tie-breaker is only applied when no drop rules are active.
-  // When drops are in effect, a tied average is a true tie regardless of individual scores.
-  const dropRulesActive = rules.drop_high || rules.drop_low
-
-  // Sort: highest average first, then tie-break (all comparisons on integers)
+  // Step 3: Sort by total (descending), then countback tie-breaker
   aggregated.sort((a, b) => {
-    if (b.intAvg !== a.intAvg) return b.intAvg - a.intAvg
-    if (!dropRulesActive && rules.tie_breaker === 'highest_individual') {
-      return b.intHighest - a.intHighest
+    if (b.intTotal !== a.intTotal) return b.intTotal - a.intTotal
+
+    if (rules.tie_breaker === 'countback') {
+      return resolveCountback(a.result, b.result)
     }
+
     return 0
   })
 
-  // Assign ranks (tied dancers get same rank)
+  // Assign ranks (tied dancers share rank)
   for (let i = 0; i < aggregated.length; i++) {
     if (i === 0) {
       aggregated[i].result.final_rank = 1
     } else {
       const prev = aggregated[i - 1]
       const curr = aggregated[i]
-      const tied =
-        curr.intAvg === prev.intAvg &&
-        (dropRulesActive ||
-          rules.tie_breaker !== 'highest_individual' ||
-          curr.intHighest === prev.intHighest)
-      aggregated[i].result.final_rank = tied ? prev.result.final_rank : i + 1
+
+      let tied = curr.intTotal === prev.intTotal
+      if (tied && rules.tie_breaker === 'countback') {
+        tied = resolveCountback(prev.result, curr.result) === 0
+      }
+
+      aggregated[i].result.final_rank = tied
+        ? prev.result.final_rank
+        : i + 1
     }
   }
 
   return aggregated.map(a => a.result)
+}
+
+/**
+ * Countback tie-breaker: compare dancers by number of 1st-place ranks,
+ * then 2nd-place ranks, etc. Returns negative if a wins, positive if b wins,
+ * 0 if still tied. Exported for direct testing.
+ */
+export function resolveCountback(a: TabulationResult, b: TabulationResult): number {
+  const maxRank = Math.max(
+    ...a.individual_ranks.map(r => r.rank),
+    ...b.individual_ranks.map(r => r.rank),
+    0
+  )
+
+  for (let rank = 1; rank <= maxRank; rank++) {
+    const aCount = a.individual_ranks.filter(r => r.rank === rank).length
+    const bCount = b.individual_ranks.filter(r => r.rank === rank).length
+    if (bCount !== aCount) return bCount - aCount
+  }
+
+  return 0
 }
