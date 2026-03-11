@@ -25,12 +25,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     .eq('event_id', eventId)
     .order('code')
 
-  const { data: stages } = await supabase
-    .from('stages')
-    .select('*')
-    .eq('event_id', eventId)
-    .order('display_order')
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -45,17 +39,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
         </Badge>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <Card className="feis-card">
           <CardContent className="pt-4 pb-4">
             <p className="feis-stat">{competitions?.length ?? 0}</p>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Competitions</p>
-          </CardContent>
-        </Card>
-        <Card className="feis-card">
-          <CardContent className="pt-4 pb-4">
-            <p className="feis-stat">{stages?.length ?? 0}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stages</p>
           </CardContent>
         </Card>
         <Card className="feis-card">
@@ -78,13 +66,13 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
       <div className="flex gap-3 mb-6">
         <Link href={`/dashboard/events/${eventId}/import`}>
-          <Button variant="default">Import Registrations</Button>
+          <Button variant="default">Import CSV</Button>
         </Link>
         <Link href={`/dashboard/events/${eventId}/competitions`}>
           <Button variant="outline">Competition Control</Button>
         </Link>
-        <Link href={`/dashboard/events/${eventId}/stages`}>
-          <Button variant="outline">Stage Manager</Button>
+        <Link href={`/dashboard/events/${eventId}/judges`}>
+          <Button variant="outline">Manage Judges</Button>
         </Link>
         <Link href={`/dashboard/events/${eventId}/results`}>
           <Button variant="outline">Results</Button>
