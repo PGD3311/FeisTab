@@ -1,7 +1,7 @@
 interface ResultRow {
   final_rank: number
   dancers: { first_name: string; last_name: string } | null
-  calculated_payload: { average_score?: number } | null
+  calculated_payload: { total_points?: number } | null
 }
 
 export function ResultsTable({ results }: { results: ResultRow[] }) {
@@ -12,7 +12,7 @@ export function ResultsTable({ results }: { results: ResultRow[] }) {
           <tr>
             <th className="px-4 py-2 text-left w-16">Place</th>
             <th className="px-4 py-2 text-left">Dancer</th>
-            <th className="px-4 py-2 text-right">Score</th>
+            <th className="px-4 py-2 text-right">Points</th>
           </tr>
         </thead>
         <tbody className="feis-tbody">
@@ -23,7 +23,7 @@ export function ResultsTable({ results }: { results: ResultRow[] }) {
                 {r.dancers?.first_name} {r.dancers?.last_name}
               </td>
               <td className="px-4 py-2 text-right">
-                {r.calculated_payload?.average_score?.toFixed(1) ?? '—'}
+                {r.calculated_payload?.total_points ?? '—'}
               </td>
             </tr>
           ))}

@@ -34,7 +34,7 @@ export default async function PublicResultsPage({
 
   interface NormalizedResult {
     final_rank: number
-    calculated_payload: { average_score?: number } | null
+    calculated_payload: { total_points?: number } | null
     published_at: string | null
     dancers: { first_name: string; last_name: string } | null
   }
