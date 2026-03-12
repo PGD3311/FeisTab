@@ -45,7 +45,7 @@ Toasts are supplemental feedback. They do not replace inline persistent UI for l
 
 **File:** `src/lib/feedback.ts`
 
-Pure utility. No React imports. No Supabase imports. Follows engine code purity rules.
+Thin wrapper over sonner's `toast()` function. No React imports. No Supabase imports.
 
 ### API
 
@@ -130,6 +130,8 @@ Every action path gets a toast. Existing inline error states (`actionError`, `ad
 | Unlock for correction | `showSuccess('Unlocked for correction')` | `showCritical(...)` | Critical — invalidates downstream trust state | Remove from `actionError` |
 | Release numbers | `showSuccess('Numbers released')` / `showSuccess('Numbers hidden')` | `showError('Failed to release numbers')` / `showError('Failed to hide numbers')` | Error — clear state | Remove from `actionError` |
 | Registration status | `showSuccess('Dancer status updated')` | `showError('Failed to update status')` | Error — retryable | Remove from `actionError` |
+| Preview tabulation | No toast (UI-only state change — sets `previewResults`) | No toast (silently returns if prerequisites missing) | N/A | No change |
+| Cancel preview | No toast (clears `previewResults`) | N/A | N/A | No change |
 
 **Net effect:** Both `actionError` and `advanceError` state variables are removed. All action feedback moves to toasts. Page gets simpler. Roster row refresh after registration status change is the real persistent confirmation (already happens via `loadData()`).
 
@@ -140,7 +142,7 @@ Every action path gets a toast. Existing inline error states (`actionError`, `ad
 | Action | Success | Failure | Tier | Inline Change |
 |--------|---------|---------|------|---------------|
 | Score save | No toast (ScoreEntryForm checkmark sufficient) | `showError('Score save failed')` + row "Retry" | Error | Remove `setError` from save path |
-| Sign-off | `showSuccess('Scores signed off for {judge}')` | `showCritical('Sign-off failed')` | Critical — workflow milestone | Keep green "Signed off" card |
+| Sign-off | `showSuccess('Scores signed off for {judge}')` | `showCritical('Sign-off failed')` | Critical — workflow milestone | Keep green "Signed off" card. Replace `setError` on sign-off path with toast. Page-level `error` state and banner remain for load failures only. |
 
 ### Judge Page (`judge/[eventId]/[compId]/page.tsx`)
 
@@ -196,11 +198,17 @@ Silent `console.error` for registrations and scores. Judge sees empty competitio
 
 With a **Retry button** that re-runs `loadData()`. Large touch targets (this is phone territory). This is not a subtle muted message — it's an operational blocker.
 
+### Results Page
+
+`loadData()` has no `.error` check. On failure, page shows "No competitions with results yet" which is misleading — it looks like there are no results when the load actually failed.
+
+**Fix:** Check `error` on the Supabase response. If truthy, show inline message: "Could not load results. Try refreshing." Distinguish between "no results exist" (valid empty state) and "load failed" (error state).
+
 ### Event Layout
 
 Silent failure for competition list load. Currently shows empty list.
 
-**Fix:** If competition load fails, show inline message in the layout's competition-dependent section: "Could not load competitions." Simple, local, no error state threading to child pages.
+**Fix:** Show inline message when `compRes.error` is truthy (not when the list is empty — an empty competition list is valid for a new event). Message: "Could not load competitions." Simple, local, no error state threading to child pages.
 
 ### Judge Management Page
 
@@ -228,7 +236,7 @@ Already has explicit error handling. No change needed.
 6. Standardize judge page actions
 7. Standardize judge management page (add missing `.error` checks)
 8. Standardize results page (add missing `.error` checks)
-9. Add load failure inline messages (competition detail, judge, layout, judge management)
+9. Add load failure inline messages (competition detail, judge, results, layout, judge management)
 
 ---
 
