@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -118,6 +119,20 @@ export default function JudgeScoringPage({
     )
     if (error) throw new Error(`Failed to save score: ${error.message}`)
 
+    void logAudit(supabase, {
+      userId: null,
+      entityType: 'score_entry',
+      entityId: compId,
+      action: 'score_submit',
+      afterData: {
+        dancer_id: dancerId,
+        judge_id: session.judge_id,
+        raw_score: score,
+        flagged,
+        entry_mode: 'judge_self_service',
+      },
+    })
+
     loadData(session.judge_id)
   }
 
@@ -173,6 +188,19 @@ export default function JudgeScoringPage({
           if (statusErr) throw new Error(`Failed to update competition status: ${statusErr.message}`)
         }
       }
+
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'round',
+        entityId: round.id,
+        action: 'sign_off',
+        afterData: {
+          judge_id: session.judge_id,
+          competition_id: compId,
+          entry_mode: 'judge_self_service',
+          all_judges_done: allDone,
+        },
+      })
 
       setSubmitted(true)
     } catch (err) {
