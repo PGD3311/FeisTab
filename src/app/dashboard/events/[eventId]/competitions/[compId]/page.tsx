@@ -20,7 +20,9 @@ import {
 import { logAudit } from '@/lib/audit'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
+import { buildCalculatedPayload } from '@/lib/result-payload'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
+import { ResultsTable } from '@/components/results-table'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -183,18 +185,30 @@ export default function CompetitionDetailPage({
     if (!latestRound) return
 
     try {
+      const mappedScores = scores.map(s => ({
+        dancer_id: s.dancer_id,
+        judge_id: s.judge_id,
+        raw_score: Number(s.raw_score),
+        flagged: s.flagged ?? false,
+        flag_reason: s.flag_reason ?? null,
+      }))
+
       for (const r of previewResults) {
+        const enrichedPayload = buildCalculatedPayload(
+          r,
+          judges,
+          mappedScores,
+          previewResults,
+          ruleset
+        )
+
         const { error } = await supabase.from('results').upsert(
           {
             competition_id: compId,
             dancer_id: r.dancer_id,
             final_rank: r.final_rank,
             display_place: String(r.final_rank),
-            calculated_payload: {
-              total_points: r.total_points,
-              individual_ranks: r.individual_ranks,
-              rules_snapshot: ruleset,
-            },
+            calculated_payload: enrichedPayload,
           },
           { onConflict: 'competition_id,dancer_id' }
         )
@@ -988,30 +1002,7 @@ export default function CompetitionDetailPage({
             <CardTitle className="text-lg">Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="feis-thead">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Place</th>
-                    <th className="px-4 py-2 text-left">Dancer</th>
-                    <th className="px-4 py-2 text-right">Points</th>
-                  </tr>
-                </thead>
-                <tbody className="feis-tbody">
-                  {results.map(r => (
-                    <tr key={r.id} className="border-t">
-                      <td className={`px-4 py-2 font-bold ${r.final_rank === 1 ? 'feis-place-1' : r.final_rank === 2 ? 'feis-place-2' : r.final_rank === 3 ? 'feis-place-3' : ''}`}>{r.final_rank}</td>
-                      <td className="px-4 py-2">
-                        {r.dancers?.first_name} {r.dancers?.last_name}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {r.calculated_payload?.total_points ?? '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResultsTable results={results} />
           </CardContent>
         </Card>
       )}
