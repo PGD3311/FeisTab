@@ -94,6 +94,7 @@ export default function JudgeScoringPage({
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
     if (!session || !round) return
 
+    // TODO: Gap 3 — add .error check on upsert response
     await supabase.from('score_entries').upsert(
       {
         round_id: round.id,
@@ -140,6 +141,7 @@ export default function JudgeScoringPage({
     const allJudgeIds = allJudges?.map(j => j.id) ?? []
     const allDone = allJudgeIds.length > 0 && allJudgeIds.every(id => updatedSignOffs[id])
 
+    // TODO: Gap 3 — use canTransition() instead of raw status check, add .error checks
     if (allDone) {
       const { data: currentComp } = await supabase
         .from('competitions')
