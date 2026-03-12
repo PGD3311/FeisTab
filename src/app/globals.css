@@ -230,11 +230,18 @@
 
   /* Segmented tab bar */
   .feis-segmented-bar {
-    display: inline-flex;
+    display: flex;
     background-color: var(--color-feis-green-light);
     border-radius: 8px;
     padding: 3px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+
+  .feis-segmented-bar::-webkit-scrollbar {
+    display: none;
   }
 
   .feis-segmented-tab {
