@@ -17,6 +17,7 @@ import {
   type CompetitionStatus,
   type TransitionContext,
 } from '@/lib/competition-states'
+import { logAudit } from '@/lib/audit'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -160,6 +161,14 @@ export default function CompetitionDetailPage({
         .eq('id', compId)
       if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
 
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'tabulate',
+        afterData: { result_count: tabulationResults.length, round_id: latestRound.id },
+      })
+
       await loadData()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Tabulation failed')
@@ -187,6 +196,14 @@ export default function CompetitionDetailPage({
         .update({ status: 'published' })
         .eq('id', compId)
       if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'result_publish',
+        afterData: { published_at: now },
+      })
 
       await loadData()
     } catch (err) {
@@ -246,6 +263,14 @@ export default function CompetitionDetailPage({
         .eq('id', compId)
       if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
 
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'recall_generate',
+        afterData: { recalled_count: recalled.length, source_round_id: latestRound.id, new_round_number: nextNum },
+      })
+
       await loadData()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Recall generation failed')
@@ -281,6 +306,15 @@ export default function CompetitionDetailPage({
         .eq('id', compId)
 
       if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'status_change',
+        beforeData: { status: currentStatus },
+        afterData: { status: targetStatus },
+      })
 
       await loadData()
     } catch (err) {
