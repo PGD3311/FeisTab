@@ -40,6 +40,7 @@ export default function CompetitionDetailPage({
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [advancing, setAdvancing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -50,6 +51,17 @@ export default function CompetitionDetailPage({
       supabase.from('results').select('*, dancers(*)').eq('competition_id', compId).order('final_rank'),
       supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
     ])
+
+    if (compRes.error) {
+      console.error('Failed to load competition:', compRes.error.message)
+      setLoading(false)
+      return
+    }
+    if (regRes.error) console.error('Failed to load registrations:', regRes.error.message)
+    if (roundRes.error) console.error('Failed to load rounds:', roundRes.error.message)
+    if (scoreRes.error) console.error('Failed to load scores:', scoreRes.error.message)
+    if (resultRes.error) console.error('Failed to load results:', resultRes.error.message)
+    if (judgesRes.error) console.error('Failed to load judges:', judgesRes.error.message)
 
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
@@ -110,40 +122,48 @@ export default function CompetitionDetailPage({
     const latestRound = rounds[rounds.length - 1]
     if (!latestRound) return
 
-    const roundScores: ScoreInput[] = scores
-      .filter(s => s.round_id === latestRound.id)
-      .map(s => ({
-        dancer_id: s.dancer_id,
-        judge_id: s.judge_id,
-        raw_score: Number(s.raw_score),
-        flagged: s.flagged ?? false,
-      }))
+    setActionError(null)
 
-    const tabulationResults = tabulate(roundScores, ruleset)
+    try {
+      const roundScores: ScoreInput[] = scores
+        .filter(s => s.round_id === latestRound.id)
+        .map(s => ({
+          dancer_id: s.dancer_id,
+          judge_id: s.judge_id,
+          raw_score: Number(s.raw_score),
+          flagged: s.flagged ?? false,
+        }))
 
-    for (const r of tabulationResults) {
-      await supabase.from('results').upsert(
-        {
-          competition_id: compId,
-          dancer_id: r.dancer_id,
-          final_rank: r.final_rank,
-          display_place: String(r.final_rank),
-          calculated_payload: {
-            total_points: r.total_points,
-            individual_ranks: r.individual_ranks,
-            rules_snapshot: ruleset,
+      const tabulationResults = tabulate(roundScores, ruleset)
+
+      for (const r of tabulationResults) {
+        const { error } = await supabase.from('results').upsert(
+          {
+            competition_id: compId,
+            dancer_id: r.dancer_id,
+            final_rank: r.final_rank,
+            display_place: String(r.final_rank),
+            calculated_payload: {
+              total_points: r.total_points,
+              individual_ranks: r.individual_ranks,
+              rules_snapshot: ruleset,
+            },
           },
-        },
-        { onConflict: 'competition_id,dancer_id' }
-      )
+          { onConflict: 'competition_id,dancer_id' }
+        )
+        if (error) throw new Error(`Failed to save result for dancer: ${error.message}`)
+      }
+
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: 'complete_unpublished' })
+        .eq('id', compId)
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Tabulation failed')
     }
-
-    await supabase
-      .from('competitions')
-      .update({ status: 'complete_unpublished' })
-      .eq('id', compId)
-
-    loadData()
   }
 
   async function handlePublish() {
@@ -152,18 +172,26 @@ export default function CompetitionDetailPage({
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'published')) return
 
-    const now = new Date().toISOString()
-    await supabase
-      .from('results')
-      .update({ published_at: now })
-      .eq('competition_id', compId)
+    setActionError(null)
 
-    await supabase
-      .from('competitions')
-      .update({ status: 'published' })
-      .eq('id', compId)
+    try {
+      const now = new Date().toISOString()
+      const { error: pubErr } = await supabase
+        .from('results')
+        .update({ published_at: now })
+        .eq('competition_id', compId)
+      if (pubErr) throw new Error(`Failed to publish results: ${pubErr.message}`)
 
-    loadData()
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: 'published' })
+        .eq('id', compId)
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Publish failed')
+    }
   }
 
   async function handleGenerateRecalls() {
@@ -176,43 +204,52 @@ export default function CompetitionDetailPage({
     const latestRound = rounds[rounds.length - 1]
     if (!latestRound) return
 
-    const roundScores: ScoreInput[] = scores
-      .filter(s => s.round_id === latestRound.id)
-      .map(s => ({
-        dancer_id: s.dancer_id,
-        judge_id: s.judge_id,
-        raw_score: Number(s.raw_score),
-        flagged: s.flagged ?? false,
-      }))
+    setActionError(null)
 
-    const tabulationResults = tabulate(roundScores, ruleset)
-    const recalled = generateRecalls(tabulationResults, ruleset.recall_top_percent)
+    try {
+      const roundScores: ScoreInput[] = scores
+        .filter(s => s.round_id === latestRound.id)
+        .map(s => ({
+          dancer_id: s.dancer_id,
+          judge_id: s.judge_id,
+          raw_score: Number(s.raw_score),
+          flagged: s.flagged ?? false,
+        }))
 
-    for (const r of recalled) {
-      await supabase.from('recalls').upsert(
-        {
-          competition_id: compId,
-          source_round_id: latestRound.id,
-          dancer_id: r.dancer_id,
-          recall_status: 'recalled',
-        },
-        { onConflict: 'competition_id,source_round_id,dancer_id' }
-      )
+      const tabulationResults = tabulate(roundScores, ruleset)
+      const recalled = generateRecalls(tabulationResults, ruleset.recall_top_percent)
+
+      for (const r of recalled) {
+        const { error } = await supabase.from('recalls').upsert(
+          {
+            competition_id: compId,
+            source_round_id: latestRound.id,
+            dancer_id: r.dancer_id,
+            recall_status: 'recalled',
+          },
+          { onConflict: 'competition_id,source_round_id,dancer_id' }
+        )
+        if (error) throw new Error(`Failed to save recall: ${error.message}`)
+      }
+
+      const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
+      const { error: roundErr } = await supabase.from('rounds').insert({
+        competition_id: compId,
+        round_number: nextNum,
+        round_type: 'recall',
+      })
+      if (roundErr) throw new Error(`Failed to create recall round: ${roundErr.message}`)
+
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: 'recalled_round_pending' })
+        .eq('id', compId)
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Recall generation failed')
     }
-
-    const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
-    await supabase.from('rounds').insert({
-      competition_id: compId,
-      round_number: nextNum,
-      round_type: 'recall',
-    })
-
-    await supabase
-      .from('competitions')
-      .update({ status: 'recalled_round_pending' })
-      .eq('id', compId)
-
-    loadData()
   }
 
   async function handleAdvance(targetStatus: CompetitionStatus) {
@@ -295,10 +332,14 @@ export default function CompetitionDetailPage({
             size="sm"
             onClick={async () => {
               const newValue = !comp.numbers_released
-              await supabase
+              const { error } = await supabase
                 .from('competitions')
                 .update({ numbers_released: newValue })
                 .eq('id', compId)
+              if (error) {
+                setActionError(`Failed to update numbers: ${error.message}`)
+                return
+              }
               loadData()
             }}
           >
@@ -470,7 +511,13 @@ export default function CompetitionDetailPage({
         <CardHeader>
           <CardTitle className="text-lg">Actions</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
+        <CardContent className="space-y-3">
+          {actionError && (
+            <div className="p-2 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
+              {actionError}
+            </div>
+          )}
+          <div className="flex gap-2 flex-wrap">
           {(comp.status === 'awaiting_scores' || comp.status === 'in_progress') && (
             <Link href={`/dashboard/events/${eventId}/competitions/${compId}/tabulator`}>
               <Button variant="outline">Enter Scores (Tabulator)</Button>
@@ -497,6 +544,7 @@ export default function CompetitionDetailPage({
               Publish Results
             </Button>
           )}
+          </div>
         </CardContent>
       </Card>
 
