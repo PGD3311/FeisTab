@@ -131,7 +131,7 @@ const formatters: Record<string, Formatter> = {
     }
   },
 
-  status_change(entry, _names) {
+  status_change(entry) {
     const d = entry.after_data ?? entry.before_data
     const from = get(d, 'from') ?? get(d, 'status')
     const to = get(d, 'to') ?? get(d, 'status')
@@ -151,7 +151,7 @@ const formatters: Record<string, Formatter> = {
     }
   },
 
-  tabulate(entry, _names) {
+  tabulate(entry) {
     const count = get(entry.after_data, 'result_count') ?? '?'
     return { summary: `${count} results saved`, actor: 'Organizer' }
   },
