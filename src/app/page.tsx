@@ -22,7 +22,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Link
               href="/dashboard"
               className="group p-6 rounded-lg border-2 border-feis-green/20 bg-white hover:border-feis-green/50 hover:shadow-md transition-all"
