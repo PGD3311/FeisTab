@@ -16,9 +16,9 @@ const transitions: Record<CompetitionStatus, CompetitionStatus[]> = {
   ready_for_day_of: ['in_progress'],
   in_progress: ['awaiting_scores'],
   awaiting_scores: ['ready_to_tabulate'],
-  ready_to_tabulate: ['recalled_round_pending', 'complete_unpublished'],
+  ready_to_tabulate: ['recalled_round_pending', 'complete_unpublished', 'awaiting_scores'],
   recalled_round_pending: ['awaiting_scores'],
-  complete_unpublished: ['published'],
+  complete_unpublished: ['published', 'awaiting_scores'],
   published: ['locked', 'complete_unpublished'],
   locked: [],
 }
@@ -51,6 +51,8 @@ const transitionLabels: Partial<Record<string, string>> = {
   'ready_to_tabulate→recalled_round_pending': 'Generate Recalls',
   'complete_unpublished→published': 'Publish Results',
   'published→complete_unpublished': 'Unpublish',
+  'ready_to_tabulate→awaiting_scores': 'Unlock for Correction',
+  'complete_unpublished→awaiting_scores': 'Unlock for Correction',
 }
 
 export function getTransitionLabel(from: CompetitionStatus, to: CompetitionStatus): string {

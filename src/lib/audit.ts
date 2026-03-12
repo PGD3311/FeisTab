@@ -14,6 +14,7 @@ export type AuditAction =
   | 'recall_generate'
   | 'scratch'
   | 'disqualify'
+  | 'unlock_for_correction'
 
 export async function logAudit(
   supabase: SupabaseClient,
