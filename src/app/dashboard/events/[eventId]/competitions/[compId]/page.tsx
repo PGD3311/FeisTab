@@ -210,6 +210,24 @@ export default function CompetitionDetailPage({
   const allSignedOff = latestRound && judges.length > 0 &&
     judges.every(j => latestRound.judge_sign_offs?.[j.id])
 
+  function resolveAnomalyMessage(anomaly: Anomaly): string {
+    let msg = anomaly.message
+    const judgeId = anomaly.entity_ids.judge_id
+    if (judgeId) {
+      const judge = judges.find(j => j.id === judgeId)
+      if (judge) msg = msg.replace(judgeId, `${judge.first_name} ${judge.last_name}`)
+    }
+    const dancerId = anomaly.entity_ids.dancer_id
+    if (dancerId) {
+      const reg = registrations.find(r => r.dancer_id === dancerId)
+      const name = reg?.dancers
+        ? `${reg.dancers.first_name} ${reg.dancers.last_name} (#${reg.competitor_number})`
+        : dancerId
+      msg = msg.replace(dancerId, name)
+    }
+    return msg
+  }
+
   if (loading) return <p className="text-muted-foreground">Loading...</p>
   if (!comp) return <p>Competition not found.</p>
 
@@ -314,7 +332,7 @@ export default function CompetitionDetailPage({
                 <p className="text-sm font-medium text-destructive">Blockers — must resolve before tabulation</p>
                 {anomalies.filter(a => a.blocking).map((a, i) => (
                   <div key={a.dedupe_key} className="text-sm p-2 rounded bg-red-50 border border-red-200 text-red-800">
-                    {a.message}
+                    {resolveAnomalyMessage(a)}
                   </div>
                 ))}
               </div>
@@ -324,7 +342,7 @@ export default function CompetitionDetailPage({
                 <p className="text-sm font-medium text-feis-orange">Warnings — review recommended</p>
                 {anomalies.filter(a => a.severity === 'warning').map((a, i) => (
                   <div key={a.dedupe_key} className="text-sm p-2 rounded bg-orange-50 border border-orange-200 text-orange-800">
-                    {a.message}
+                    {resolveAnomalyMessage(a)}
                   </div>
                 ))}
               </div>
@@ -337,7 +355,7 @@ export default function CompetitionDetailPage({
                 <div className="mt-2 space-y-2">
                   {anomalies.filter(a => a.severity === 'info').map((a, i) => (
                     <div key={a.dedupe_key} className="p-2 rounded bg-muted text-muted-foreground">
-                      {a.message}
+                      {resolveAnomalyMessage(a)}
                     </div>
                   ))}
                 </div>
