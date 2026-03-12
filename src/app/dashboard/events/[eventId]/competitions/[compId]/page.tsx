@@ -9,7 +9,14 @@ import { generateRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
 import { detectAnomalies, type Anomaly, type AnomalyInput } from '@/lib/engine/anomalies'
 import { DEFAULT_RULES } from '@/lib/engine/rules'
-import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import {
+  canTransition,
+  getNextStates,
+  getTransitionLabel,
+  getTransitionBlockReason,
+  type CompetitionStatus,
+  type TransitionContext,
+} from '@/lib/competition-states'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,6 +38,8 @@ export default function CompetitionDetailPage({
   const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [advanceError, setAdvanceError] = useState<string | null>(null)
+  const [advancing, setAdvancing] = useState(false)
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -206,6 +215,44 @@ export default function CompetitionDetailPage({
     loadData()
   }
 
+  async function handleAdvance(targetStatus: CompetitionStatus) {
+    if (!comp) return
+
+    const currentStatus = comp.status as CompetitionStatus
+    if (!canTransition(currentStatus, targetStatus)) {
+      setAdvanceError(`Cannot transition from ${currentStatus} to ${targetStatus}`)
+      return
+    }
+
+    setAdvancing(true)
+    setAdvanceError(null)
+
+    try {
+      // Side effect: create Round 1 when opening for scoring
+      if (currentStatus === 'in_progress' && targetStatus === 'awaiting_scores' && rounds.length === 0) {
+        const { error: roundErr } = await supabase.from('rounds').insert({
+          competition_id: compId,
+          round_number: 1,
+          round_type: 'standard',
+        })
+        if (roundErr) throw new Error(`Failed to create round: ${roundErr.message}`)
+      }
+
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: targetStatus })
+        .eq('id', compId)
+
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      await loadData()
+    } catch (err) {
+      setAdvanceError(err instanceof Error ? err.message : 'Failed to advance competition')
+    } finally {
+      setAdvancing(false)
+    }
+  }
+
   const latestRound = rounds[rounds.length - 1]
   const allSignedOff = latestRound && judges.length > 0 &&
     judges.every(j => latestRound.judge_sign_offs?.[j.id])
@@ -259,6 +306,59 @@ export default function CompetitionDetailPage({
           </Button>
         </div>
       </div>
+
+      {/* Next Step */}
+      {(() => {
+        const currentStatus = comp.status as CompetitionStatus
+        const nextStates = getNextStates(currentStatus)
+        // Only show operator-driven transitions (not tabulate/recalls/publish — those have their own buttons)
+        const operatorTransitions = nextStates.filter(s =>
+          ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
+        )
+
+        if (operatorTransitions.length === 0) return null
+
+        const context: TransitionContext = {
+          registrationCount: registrations.length,
+          judgeCount: judges.length,
+          roundCount: rounds.length,
+        }
+
+        return (
+          <Card className="feis-card border-feis-green/30 bg-feis-green-light/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Next Step</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {advanceError && (
+                <div className="p-2 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
+                  {advanceError}
+                </div>
+              )}
+              {operatorTransitions.map(target => {
+                const blockReason = getTransitionBlockReason(currentStatus, target, context)
+                const label = getTransitionLabel(currentStatus, target)
+
+                return (
+                  <div key={target}>
+                    <Button
+                      onClick={() => handleAdvance(target)}
+                      disabled={!!blockReason || advancing}
+                      className="w-full justify-start text-left"
+                      size="lg"
+                    >
+                      {advancing ? 'Advancing...' : label}
+                    </Button>
+                    {blockReason && (
+                      <p className="text-sm text-muted-foreground mt-1 ml-1">{blockReason}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Roster */}
       <Card className="feis-card">
