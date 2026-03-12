@@ -1,19 +1,12 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
+
+export const dynamic = 'force-dynamic'
 
 export default async function CompetitionsPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params
   const supabase = await createClient()
-
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name')
-    .eq('id', eventId)
-    .single()
-
-  if (!event) notFound()
 
   const { data: competitions } = await supabase
     .from('competitions')
