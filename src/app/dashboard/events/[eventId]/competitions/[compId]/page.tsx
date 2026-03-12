@@ -43,6 +43,10 @@ export default function CompetitionDetailPage({
   const [advancing, setAdvancing] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [previewResults, setPreviewResults] = useState<TabulationResult[] | null>(null)
+  const [unlockJudgeId, setUnlockJudgeId] = useState<string | null>(null)
+  const [unlockReason, setUnlockReason] = useState('')
+  const [unlockNote, setUnlockNote] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -336,6 +340,91 @@ export default function CompetitionDetailPage({
     }
   }
 
+  const UNLOCK_REASONS = [
+    { value: 'wrong_score', label: 'Wrong score entered' },
+    { value: 'wrong_dancer', label: 'Wrong dancer selected' },
+    { value: 'judge_requested', label: 'Judge requested change' },
+    { value: 'data_entry_error', label: 'Data entry error' },
+    { value: 'other', label: 'Other' },
+  ] as const
+
+  async function handleUnlockForCorrection() {
+    if (!unlockJudgeId || !unlockReason || !comp) return
+    if (unlockReason === 'other' && !unlockNote.trim()) return
+
+    const currentStatus = comp.status as CompetitionStatus
+    if (!canTransition(currentStatus, 'awaiting_scores')) return
+
+    const latestRnd = rounds[rounds.length - 1]
+    if (!latestRnd) return
+
+    setUnlocking(true)
+    setActionError(null)
+
+    try {
+      // 1. Remove judge's sign-off
+      const currentSignOffs = latestRnd.judge_sign_offs ?? {}
+      const { [unlockJudgeId]: _, ...remainingSignOffs } = currentSignOffs
+      const { error: signOffErr } = await supabase
+        .from('rounds')
+        .update({ judge_sign_offs: remainingSignOffs })
+        .eq('id', latestRnd.id)
+      if (signOffErr) throw new Error(`Failed to remove sign-off: ${signOffErr.message}`)
+
+      // 2. Unlock judge's scores (clear locked_at)
+      const { error: unlockErr } = await supabase
+        .from('score_entries')
+        .update({ locked_at: null })
+        .eq('round_id', latestRnd.id)
+        .eq('judge_id', unlockJudgeId)
+      if (unlockErr) throw new Error(`Failed to unlock scores: ${unlockErr.message}`)
+
+      // 3. If complete_unpublished, clear stale results
+      if (currentStatus === 'complete_unpublished') {
+        const { error: clearErr } = await supabase
+          .from('results')
+          .delete()
+          .eq('competition_id', compId)
+        if (clearErr) throw new Error(`Failed to clear stale results: ${clearErr.message}`)
+      }
+
+      // 4. Transition back to awaiting_scores
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: 'awaiting_scores' })
+        .eq('id', compId)
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      // 5. Audit log
+      const unlockJudge = judges.find(j => j.id === unlockJudgeId)
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'unlock_for_correction',
+        beforeData: { status: currentStatus, judge_id: unlockJudgeId },
+        afterData: {
+          status: 'awaiting_scores',
+          judge_id: unlockJudgeId,
+          judge_name: unlockJudge ? `${unlockJudge.first_name} ${unlockJudge.last_name}` : null,
+          reason: unlockReason,
+          note: unlockNote.trim() || null,
+          results_cleared: currentStatus === 'complete_unpublished',
+        },
+      })
+
+      // Reset form
+      setUnlockJudgeId(null)
+      setUnlockReason('')
+      setUnlockNote('')
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Unlock failed')
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
   const latestRound = rounds[rounds.length - 1]
   const allSignedOff = latestRound && judges.length > 0 &&
     judges.every(j => latestRound.judge_sign_offs?.[j.id])
@@ -399,9 +488,10 @@ export default function CompetitionDetailPage({
         const currentStatus = comp.status as CompetitionStatus
         const nextStates = getNextStates(currentStatus)
         // Only show operator-driven transitions (not tabulate/recalls/publish — those have their own buttons)
-        const operatorTransitions = nextStates.filter(s =>
-          ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
-        )
+        const operatorTransitions = nextStates.filter(s => {
+          if (s === 'awaiting_scores' && currentStatus !== 'in_progress') return false
+          return ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
+        })
 
         if (operatorTransitions.length === 0) return null
 
@@ -584,6 +674,99 @@ export default function CompetitionDetailPage({
                 </div>
               </details>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Corrections */}
+      {(comp.status === 'ready_to_tabulate' || comp.status === 'complete_unpublished') && (
+        <Card className="feis-card border-feis-orange/30">
+          <CardHeader>
+            <CardTitle className="text-lg">Corrections</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {comp.status === 'complete_unpublished' && (
+              <div className="p-3 rounded-md bg-feis-orange/10 border border-feis-orange/30 text-sm">
+                <p className="font-medium text-feis-orange">Results have been tabulated.</p>
+                <p className="text-muted-foreground mt-1">
+                  Unlocking a judge&apos;s scores will clear all current results and require re-tabulation.
+                </p>
+              </div>
+            )}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Judge to unlock</label>
+                <select
+                  value={unlockJudgeId ?? ''}
+                  onChange={e => setUnlockJudgeId(e.target.value || null)}
+                  className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                >
+                  <option value="">Select judge...</option>
+                  {judges.map(j => {
+                    const signedOff = latestRound?.judge_sign_offs?.[j.id]
+                    return (
+                      <option key={j.id} value={j.id} disabled={!signedOff}>
+                        {j.first_name} {j.last_name}
+                        {signedOff ? '' : ' (not signed off)'}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+              {unlockJudgeId && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium">Reason for correction</label>
+                    <select
+                      value={unlockReason}
+                      onChange={e => setUnlockReason(e.target.value)}
+                      className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                    >
+                      <option value="">Select reason...</option>
+                      {UNLOCK_REASONS.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {unlockReason === 'other' && (
+                    <div>
+                      <label className="text-sm font-medium">Note (required for &quot;Other&quot;)</label>
+                      <input
+                        type="text"
+                        value={unlockNote}
+                        onChange={e => setUnlockNote(e.target.value)}
+                        placeholder="Briefly describe the correction needed..."
+                        className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                      />
+                    </div>
+                  )}
+                  {unlockReason && unlockReason !== 'other' && (
+                    <div>
+                      <label className="text-sm font-medium">Optional note</label>
+                      <input
+                        type="text"
+                        value={unlockNote}
+                        onChange={e => setUnlockNote(e.target.value)}
+                        placeholder="Additional context (optional)..."
+                        className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                      />
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleUnlockForCorrection}
+                    variant="outline"
+                    disabled={
+                      !unlockReason ||
+                      (unlockReason === 'other' && !unlockNote.trim()) ||
+                      unlocking
+                    }
+                    className="border-feis-orange text-feis-orange hover:bg-feis-orange/10"
+                  >
+                    {unlocking ? 'Unlocking...' : 'Unlock for Correction'}
+                  </Button>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
