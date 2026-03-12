@@ -155,12 +155,14 @@ export default function TabulatorEntryPage({
   }, [])
 
   useEffect(() => {
+    // Clear scores synchronously BEFORE async load to prevent stale data
+    // from previous judge bleeding into newly mounted ScoreEntryForm components
+    setScores([])
+    setPacketBlocked(null)
+    setSignedOff(false)
+
     if (selectedJudgeId && round) {
       loadJudgeScores(selectedJudgeId)
-    } else {
-      setScores([])
-      setPacketBlocked(null)
-      setSignedOff(false)
     }
   }, [selectedJudgeId, round])
 
