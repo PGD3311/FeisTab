@@ -7,6 +7,7 @@ import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +37,7 @@ export default function JudgeScoringPage({
   const [submitted, setSubmitted] = useState(false)
   const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('judge_session')
@@ -65,7 +66,12 @@ export default function JudgeScoringPage({
       setLoading(false)
       return
     }
-    if (regRes.error) console.error('Failed to load registrations:', regRes.error.message)
+    if (regRes.error) {
+      console.error('Failed to load registrations:', regRes.error.message)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
 
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
@@ -82,7 +88,12 @@ export default function JudgeScoringPage({
         .select('*')
         .eq('round_id', roundRes.data.id)
         .eq('judge_id', judgeId)
-      if (scoresErr) console.error('Failed to load scores:', scoresErr.message)
+      if (scoresErr) {
+        console.error('Failed to load scores:', scoresErr.message)
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
       setScores(existingScores ?? [])
 
       const entries = existingScores ?? []
@@ -139,7 +150,6 @@ export default function JudgeScoringPage({
 
   async function handleSignOff() {
     if (!session || !round) return
-    setActionError(null)
 
     try {
       // Lock all scores for this judge/round
@@ -233,13 +243,36 @@ export default function JudgeScoringPage({
       })
 
       setSubmitted(true)
+      showSuccess('Round signed off')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Sign-off failed')
+      showCritical('Sign-off failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
   if (loading) return <p className="text-muted-foreground p-6">Loading...</p>
   if (!comp) return <p className="p-6">Competition not found.</p>
+
+  if (loadError) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+          <p className="font-medium">Could not load competition data.</p>
+          <p className="text-sm mt-1">Check your connection and try again.</p>
+        </div>
+        <Button
+          onClick={() => {
+            setLoadError(false)
+            setLoading(true)
+            if (session) loadData(session.judge_id)
+          }}
+          size="lg"
+          className="w-full text-lg py-6"
+        >
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
@@ -330,11 +363,6 @@ export default function JudgeScoringPage({
                   ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
                   : 'Sign Off Round'}
               </Button>
-              {actionError && (
-                <div className="mt-3 p-3 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
-                  {actionError}
-                </div>
-              )}
             </>
           )}
         </>

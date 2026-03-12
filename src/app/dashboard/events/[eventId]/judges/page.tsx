@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
+import { showSuccess, showError } from '@/lib/feedback'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,15 +28,22 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   async function loadJudges() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('judges')
       .select('id, first_name, last_name, access_code')
       .eq('event_id', eventId)
       .order('created_at')
+    if (error) {
+      console.error('Failed to load judges:', error.message)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+    setLoadError(false)
     setJudges((data as Judge[]) ?? [])
     setLoading(false)
   }
@@ -46,7 +54,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     e.preventDefault()
     if (!firstName.trim() || !lastName.trim()) return
     setSaving(true)
-    setError('')
 
     const code = generateAccessCode(lastName)
 
@@ -58,8 +65,9 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     })
 
     if (err) {
-      setError(err.message)
+      showError('Failed to add judge', { description: err.message })
     } else {
+      showSuccess('Judge added')
       setFirstName('')
       setLastName('')
       await loadJudges()
@@ -69,16 +77,36 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
 
   async function handleRegenCode(judgeId: string, lastName: string) {
     const code = generateAccessCode(lastName)
-    await supabase.from('judges').update({ access_code: code }).eq('id', judgeId)
+    const { error } = await supabase.from('judges').update({ access_code: code }).eq('id', judgeId)
+    if (error) {
+      showError('Failed to regenerate code', { description: error.message })
+      return
+    }
+    showSuccess('Access code regenerated')
     loadJudges()
   }
 
   async function handleRemove(judgeId: string) {
-    await supabase.from('judges').delete().eq('id', judgeId)
+    const { error } = await supabase.from('judges').delete().eq('id', judgeId)
+    if (error) {
+      showError('Failed to remove judge', { description: error.message })
+      return
+    }
+    showSuccess('Judge removed')
     loadJudges()
   }
 
   if (loading) return <p className="text-muted-foreground p-6">Loading...</p>
+
+  if (loadError) {
+    return (
+      <div className="max-w-2xl">
+        <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+          Could not load judges. Try refreshing.
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl">
@@ -100,7 +128,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
               {saving ? 'Adding...' : 'Add Judge'}
             </Button>
           </form>
-          {error && <p className="text-sm text-destructive mt-2">{error}</p>}
         </CardContent>
       </Card>
 

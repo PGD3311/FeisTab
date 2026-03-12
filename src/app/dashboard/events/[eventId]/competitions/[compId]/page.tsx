@@ -18,6 +18,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
+import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
@@ -40,15 +41,14 @@ export default function CompetitionDetailPage({
   const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
-  const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [advancing, setAdvancing] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
   const [previewResults, setPreviewResults] = useState<TabulationResult[] | null>(null)
   const [unlockJudgeId, setUnlockJudgeId] = useState<string | null>(null)
   const [unlockReason, setUnlockReason] = useState('')
   const [unlockNote, setUnlockNote] = useState('')
   const [unlocking, setUnlocking] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [loadWarning, setLoadWarning] = useState(false)
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -70,6 +70,12 @@ export default function CompetitionDetailPage({
     if (scoreRes.error) console.error('Failed to load scores:', scoreRes.error.message)
     if (resultRes.error) console.error('Failed to load results:', resultRes.error.message)
     if (judgesRes.error) console.error('Failed to load judges:', judgesRes.error.message)
+
+    if (regRes.error || roundRes.error || scoreRes.error || resultRes.error || judgesRes.error) {
+      setLoadWarning(true)
+    } else {
+      setLoadWarning(false)
+    }
 
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
@@ -157,8 +163,6 @@ export default function CompetitionDetailPage({
     const latestRound = rounds[rounds.length - 1]
     if (!latestRound) return
 
-    setActionError(null)
-
     const roundScores: ScoreInput[] = scores
       .filter(s => s.round_id === latestRound.id)
       .map(s => ({
@@ -177,8 +181,6 @@ export default function CompetitionDetailPage({
 
     const latestRound = rounds[rounds.length - 1]
     if (!latestRound) return
-
-    setActionError(null)
 
     try {
       for (const r of previewResults) {
@@ -215,8 +217,9 @@ export default function CompetitionDetailPage({
 
       setPreviewResults(null)
       await loadData()
+      showSuccess('Results approved and saved')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to save results')
+      showCritical('Failed to save results', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
@@ -225,8 +228,6 @@ export default function CompetitionDetailPage({
 
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'published')) return
-
-    setActionError(null)
 
     try {
       const now = new Date().toISOString()
@@ -251,8 +252,9 @@ export default function CompetitionDetailPage({
       })
 
       await loadData()
+      showSuccess('Results published')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Publish failed')
+      showCritical('Publish failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
@@ -265,8 +267,6 @@ export default function CompetitionDetailPage({
 
     const latestRound = rounds[rounds.length - 1]
     if (!latestRound) return
-
-    setActionError(null)
 
     try {
       const roundScores: ScoreInput[] = scores
@@ -317,8 +317,9 @@ export default function CompetitionDetailPage({
       })
 
       await loadData()
+      showSuccess('Recalls generated')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Recall generation failed')
+      showCritical('Recall generation failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
@@ -327,12 +328,11 @@ export default function CompetitionDetailPage({
 
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, targetStatus)) {
-      setAdvanceError(`Cannot transition from ${currentStatus} to ${targetStatus}`)
+      showCritical('Cannot transition', { description: `Cannot transition from ${currentStatus} to ${targetStatus}` })
       return
     }
 
     setAdvancing(true)
-    setAdvanceError(null)
 
     try {
       // Side effect: create Round 1 when opening for scoring
@@ -362,8 +362,9 @@ export default function CompetitionDetailPage({
       })
 
       await loadData()
+      showSuccess(`Status updated to ${getTransitionLabel(currentStatus, targetStatus)}`)
     } catch (err) {
-      setAdvanceError(err instanceof Error ? err.message : 'Failed to advance competition')
+      showCritical('Status update failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     } finally {
       setAdvancing(false)
     }
@@ -388,7 +389,6 @@ export default function CompetitionDetailPage({
     if (!latestRnd) return
 
     setUnlocking(true)
-    setActionError(null)
 
     try {
       // 1. Remove judge's sign-off
@@ -447,8 +447,9 @@ export default function CompetitionDetailPage({
       setUnlockReason('')
       setUnlockNote('')
       await loadData()
+      showSuccess('Unlocked for correction')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Unlock failed')
+      showCritical('Unlock failed', { description: err instanceof Error ? err.message : 'Unknown error' })
     } finally {
       setUnlocking(false)
     }
@@ -520,16 +521,23 @@ export default function CompetitionDetailPage({
                 .update({ numbers_released: newValue })
                 .eq('id', compId)
               if (error) {
-                setActionError(`Failed to update numbers: ${error.message}`)
+                showError(newValue ? 'Failed to release numbers' : 'Failed to hide numbers')
                 return
               }
-              loadData()
+              await loadData()
+              showSuccess(newValue ? 'Numbers released' : 'Numbers hidden')
             }}
           >
             {comp.numbers_released ? '✓ Numbers Released' : 'Release Numbers'}
           </Button>
         </div>
       </div>
+
+      {loadWarning && (
+        <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+          Some competition data could not be loaded. Roster, scores, or judge details may be incomplete. Refresh to try again.
+        </div>
+      )}
 
       {/* Next Step */}
       {(() => {
@@ -555,11 +563,6 @@ export default function CompetitionDetailPage({
               <CardTitle className="text-lg">Next Step</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {advanceError && (
-                <div className="p-2 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
-                  {advanceError}
-                </div>
-              )}
               {operatorTransitions.map(target => {
                 const blockReason = getTransitionBlockReason(currentStatus, target, context)
                 const label = getTransitionLabel(currentStatus, target)
@@ -609,7 +612,7 @@ export default function CompetitionDetailPage({
                       .update({ status: newStatus })
                       .eq('id', reg.id)
                     if (error) {
-                      setActionError(`Failed to update status: ${error.message}`)
+                      showError('Failed to update status', { description: error.message })
                       return
                     }
                     void logAudit(supabase, {
@@ -620,7 +623,8 @@ export default function CompetitionDetailPage({
                       beforeData: { status: reg.status, dancer_id: reg.dancer_id, competition_id: compId },
                       afterData: { status: newStatus, dancer_id: reg.dancer_id, competition_id: compId },
                     })
-                    loadData()
+                    await loadData()
+                    showSuccess('Dancer status updated')
                   }}
                   className={`text-xs border rounded px-2 py-1 ${
                     reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
@@ -880,11 +884,6 @@ export default function CompetitionDetailPage({
           <CardTitle className="text-lg">Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {actionError && (
-            <div className="p-2 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
-              {actionError}
-            </div>
-          )}
           <div className="flex gap-2 flex-wrap">
           {(comp.status === 'awaiting_scores' || comp.status === 'in_progress') && (
             <Link href={`/dashboard/events/${eventId}/competitions/${compId}/tabulator`}>

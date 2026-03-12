@@ -21,6 +21,7 @@ export default function EventLayout({
   const [event, setEvent] = useState<EventData | null>(null)
   const [competitions, setCompetitions] = useState<CompetitionData[]>([])
   const [loading, setLoading] = useState(true)
+  const [compLoadError, setCompLoadError] = useState(false)
 
   async function loadData() {
     const [eventRes, compRes] = await Promise.all([
@@ -33,6 +34,9 @@ export default function EventLayout({
     }
     if (compRes.error) {
       console.error('Failed to load competitions:', compRes.error.message)
+      setCompLoadError(true)
+    } else {
+      setCompLoadError(false)
     }
 
     setEvent(eventRes.data as EventData | null)
@@ -81,6 +85,11 @@ export default function EventLayout({
         <EventTabs eventId={eventId} />
 
         {/* Tab content */}
+        {compLoadError && (
+          <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+            Could not load competitions.
+          </div>
+        )}
         <div>{children}</div>
       </div>
     </EventProvider>

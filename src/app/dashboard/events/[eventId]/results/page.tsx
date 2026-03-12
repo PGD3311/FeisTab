@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
+import { showSuccess, showCritical } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { Button } from '@/components/ui/button'
@@ -25,13 +26,21 @@ export default function ResultsPublishingPage({
   const supabase = useSupabase()
   const [competitions, setCompetitions] = useState<CompetitionRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   async function loadData(): Promise<void> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('competitions')
       .select('*, results(count)')
       .eq('event_id', eventId)
       .order('code')
+    if (error) {
+      console.error('Failed to load competitions:', error.message)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+    setLoadError(false)
     setCompetitions((data as CompetitionRow[] | null) ?? [])
     setLoading(false)
   }
@@ -41,19 +50,45 @@ export default function ResultsPublishingPage({
   async function handlePublish(compId: string, currentStatus: CompetitionStatus): Promise<void> {
     if (!canTransition(currentStatus, 'published')) return
     const now = new Date().toISOString()
-    await supabase.from('results').update({ published_at: now }).eq('competition_id', compId)
-    await supabase.from('competitions').update({ status: 'published' }).eq('id', compId)
+    const { error: pubErr } = await supabase.from('results').update({ published_at: now }).eq('competition_id', compId)
+    if (pubErr) {
+      showCritical('Failed to publish results', { description: pubErr.message })
+      return
+    }
+    const { error: statusErr } = await supabase.from('competitions').update({ status: 'published' }).eq('id', compId)
+    if (statusErr) {
+      showCritical('Failed to publish results', { description: statusErr.message })
+      return
+    }
+    showSuccess('Results published')
     loadData()
   }
 
   async function handleUnpublish(compId: string, currentStatus: CompetitionStatus): Promise<void> {
     if (!canTransition(currentStatus, 'complete_unpublished')) return
-    await supabase.from('results').update({ published_at: null }).eq('competition_id', compId)
-    await supabase.from('competitions').update({ status: 'complete_unpublished' }).eq('id', compId)
+    const { error: pubErr } = await supabase.from('results').update({ published_at: null }).eq('competition_id', compId)
+    if (pubErr) {
+      showCritical('Failed to unpublish results', { description: pubErr.message })
+      return
+    }
+    const { error: statusErr } = await supabase.from('competitions').update({ status: 'complete_unpublished' }).eq('id', compId)
+    if (statusErr) {
+      showCritical('Failed to unpublish results', { description: statusErr.message })
+      return
+    }
+    showSuccess('Results unpublished')
     loadData()
   }
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
+
+  if (loadError) {
+    return (
+      <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+        Could not load results. Try refreshing.
+      </div>
+    )
+  }
 
   const publishable = competitions.filter(c =>
     ['complete_unpublished'].includes(c.status) && (c.results?.[0]?.count ?? 0) > 0

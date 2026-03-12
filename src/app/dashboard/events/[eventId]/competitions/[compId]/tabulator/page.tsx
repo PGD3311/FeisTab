@@ -9,6 +9,7 @@ import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
+import { showError, showSuccess, showCritical } from '@/lib/feedback'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -187,8 +188,8 @@ export default function TabulatorEntryPage({
     )
 
     if (upsertErr) {
-      setError(`Failed to save score: ${upsertErr.message}`)
-      return
+      showError('Score save failed', { description: upsertErr.message })
+      throw new Error(`Failed to save score: ${upsertErr.message}`)
     }
 
     void logAudit(supabase, {
@@ -291,8 +292,12 @@ export default function TabulatorEntryPage({
 
       setSignedOff(true)
       setRound({ ...round, judge_sign_offs: updatedSignOffs })
+      const judge = judges.find(j => j.id === selectedJudgeId)
+      showSuccess(`Scores signed off for ${judge?.first_name ?? 'judge'}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-off failed')
+      showCritical('Sign-off failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
     }
   }
 
