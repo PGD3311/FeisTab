@@ -52,7 +52,7 @@ export default function JudgeLoginPage() {
     <div className="flex items-center justify-center min-h-[60vh]">
       <Card className="feis-card w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-serif">Judge Sign In</CardTitle>
+          <CardTitle className="text-xl font-semibold">Judge Sign In</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
             Enter the access code from your organizer
           </p>

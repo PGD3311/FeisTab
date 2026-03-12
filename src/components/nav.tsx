@@ -16,11 +16,11 @@ export function Nav() {
   }
 
   return (
-    <header className="feis-nav-accent bg-feis-green">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="bg-feis-green border-b border-white/10">
+      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-serif text-2xl font-bold text-white tracking-tight">
+            <span className="text-lg font-bold text-white tracking-wide uppercase">
               FeisTab
             </span>
           </Link>

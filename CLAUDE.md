@@ -2,27 +2,27 @@
 
 **Goal: Make tabulation and results trustworthy, fast, and hard to screw up.** Remove manual chaos from the most painful part of the competition workflow. Phase 1 is the scoring/results engine — not the whole feis, not registration, not full live event ops.
 
-**Where we are:** The core scoring engine is built and tested. Phase 1 is no longer a scoring-math problem — it is now an operator workflow problem. The product needs the control layer that makes it usable and trustworthy in the real world.
-
 **The Phase 1 chain:** judge scores → tabulation → anomaly checks → verification → sign-off → official results
 
-**What Phase 1 must deliver:**
-- Collect judge scoring data cleanly
-- Detect obvious blockers before results are finalized
-- Calculate results consistently using the rules
-- Show warnings/review signals without stopping everything
-- Block sign-off or publish when integrity/rules issues exist
-- Produce official results that can be reproduced from stored inputs
-- Leave an audit trail so the output is defensible
+## Phase 1 Truth Test
 
-**The control layer still needed:**
-- Explicit competition state transitions (operator-driven, not database-hacked)
-- Dancer status handling (scratches, no-shows, DNC, medical)
-- Tabulation preview and approval (review before committing results)
-- Audit logging on all critical actions (wired, not dead code)
-- Correction workflows (what happens when a score is wrong after sign-off?)
-- Publish controls (preview, publish, unpublish with gates)
-- Failure-safe recovery (no silent partial writes, no corrupted state)
+Phase 1 is done when the app can answer YES to all 15 of these. If it can't, it's still a demo with good posture.
+
+1. Can an organizer run a competition from scoring to published results without touching the database?
+2. Can the app support both judge self-entry and tabulator entry?
+3. Is every competition state clear and manually controllable from the UI?
+4. Are blockers obvious and actionable?
+5. Can dancers be marked scratched, no-show, or disqualified cleanly?
+6. Can incomplete or bad score packets be detected before tabulation?
+7. Can results be previewed before approval?
+8. Is publish an explicit controlled action?
+9. Can a score correction be made safely after submission?
+10. Can tabulation be re-run after a correction?
+11. Is there an audit trail for who entered, changed, approved, and published?
+12. Does the app fail safely on network or database issues?
+13. Is tabulator entry fast enough for a real local feis?
+14. Is judge entry actually usable on tablet and phone?
+15. If someone questions a result, can the organizer explain exactly how it happened?
 
 ## Tech Stack
 - **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui v4
@@ -267,14 +267,16 @@ export function computeSomething(
 ### 5.6 Design Tokens
 All FeisTab brand colors are defined as CSS custom properties in `src/app/globals.css` under `@theme inline`. Use Tailwind classes that reference these tokens (e.g., `bg-feis-green`, `text-feis-orange`). Custom component classes use the `feis-` prefix and are defined in `@layer components`.
 
+**Visual identity: "Precision Utility."** Single font (Outfit), cool neutral palette, flat panels with 1px borders, monospace for data/numbers. No serif, no textures, no decorative elements. Software, not app.
+
 | Token | Value | Usage |
 |---|---|---|
 | `--color-feis-green` | `#0B4D2C` | Primary — nav, headers, CTAs |
-| `--color-feis-green-light` | `#E8F5EE` | Hover backgrounds, secondary |
-| `--color-feis-cream` | `#FDFBF7` | Page background |
+| `--color-feis-green-light` | `#EBF4EF` | Hover backgrounds, secondary |
+| `--color-feis-cream` | `#F7F8FA` | Page background (cool neutral) |
 | `--color-feis-orange` | `#D4652A` | Active/important accents |
 | `--color-feis-gold` | `#C59D5F` | 1st place, medals |
-| `--color-feis-charcoal` | `#1A1F16` | Text |
+| `--color-feis-charcoal` | `#1A1D23` | Text |
 
 ### 5.7 Import Order
 1. React / Next.js imports

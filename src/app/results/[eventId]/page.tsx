@@ -65,7 +65,7 @@ export default async function PublicResultsPage({
     <div className="feis-bg-texture min-h-screen">
       <header className="bg-feis-green border-b border-feis-green-700">
         <div className="max-w-3xl mx-auto px-4 py-6">
-          <h1 className="font-serif text-3xl font-bold text-white">{event.name}</h1>
+          <h1 className="text-2xl font-bold text-white">{event.name}</h1>
           <p className="text-sm text-white/70">
             {event.start_date} {event.location && `· ${event.location}`}
           </p>
@@ -105,7 +105,7 @@ export default async function PublicResultsPage({
           </div>
         )}
 
-        <footer className="mt-12 pt-6 border-t text-center text-xs font-serif text-feis-green/40">
+        <footer className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground/40">
           Powered by FeisTab
         </footer>
       </main>

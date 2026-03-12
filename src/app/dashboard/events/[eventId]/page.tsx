@@ -54,9 +54,9 @@ export default function EventOverviewPage() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-1">
               Event Progress
             </p>
-            <p className="font-serif text-3xl font-bold text-feis-green leading-none">
+            <p className="text-3xl font-bold text-feis-green leading-none tabular-nums">
               {progressPct}%
-              <span className="text-base font-sans font-normal text-muted-foreground ml-2">
+              <span className="text-base font-normal text-muted-foreground ml-2">
                 complete
               </span>
             </p>
@@ -110,7 +110,7 @@ export default function EventOverviewPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1.5 h-1.5 rounded-full bg-feis-orange animate-pulse" />
-            <h2 className="font-serif text-lg font-semibold">Needs Attention</h2>
+            <h2 className="text-base font-semibold">Needs Attention</h2>
             <span className="text-xs text-muted-foreground">
               {needsAttention.length} competition{needsAttention.length !== 1 ? 's' : ''} waiting on you
             </span>
@@ -146,7 +146,7 @@ export default function EventOverviewPage() {
       {/* All Competitions */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-serif text-lg font-semibold">All Competitions</h2>
+          <h2 className="text-base font-semibold">All Competitions</h2>
           <Link
             href={`/dashboard/events/${eventId}/competitions`}
             className="text-xs text-feis-green hover:underline font-medium"
