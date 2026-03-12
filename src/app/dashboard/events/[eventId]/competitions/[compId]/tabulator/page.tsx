@@ -393,7 +393,10 @@ export default function TabulatorEntryPage({
         <CardContent>
           <select
             value={selectedJudgeId}
-            onChange={e => setSelectedJudgeId(e.target.value)}
+            onChange={e => {
+              setScores([])
+              setSelectedJudgeId(e.target.value)
+            }}
             className="w-full max-w-md border rounded-md px-3 py-2 text-sm"
           >
             <option value="">Choose a judge...</option>
