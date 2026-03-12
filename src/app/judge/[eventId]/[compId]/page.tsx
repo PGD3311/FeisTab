@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +31,7 @@ export default function JudgeScoringPage({
   const [scores, setScores] = useState<any[]>([])
   const [ruleConfig, setRuleConfig] = useState<any>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -71,6 +73,19 @@ export default function JudgeScoringPage({
         .eq('round_id', roundRes.data.id)
         .eq('judge_id', judgeId)
       setScores(existingScores ?? [])
+
+      const entries = existingScores ?? []
+      const existingModes = entries.map((s: { entry_mode: string }) => s.entry_mode)
+      if (existingModes.length > 0) {
+        const check = canEnterScores(existingModes as EntryMode[], 'judge_self_service')
+        if (!check.allowed) {
+          setPacketBlocked(check.reason ?? 'Scores are being entered by the tabulator.')
+        } else {
+          setPacketBlocked(null)
+        }
+      } else {
+        setPacketBlocked(null)
+      }
     }
 
     setLoading(false)
@@ -88,6 +103,7 @@ export default function JudgeScoringPage({
         raw_score: score,
         flagged,
         flag_reason: flagReason,
+        entry_mode: 'judge_self_service',
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
@@ -184,37 +200,54 @@ export default function JudgeScoringPage({
         </Card>
       ) : (
         <>
-          <div className="space-y-2 mb-6">
-            {registrations.map(reg => {
-              const existing = scores.find(s => s.dancer_id === reg.dancer_id)
-              return (
-                <ScoreEntryForm
-                  key={reg.id}
-                  dancerId={reg.dancer_id}
-                  dancerName={`${reg.dancers?.first_name} ${reg.dancers?.last_name}`}
-                  competitorNumber={reg.competitor_number}
-                  existingScore={existing?.raw_score}
-                  existingFlagged={existing?.flagged ?? false}
-                  existingFlagReason={existing?.flag_reason}
-                  scoreMin={scoreMin}
-                  scoreMax={scoreMax}
-                  onSubmit={handleScoreSubmit}
-                  locked={submitted}
-                />
-              )
-            })}
-          </div>
+          {packetBlocked && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="py-6 text-center">
+                <p className="text-sm font-medium text-orange-800">
+                  Your scores are being entered by the tabulator.
+                </p>
+                <p className="text-xs text-orange-600 mt-1">
+                  Contact the tabulator if you need to make changes.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-          <Button
-            onClick={handleSignOff}
-            disabled={scoredCount < totalDancers}
-            className="w-full text-lg font-semibold"
-            size="lg"
-          >
-            {scoredCount < totalDancers
-              ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
-              : 'Sign Off Round'}
-          </Button>
+          {!packetBlocked && (
+            <>
+              <div className="space-y-2 mb-6">
+                {registrations.map(reg => {
+                  const existing = scores.find(s => s.dancer_id === reg.dancer_id)
+                  return (
+                    <ScoreEntryForm
+                      key={reg.id}
+                      dancerId={reg.dancer_id}
+                      dancerName={`${reg.dancers?.first_name} ${reg.dancers?.last_name}`}
+                      competitorNumber={reg.competitor_number}
+                      existingScore={existing?.raw_score}
+                      existingFlagged={existing?.flagged ?? false}
+                      existingFlagReason={existing?.flag_reason}
+                      scoreMin={scoreMin}
+                      scoreMax={scoreMax}
+                      onSubmit={handleScoreSubmit}
+                      locked={submitted}
+                    />
+                  )
+                })}
+              </div>
+
+              <Button
+                onClick={handleSignOff}
+                disabled={scoredCount < totalDancers}
+                className="w-full text-lg font-semibold"
+                size="lg"
+              >
+                {scoredCount < totalDancers
+                  ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
+                  : 'Sign Off Round'}
+              </Button>
+            </>
+          )}
         </>
       )}
     </div>
