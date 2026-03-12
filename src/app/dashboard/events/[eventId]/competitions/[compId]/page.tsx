@@ -450,7 +450,43 @@ export default function CompetitionDetailPage({
                   <span className="feis-number font-mono text-sm mr-3">{reg.competitor_number}</span>
                   {reg.dancers?.first_name} {reg.dancers?.last_name}
                 </span>
-                <Badge variant="outline">{reg.status}</Badge>
+                <select
+                  value={reg.status}
+                  onChange={async (e) => {
+                    const newStatus = e.target.value
+                    const { error } = await supabase
+                      .from('registrations')
+                      .update({ status: newStatus })
+                      .eq('id', reg.id)
+                    if (error) {
+                      setActionError(`Failed to update status: ${error.message}`)
+                      return
+                    }
+                    void logAudit(supabase, {
+                      userId: null,
+                      entityType: 'registration',
+                      entityId: reg.id,
+                      action: 'status_change',
+                      beforeData: { status: reg.status, dancer_id: reg.dancer_id },
+                      afterData: { status: newStatus, dancer_id: reg.dancer_id },
+                    })
+                    loadData()
+                  }}
+                  className={`text-xs border rounded px-2 py-1 ${
+                    reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
+                      ? 'border-red-300 bg-red-50 text-red-800'
+                      : reg.status === 'medical' || reg.status === 'did_not_complete'
+                        ? 'border-orange-300 bg-orange-50 text-orange-800'
+                        : 'border-gray-200'
+                  }`}
+                >
+                  <option value="present">Present</option>
+                  <option value="scratched">Scratched</option>
+                  <option value="no_show">No Show</option>
+                  <option value="did_not_complete">Did Not Complete</option>
+                  <option value="medical">Medical</option>
+                  <option value="disqualified">Disqualified</option>
+                </select>
               </div>
             ))}
           </div>
