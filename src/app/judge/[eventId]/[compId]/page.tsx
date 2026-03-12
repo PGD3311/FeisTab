@@ -179,7 +179,18 @@ export default function JudgeScoringPage({
           .single()
         if (compErr) throw new Error(`Failed to check competition status: ${compErr.message}`)
 
-        const currentStatus = currentComp?.status as CompetitionStatus
+        // Step through transitions to reach ready_to_tabulate
+        // Handles both in_progress → awaiting_scores → ready_to_tabulate
+        // and awaiting_scores → ready_to_tabulate
+        let currentStatus = currentComp?.status as CompetitionStatus
+        if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
+          const { error: midErr } = await supabase
+            .from('competitions')
+            .update({ status: 'awaiting_scores' })
+            .eq('id', compId)
+          if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
+          currentStatus = 'awaiting_scores' as CompetitionStatus
+        }
         if (canTransition(currentStatus, 'ready_to_tabulate')) {
           const { error: statusErr } = await supabase
             .from('competitions')

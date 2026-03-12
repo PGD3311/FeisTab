@@ -234,13 +234,26 @@ export default function TabulatorEntryPage({
       const allDone =
         judges.length > 0 && judges.every(j => updatedSignOffs[j.id])
 
-      if (allDone && canTransition(compStatus, 'ready_to_tabulate')) {
-        const { error: statusErr } = await supabase
-          .from('competitions')
-          .update({ status: 'ready_to_tabulate' })
-          .eq('id', compId)
-
-        if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+      if (allDone) {
+        // Step through transitions to reach ready_to_tabulate
+        // Handles both in_progress → awaiting_scores → ready_to_tabulate
+        // and awaiting_scores → ready_to_tabulate
+        let status = compStatus
+        if (canTransition(status, 'awaiting_scores') && !canTransition(status, 'ready_to_tabulate')) {
+          const { error: midErr } = await supabase
+            .from('competitions')
+            .update({ status: 'awaiting_scores' })
+            .eq('id', compId)
+          if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
+          status = 'awaiting_scores' as CompetitionStatus
+        }
+        if (canTransition(status, 'ready_to_tabulate')) {
+          const { error: statusErr } = await supabase
+            .from('competitions')
+            .update({ status: 'ready_to_tabulate' })
+            .eq('id', compId)
+          if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+        }
       }
 
       void logAudit(supabase, {
