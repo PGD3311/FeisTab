@@ -57,31 +57,38 @@ export function ScoreEntryForm({
   const hasError = score !== '' && !isValid
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
-      flagged
-        ? 'border-feis-orange/60 bg-feis-orange/5'
-        : 'hover:bg-feis-green-light/50'
-    }`}>
-      <span className="feis-number font-mono text-2xl font-bold w-16 text-center text-feis-green">{competitorNumber}</span>
-      <span className="flex-1 text-sm">{dancerName}</span>
-      <div className="flex items-center gap-2">
+    <div
+      className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-md border transition-colors ${
+        flagged ? 'border-feis-orange/60 bg-feis-orange/5' : 'hover:bg-feis-green-light/50'
+      }`}
+    >
+      <div className="flex items-center gap-2 sm:gap-0">
+        <span className="feis-number font-mono text-2xl font-bold w-16 text-center text-feis-green">
+          {competitorNumber}
+        </span>
+        <span className="flex-1 text-sm sm:ml-1">{dancerName}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
         <Input
           type="number"
           min={scoreMin}
           max={scoreMax}
           step="0.1"
           value={score}
-          onChange={e => { setScore(e.target.value); setSaved(false) }}
-          className={`w-24 text-center text-lg ${hasError ? 'border-destructive' : ''}`}
+          onChange={e => {
+            setScore(e.target.value)
+            setSaved(false)
+          }}
+          className={`w-full sm:w-24 text-center text-lg h-11 ${hasError ? 'border-destructive' : ''}`}
           disabled={locked}
         />
-        <label className="flex items-center gap-1.5 cursor-pointer">
+        <label className="flex items-center gap-1.5 cursor-pointer h-11">
           <input
             type="checkbox"
             checked={flagged}
             onChange={e => setFlagged(e.target.checked)}
             disabled={locked}
-            className="accent-feis-orange"
+            className="accent-feis-orange w-5 h-5"
           />
           <span className="text-xs text-muted-foreground">Flag</span>
         </label>
@@ -90,7 +97,7 @@ export function ScoreEntryForm({
             value={flagReason}
             onChange={e => setFlagReason(e.target.value)}
             disabled={locked}
-            className="text-xs border rounded px-1 py-0.5"
+            className="text-xs border rounded px-2 py-2 h-11"
           >
             <option value="">Reason...</option>
             <option value="early_start">Early Start</option>
@@ -103,13 +110,12 @@ export function ScoreEntryForm({
           onClick={handleSave}
           disabled={!isValid || saving || locked}
           variant={saveError ? 'destructive' : 'default'}
+          className="h-11 min-w-[4rem]"
         >
-          {saving ? '...' : saveError ? 'Retry' : saved ? '\u2713 Saved' : 'Save'}
+          {saving ? '...' : saveError ? 'Retry' : saved ? '✓ Saved' : 'Save'}
         </Button>
       </div>
-      {saveError && (
-        <p className="text-xs text-destructive mt-1 ml-16">{saveError}</p>
-      )}
+      {saveError && <p className="text-xs text-destructive">{saveError}</p>}
     </div>
   )
 }
