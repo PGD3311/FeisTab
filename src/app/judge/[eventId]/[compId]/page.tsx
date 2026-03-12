@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
+import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,7 @@ export default function JudgeScoringPage({
   const [submitted, setSubmitted] = useState(false)
   const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem('judge_session')
@@ -56,22 +58,29 @@ export default function JudgeScoringPage({
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number', { ascending: false }).limit(1).single(),
     ])
 
+    if (compRes.error) {
+      console.error('Failed to load competition:', compRes.error.message)
+      setLoading(false)
+      return
+    }
+    if (regRes.error) console.error('Failed to load registrations:', regRes.error.message)
+
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
-    setRound(roundRes.data)
+    setRound(roundRes.error ? null : roundRes.data)
     setRuleConfig(compRes.data?.rule_sets?.config)
 
-    if (roundRes.data) {
-      // Check if this judge already signed off
+    if (!roundRes.error && roundRes.data) {
       if (roundRes.data.judge_sign_offs?.[judgeId]) {
         setSubmitted(true)
       }
 
-      const { data: existingScores } = await supabase
+      const { data: existingScores, error: scoresErr } = await supabase
         .from('score_entries')
         .select('*')
         .eq('round_id', roundRes.data.id)
         .eq('judge_id', judgeId)
+      if (scoresErr) console.error('Failed to load scores:', scoresErr.message)
       setScores(existingScores ?? [])
 
       const entries = existingScores ?? []
@@ -94,8 +103,7 @@ export default function JudgeScoringPage({
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
     if (!session || !round) return
 
-    // TODO: Gap 3 — add .error check on upsert response
-    await supabase.from('score_entries').upsert(
+    const { error } = await supabase.from('score_entries').upsert(
       {
         round_id: round.id,
         competition_id: compId,
@@ -108,55 +116,68 @@ export default function JudgeScoringPage({
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
+    if (error) throw new Error(`Failed to save score: ${error.message}`)
 
     loadData(session.judge_id)
   }
 
   async function handleSignOff() {
     if (!session || !round) return
+    setActionError(null)
 
-    // Lock all scores for this judge/round
-    await supabase
-      .from('score_entries')
-      .update({ locked_at: new Date().toISOString() })
-      .eq('round_id', round.id)
-      .eq('judge_id', session.judge_id)
+    try {
+      // Lock all scores for this judge/round
+      const { error: lockErr } = await supabase
+        .from('score_entries')
+        .update({ locked_at: new Date().toISOString() })
+        .eq('round_id', round.id)
+        .eq('judge_id', session.judge_id)
+      if (lockErr) throw new Error(`Failed to lock scores: ${lockErr.message}`)
 
-    // Record sign-off in round's judge_sign_offs jsonb
-    const currentSignOffs = round.judge_sign_offs || {}
-    const updatedSignOffs = {
-      ...currentSignOffs,
-      [session.judge_id]: new Date().toISOString(),
-    }
-    await supabase
-      .from('rounds')
-      .update({ judge_sign_offs: updatedSignOffs })
-      .eq('id', round.id)
-
-    // Check if all judges have now signed off
-    const { data: allJudges } = await supabase
-      .from('judges')
-      .select('id')
-      .eq('event_id', eventId)
-    const allJudgeIds = allJudges?.map(j => j.id) ?? []
-    const allDone = allJudgeIds.length > 0 && allJudgeIds.every(id => updatedSignOffs[id])
-
-    // TODO: Gap 3 — use canTransition() instead of raw status check, add .error checks
-    if (allDone) {
-      const { data: currentComp } = await supabase
-        .from('competitions')
-        .select('status')
-        .eq('id', compId)
-        .single()
-      if (currentComp?.status === 'awaiting_scores') {
-        await supabase
-          .from('competitions')
-          .update({ status: 'ready_to_tabulate' })
-          .eq('id', compId)
+      // Record sign-off in round's judge_sign_offs jsonb
+      const currentSignOffs = round.judge_sign_offs || {}
+      const updatedSignOffs = {
+        ...currentSignOffs,
+        [session.judge_id]: new Date().toISOString(),
       }
-    }
+      const { error: signOffErr } = await supabase
+        .from('rounds')
+        .update({ judge_sign_offs: updatedSignOffs })
+        .eq('id', round.id)
+      if (signOffErr) throw new Error(`Failed to record sign-off: ${signOffErr.message}`)
 
-    setSubmitted(true)
+      // Check if all judges have now signed off
+      const { data: allJudges, error: judgesErr } = await supabase
+        .from('judges')
+        .select('id')
+        .eq('event_id', eventId)
+      if (judgesErr) throw new Error(`Failed to check judges: ${judgesErr.message}`)
+
+      const allJudgeIds = allJudges?.map(j => j.id) ?? []
+      const allDone = allJudgeIds.length > 0 && allJudgeIds.every(id => updatedSignOffs[id])
+
+      if (allDone) {
+        const { data: currentComp, error: compErr } = await supabase
+          .from('competitions')
+          .select('status')
+          .eq('id', compId)
+          .single()
+        if (compErr) throw new Error(`Failed to check competition status: ${compErr.message}`)
+
+        const currentStatus = currentComp?.status as CompetitionStatus
+        if (canTransition(currentStatus, 'ready_to_tabulate')) {
+          const { error: statusErr } = await supabase
+            .from('competitions')
+            .update({ status: 'ready_to_tabulate' })
+            .eq('id', compId)
+          if (statusErr) throw new Error(`Failed to update competition status: ${statusErr.message}`)
+        }
+      }
+
+      setSubmitted(true)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Sign-off failed')
+    }
   }
 
   if (loading) return <p className="text-muted-foreground p-6">Loading...</p>
@@ -248,6 +269,11 @@ export default function JudgeScoringPage({
                   ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
                   : 'Sign Off Round'}
               </Button>
+              {actionError && (
+                <div className="mt-3 p-3 rounded bg-red-50 border border-red-200 text-red-800 text-sm">
+                  {actionError}
+                </div>
+              )}
             </>
           )}
         </>
