@@ -1,14 +1,14 @@
-# Phase 1 Completion — Operational Gaps
+# Phase 1 Completion — Operator Control Layer
 
 **Date:** 2026-03-12
-**Goal:** Close the three gaps between "Phase 1 core logic done" and "Phase 1 full workflow done."
+**Goal:** Build the control layer that makes FeisTab usable and trustworthy in the real world.
 **North star:** Make tabulation and results trustworthy, fast, and hard to screw up.
 
 ---
 
 ## Current State
 
-Phase 1 core engine is ~85% complete. Scoring logic, anomaly detection, tabulation, and result gating are solid and tested (97 tests). But the operational layer that makes it trustworthy and demo-safe has three real gaps.
+Phase 1 is no longer a scoring-math problem. It is now an operator workflow problem. The core scoring foundation is in place (engine, anomaly detection, state machine, 97 tests). What's missing is the control layer: explicit state transitions, dancer status handling, tabulation preview, audit logging, correction workflows, publish controls, and failure-safe recovery.
 
 **The test for "done":** A normal operator can do this without touching the database:
 1. Import / create competition
@@ -88,14 +88,75 @@ Phase 1 core engine is ~85% complete. Scoring logic, anomaly detection, tabulati
 
 ---
 
-## Bonus Fix: Score Entry Responsiveness
+## Gap 4: Dancer Status Handling
 
-**Problem:** Score entry form has no responsive breakpoints. Judges use phones.
+**Problem:** No UI for organizers to mark dancers as scratched, no-show, DNC, or medical. The anomaly engine detects "registered but no scores and no explanation" — but there's no way to provide the explanation. Operators need to update dancer status before/during a competition.
+
+**Fix:** Add dancer status controls on the competition detail page roster. Dropdown or quick-action buttons for common statuses (scratched, no-show, did_not_complete, medical) with optional reason.
+
+**Files:**
+- Modify: `src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx`
+
+**Acceptance criteria:**
+- Organizer can change a dancer's registration status from the roster view
+- Status changes clear the "unexplained no scores" warnings
+- Status changes are audit-logged
+
+---
+
+## Gap 5: Tabulation Preview and Approval
+
+**Problem:** Tabulation currently runs and commits results in one step. No preview. No "are you sure?" If something looks wrong, results are already written.
+
+**Fix:** Split tabulation into preview → approve → commit. Show results in a preview table before writing to the database. Organizer reviews and clicks "Approve Results" to commit.
+
+**Files:**
+- Modify: `src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx`
+
+**Acceptance criteria:**
+- "Run Tabulation" shows a preview of results without writing to the database
+- Preview shows rank, dancer name, points, per-judge breakdown
+- "Approve & Save Results" commits to the database
+- "Cancel" discards the preview
+- Approved results are audit-logged
+
+---
+
+## Gap 6: Correction Workflows
+
+**Problem:** What happens when a score is wrong after sign-off? Currently no path to correct it. Scores are locked, and there's no unlock mechanism.
+
+**Fix:** Add an "Unlock for Correction" flow on the competition detail page. Organizer can unlock a judge's scores for a specific round, which:
+1. Reverts sign-off for that judge
+2. Transitions competition back to `awaiting_scores`
+3. Logs the unlock in the audit trail
+4. Judge can then re-enter/edit and re-sign-off
+
+**Files:**
+- Modify: `src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx`
+
+**Acceptance criteria:**
+- Organizer can unlock a specific judge's scores for correction
+- Unlock reverts sign-off and transitions state back appropriately
+- Unlock is audit-logged with reason
+- Judge can re-edit and re-sign-off
+- Previously computed results are cleared if scores change
+
+---
+
+## Gap 7: Score Entry Responsiveness
+
+**Problem:** Score entry form has no responsive breakpoints. Judges use phones at the table.
 
 **Fix:** Add `flex-wrap` and responsive breakpoints to `score-entry-form.tsx` so it stacks properly on narrow screens.
 
 **Files:**
 - Modify: `src/components/score-entry-form.tsx`
+
+**Acceptance criteria:**
+- Score entry form is usable on a 375px-wide phone screen
+- Inputs stack vertically on narrow screens
+- Touch targets are large enough for reliable tapping
 
 ---
 
@@ -104,4 +165,7 @@ Phase 1 core engine is ~85% complete. Scoring logic, anomaly detection, tabulati
 1. Competition advancement buttons (unblocks the entire demo flow)
 2. Error handling around scoring/tabulation (prevents silent corruption)
 3. Audit logging wiring (completes the trust story)
-4. Score entry responsiveness (field-readiness for judges on phones)
+4. Dancer status handling (closes the "unexplained no scores" loop)
+5. Tabulation preview and approval (adds review before commit)
+6. Correction workflows (handles the "oops" case)
+7. Score entry responsiveness (field-readiness for judges on phones)

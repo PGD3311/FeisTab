@@ -2,6 +2,8 @@
 
 **Goal: Make tabulation and results trustworthy, fast, and hard to screw up.** Remove manual chaos from the most painful part of the competition workflow. Phase 1 is the scoring/results engine — not the whole feis, not registration, not full live event ops.
 
+**Where we are:** The core scoring engine is built and tested. Phase 1 is no longer a scoring-math problem — it is now an operator workflow problem. The product needs the control layer that makes it usable and trustworthy in the real world.
+
 **The Phase 1 chain:** judge scores → tabulation → anomaly checks → verification → sign-off → official results
 
 **What Phase 1 must deliver:**
@@ -12,6 +14,15 @@
 - Block sign-off or publish when integrity/rules issues exist
 - Produce official results that can be reproduced from stored inputs
 - Leave an audit trail so the output is defensible
+
+**The control layer still needed:**
+- Explicit competition state transitions (operator-driven, not database-hacked)
+- Dancer status handling (scratches, no-shows, DNC, medical)
+- Tabulation preview and approval (review before committing results)
+- Audit logging on all critical actions (wired, not dead code)
+- Correction workflows (what happens when a score is wrong after sign-off?)
+- Publish controls (preview, publish, unpublish with gates)
+- Failure-safe recovery (no silent partial writes, no corrupted state)
 
 ## Tech Stack
 - **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui v4
