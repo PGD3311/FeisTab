@@ -569,8 +569,8 @@ export default function CompetitionDetailPage({
                       entityType: 'registration',
                       entityId: reg.id,
                       action: 'status_change',
-                      beforeData: { status: reg.status, dancer_id: reg.dancer_id },
-                      afterData: { status: newStatus, dancer_id: reg.dancer_id },
+                      beforeData: { status: reg.status, dancer_id: reg.dancer_id, competition_id: compId },
+                      afterData: { status: newStatus, dancer_id: reg.dancer_id, competition_id: compId },
                     })
                     loadData()
                   }}
