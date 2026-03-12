@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
+import { canEnterScores } from '@/lib/entry-mode'
 
 describe('canEnterScores', () => {
   it('allows entry when no existing scores', () => {

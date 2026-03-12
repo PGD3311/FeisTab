@@ -50,7 +50,6 @@ export default function TabulatorEntryPage({
 
   const [judges, setJudges] = useState<Judge[]>([])
   const [selectedJudgeId, setSelectedJudgeId] = useState<string>('')
-  const [compName, setCompName] = useState('')
   const [compCode, setCompCode] = useState('')
   const [compStatus, setCompStatus] = useState<CompetitionStatus>('draft')
   const [ruleConfig, setRuleConfig] = useState<{ score_min: number; score_max: number } | null>(null)
@@ -104,7 +103,6 @@ export default function TabulatorEntryPage({
     }
 
     const status = (compRes.data?.status as CompetitionStatus) ?? 'draft'
-    setCompName(compRes.data?.name ?? '')
     setCompCode(compRes.data?.code ?? '')
     setCompStatus(status)
     setRuleConfig(compRes.data?.rule_sets?.config ?? null)

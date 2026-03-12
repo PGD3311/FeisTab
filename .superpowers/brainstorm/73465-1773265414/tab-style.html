@@ -1,0 +1,55 @@
+<h2>Tab bar style</h2>
+<p class="subtitle">Which tab bar style fits FeisTab better?</p>
+
+<div class="cards">
+  <!-- Option A: Pill tabs like ChatGPT design -->
+  <div class="card" data-choice="pills" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px; background: #FDFBF7;">
+      <div style="display: flex; gap: 8px; font-family: system-ui; font-size: 13px;">
+        <div style="background: #0B4D2C; color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600;">Overview</div>
+        <div style="background: white; color: #1A1F16; padding: 8px 16px; border-radius: 20px; border: 1px solid #D6D3CB;">Competitions</div>
+        <div style="background: white; color: #1A1F16; padding: 8px 16px; border-radius: 20px; border: 1px solid #D6D3CB;">Judges</div>
+        <div style="background: white; color: #1A1F16; padding: 8px 16px; border-radius: 20px; border: 1px solid #D6D3CB;">Import</div>
+        <div style="background: white; color: #1A1F16; padding: 8px 16px; border-radius: 20px; border: 1px solid #D6D3CB;">Results</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Pill tabs</h3>
+      <p>Like the ChatGPT design. Active tab is filled green, others outlined. Friendly, modern feel.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Underline tabs -->
+  <div class="card" data-choice="underline" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px; background: #FDFBF7;">
+      <div style="display: flex; gap: 0; font-family: system-ui; font-size: 13px; border-bottom: 2px solid #E8F5EE;">
+        <div style="padding: 10px 20px; border-bottom: 3px solid #0B4D2C; margin-bottom: -2px; color: #0B4D2C; font-weight: 600;">Overview</div>
+        <div style="padding: 10px 20px; color: #6B7264;">Competitions</div>
+        <div style="padding: 10px 20px; color: #6B7264;">Judges</div>
+        <div style="padding: 10px 20px; color: #6B7264;">Import</div>
+        <div style="padding: 10px 20px; color: #6B7264;">Results</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Underline tabs</h3>
+      <p>Classic tab bar with green underline on active. Clean, professional, common pattern.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Segmented control -->
+  <div class="card" data-choice="segmented" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px; background: #FDFBF7;">
+      <div style="display: inline-flex; background: #E8F5EE; border-radius: 8px; padding: 3px; font-family: system-ui; font-size: 13px;">
+        <div style="background: white; color: #0B4D2C; padding: 8px 16px; border-radius: 6px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">Overview</div>
+        <div style="padding: 8px 16px; color: #6B7264;">Competitions</div>
+        <div style="padding: 8px 16px; color: #6B7264;">Judges</div>
+        <div style="padding: 8px 16px; color: #6B7264;">Import</div>
+        <div style="padding: 8px 16px; color: #6B7264;">Results</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Segmented control</h3>
+      <p>iOS-style segmented bar. Active tab is raised white on green-light background. Compact, app-like.</p>
+    </div>
+  </div>
+</div>
