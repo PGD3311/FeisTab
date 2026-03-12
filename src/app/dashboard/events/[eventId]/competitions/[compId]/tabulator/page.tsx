@@ -8,6 +8,7 @@ import { ScoreEntryForm } from '@/components/score-entry-form'
 import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,7 @@ interface Registration {
   id: string
   dancer_id: string
   competitor_number: string
+  status: string | null
   dancers: { first_name: string; last_name: string } | null
 }
 
@@ -68,7 +70,7 @@ export default function TabulatorEntryPage({
       supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
       supabase
         .from('registrations')
-        .select('id, dancer_id, competitor_number, dancers(first_name, last_name)')
+        .select('id, dancer_id, competitor_number, status, dancers(first_name, last_name)')
         .eq('competition_id', compId)
         .order('competitor_number'),
       supabase
@@ -239,20 +241,38 @@ export default function TabulatorEntryPage({
         // Handles both in_progress → awaiting_scores → ready_to_tabulate
         // and awaiting_scores → ready_to_tabulate
         let status = compStatus
-        if (canTransition(status, 'awaiting_scores') && !canTransition(status, 'ready_to_tabulate')) {
-          const { error: midErr } = await supabase
-            .from('competitions')
-            .update({ status: 'awaiting_scores' })
-            .eq('id', compId)
-          if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
-          status = 'awaiting_scores' as CompetitionStatus
-        }
-        if (canTransition(status, 'ready_to_tabulate')) {
-          const { error: statusErr } = await supabase
-            .from('competitions')
-            .update({ status: 'ready_to_tabulate' })
-            .eq('id', compId)
-          if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+        if (status === 'ready_to_tabulate') {
+          // Already there — idempotent, nothing to do
+        } else {
+          if (canTransition(status, 'awaiting_scores') && !canTransition(status, 'ready_to_tabulate')) {
+            const { error: midErr } = await supabase
+              .from('competitions')
+              .update({ status: 'awaiting_scores' })
+              .eq('id', compId)
+            if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
+            void logAudit(supabase, {
+              userId: null,
+              entityType: 'competition',
+              entityId: compId,
+              action: 'status_change',
+              afterData: { from: status, to: 'awaiting_scores', trigger: 'auto_advance_on_sign_off' },
+            })
+            status = 'awaiting_scores' as CompetitionStatus
+          }
+          if (canTransition(status, 'ready_to_tabulate')) {
+            const { error: statusErr } = await supabase
+              .from('competitions')
+              .update({ status: 'ready_to_tabulate' })
+              .eq('id', compId)
+            if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+            void logAudit(supabase, {
+              userId: null,
+              entityType: 'competition',
+              entityId: compId,
+              action: 'status_change',
+              afterData: { from: status, to: 'ready_to_tabulate', trigger: 'auto_advance_on_sign_off' },
+            })
+          }
         }
       }
 
@@ -278,8 +298,11 @@ export default function TabulatorEntryPage({
 
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
+  const activeDancers = registrations.filter(
+    r => !NON_ACTIVE_STATUSES.includes((r.status ?? 'registered') as RegistrationStatus)
+  )
   const scoredCount = scores.length
-  const totalDancers = registrations.length
+  const totalDancers = activeDancers.length
   const selectedJudge = judges.find(j => j.id === selectedJudgeId)
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>

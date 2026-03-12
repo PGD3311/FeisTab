@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -183,20 +184,38 @@ export default function JudgeScoringPage({
         // Handles both in_progress → awaiting_scores → ready_to_tabulate
         // and awaiting_scores → ready_to_tabulate
         let currentStatus = currentComp?.status as CompetitionStatus
-        if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
-          const { error: midErr } = await supabase
-            .from('competitions')
-            .update({ status: 'awaiting_scores' })
-            .eq('id', compId)
-          if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
-          currentStatus = 'awaiting_scores' as CompetitionStatus
-        }
-        if (canTransition(currentStatus, 'ready_to_tabulate')) {
-          const { error: statusErr } = await supabase
-            .from('competitions')
-            .update({ status: 'ready_to_tabulate' })
-            .eq('id', compId)
-          if (statusErr) throw new Error(`Failed to update competition status: ${statusErr.message}`)
+        if (currentStatus === 'ready_to_tabulate') {
+          // Already there — idempotent, nothing to do
+        } else {
+          if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
+            const { error: midErr } = await supabase
+              .from('competitions')
+              .update({ status: 'awaiting_scores' })
+              .eq('id', compId)
+            if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
+            void logAudit(supabase, {
+              userId: null,
+              entityType: 'competition',
+              entityId: compId,
+              action: 'status_change',
+              afterData: { from: currentStatus, to: 'awaiting_scores', trigger: 'auto_advance_on_sign_off' },
+            })
+            currentStatus = 'awaiting_scores' as CompetitionStatus
+          }
+          if (canTransition(currentStatus, 'ready_to_tabulate')) {
+            const { error: statusErr } = await supabase
+              .from('competitions')
+              .update({ status: 'ready_to_tabulate' })
+              .eq('id', compId)
+            if (statusErr) throw new Error(`Failed to update competition status: ${statusErr.message}`)
+            void logAudit(supabase, {
+              userId: null,
+              entityType: 'competition',
+              entityId: compId,
+              action: 'status_change',
+              afterData: { from: currentStatus, to: 'ready_to_tabulate', trigger: 'auto_advance_on_sign_off' },
+            })
+          }
         }
       }
 
@@ -224,8 +243,11 @@ export default function JudgeScoringPage({
 
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
+  const activeDancers = registrations.filter(
+    r => !NON_ACTIVE_STATUSES.includes(r.status ?? 'registered')
+  )
   const scoredCount = scores.length
-  const totalDancers = registrations.length
+  const totalDancers = activeDancers.length
 
   return (
     <div>
