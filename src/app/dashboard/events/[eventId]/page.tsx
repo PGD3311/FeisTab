@@ -33,8 +33,25 @@ export default function EventOverviewPage() {
     c.status === 'complete_unpublished'
   )
 
+  // Weighted progress — reflects workflow completion, not just publication
+  const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
+    draft: 0,
+    imported: 10,
+    ready_for_day_of: 15,
+    in_progress: 30,
+    awaiting_scores: 40,
+    ready_to_tabulate: 60,
+    recalled_round_pending: 55,
+    complete_unpublished: 80,
+    published: 100,
+    locked: 100,
+  }
+
   const progressPct = competitions.length > 0
-    ? Math.round((statusGroups.published.length / competitions.length) * 100)
+    ? Math.round(
+        competitions.reduce((sum, c) => sum + (STATUS_WEIGHT[c.status] ?? 0), 0) /
+        (competitions.length * 100) * 100
+      )
     : 0
 
   // Group competitions by status phase for the pipeline
