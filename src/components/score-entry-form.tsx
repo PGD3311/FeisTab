@@ -34,15 +34,22 @@ export function ScoreEntryForm({
   const [saved, setSaved] = useState(false)
   const [flagged, setFlagged] = useState(existingFlagged ?? false)
   const [flagReason, setFlagReason] = useState(existingFlagReason ?? '')
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   async function handleSave() {
     const num = parseFloat(score)
     if (isNaN(num) || num < scoreMin || num > scoreMax) return
     setSaving(true)
-    await onSubmit(dancerId, num, flagged, flagged ? flagReason || null : null)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaveError(null)
+    try {
+      await onSubmit(dancerId, num, flagged, flagged ? flagReason || null : null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save score')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const numScore = parseFloat(score)
@@ -95,10 +102,14 @@ export function ScoreEntryForm({
           size="sm"
           onClick={handleSave}
           disabled={!isValid || saving || locked}
+          variant={saveError ? 'destructive' : 'default'}
         >
-          {saving ? '...' : saved ? '\u2713 Saved' : 'Save'}
+          {saving ? '...' : saveError ? 'Retry' : saved ? '\u2713 Saved' : 'Save'}
         </Button>
       </div>
+      {saveError && (
+        <p className="text-xs text-destructive mt-1 ml-16">{saveError}</p>
+      )}
     </div>
   )
 }
