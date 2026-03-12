@@ -19,7 +19,7 @@
 **Files:**
 - Modify: `src/app/globals.css`
 
-- [ ] **Step 1: Add CSS classes at the end of `@layer components`**
+- [x] **Step 1: Add CSS classes at the end of `@layer components`**
 
 Append before the closing `}` of `@layer components` in `globals.css`:
 
@@ -60,12 +60,12 @@ Append before the closing `}` of `@layer components` in `globals.css`:
   }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds with no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/globals.css
@@ -79,7 +79,7 @@ git commit -m "feat: add CSS classes for segmented tabs and context cards"
 **Files:**
 - Create: `src/contexts/event-context.tsx`
 
-- [ ] **Step 1: Create the context file**
+- [x] **Step 1: Create the context file**
 
 ```tsx
 'use client'
@@ -139,12 +139,12 @@ export function useEvent(): EventContextValue {
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/contexts/event-context.tsx
@@ -158,7 +158,7 @@ git commit -m "feat: add EventContext provider for shared event data"
 **Files:**
 - Create: `src/components/event-tabs.tsx`
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 ```tsx
 'use client'
@@ -201,12 +201,12 @@ export function EventTabs({ eventId }: { eventId: string }) {
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/components/event-tabs.tsx
@@ -223,7 +223,7 @@ git commit -m "feat: add EventTabs segmented control component"
 
 The context cards component receives competition data and computes the 4 metrics. Status groupings are centralized in `competition-states.ts` so they stay co-located with the status definitions.
 
-- [ ] **Step 1: Add status grouping helpers to `competition-states.ts`**
+- [x] **Step 1: Add status grouping helpers to `competition-states.ts`**
 
 Append to the end of `src/lib/competition-states.ts`:
 
@@ -239,7 +239,7 @@ export const BLOCKED_STATUSES: CompetitionStatus[] = [
 ]
 ```
 
-- [ ] **Step 2: Create the component**
+- [x] **Step 2: Create the component**
 
 ```tsx
 'use client'
@@ -284,12 +284,12 @@ export function EventContextCards({ competitions }: EventContextCardsProps) {
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/competition-states.ts src/components/event-context-cards.tsx
@@ -307,7 +307,7 @@ git commit -m "feat: add EventContextCards with centralized status groupings"
 
 This is the core of the redesign. The layout fetches event + competition data, provides it via context, and renders the header + cards + tabs chrome around `{children}`.
 
-- [ ] **Step 1: Create the layout**
+- [x] **Step 1: Create the layout**
 
 ```tsx
 'use client'
@@ -400,12 +400,12 @@ export default function EventLayout({
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds. Note: some child pages may now show duplicate headers — that's expected until we strip them in the next tasks.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/layout.tsx
@@ -421,7 +421,7 @@ git commit -m "feat: add shared event layout with header, context cards, and tab
 
 Strip the header, stats row, button row, and back nav — the layout provides all of that now. Keep only the competition list. Convert to client component consuming `useEvent()`. Replace the plain `Badge` with `CompetitionStatusBadge` for color-coded pills.
 
-- [ ] **Step 1: Rewrite the page**
+- [x] **Step 1: Rewrite the page**
 
 Replace the entire contents of `src/app/dashboard/events/[eventId]/page.tsx` with:
 
@@ -475,12 +475,12 @@ export default function EventOverviewPage() {
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds. Navigate to an event — should see layout chrome + competition list with colored status pills.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/page.tsx
@@ -496,7 +496,7 @@ git commit -m "refactor: simplify event overview page to use shared layout and c
 
 Strip the heading and back nav — the layout provides them. The competitions page **stays as a server component** — it fetches its own detailed data (rounds + score counts per competition) that the layout doesn't have. This is an intentional deviation from the spec: the spec said to convert it to client, but it needs server-side data not available in the layout context. Next.js supports server component children inside client layouts.
 
-- [ ] **Step 1: Update the page**
+- [x] **Step 1: Update the page**
 
 In `src/app/dashboard/events/[eventId]/competitions/page.tsx`:
 
@@ -516,12 +516,12 @@ The return should start directly with the table card, no heading wrapper:
   )
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/competitions/page.tsx
@@ -537,7 +537,7 @@ git commit -m "refactor: strip heading from competitions page (provided by layou
 
 Strip the heading, subtitle, and back nav link. Keep the Add Judge card and Judge List card.
 
-- [ ] **Step 1: Update the page**
+- [x] **Step 1: Update the page**
 
 In `src/app/dashboard/events/[eventId]/judges/page.tsx`:
 
@@ -546,12 +546,12 @@ In `src/app/dashboard/events/[eventId]/judges/page.tsx`:
 3. Remove the `<h1>` heading and the `<p>` subtitle below it
 4. The return should start with the Add Judge card directly
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/judges/page.tsx
@@ -567,7 +567,7 @@ git commit -m "refactor: strip heading from judges page (provided by layout)"
 
 Strip the heading and back nav link. Keep the upload card and preview/import functionality.
 
-- [ ] **Step 1: Update the page**
+- [x] **Step 1: Update the page**
 
 In `src/app/dashboard/events/[eventId]/import/page.tsx`:
 
@@ -576,12 +576,12 @@ In `src/app/dashboard/events/[eventId]/import/page.tsx`:
 3. Remove the `<h1>` heading
 4. The return should start with the Upload CSV card directly
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/import/page.tsx
@@ -597,7 +597,7 @@ git commit -m "refactor: strip heading from import page (provided by layout)"
 
 Strip the heading and back nav link.
 
-- [ ] **Step 1: Update the page**
+- [x] **Step 1: Update the page**
 
 In `src/app/dashboard/events/[eventId]/results/page.tsx`:
 
@@ -606,12 +606,12 @@ In `src/app/dashboard/events/[eventId]/results/page.tsx`:
 3. Remove the `<h1>` heading
 4. The return should start with the public results page info + cards directly
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/dashboard/events/\[eventId\]/results/page.tsx
@@ -627,7 +627,7 @@ git commit -m "refactor: strip heading from results page (provided by layout)"
 
 This page already imports `Link`. Add a `ChevronLeft` back arrow pointing to `/judge` at the top of the return JSX.
 
-- [ ] **Step 1: Add import and back link**
+- [x] **Step 1: Add import and back link**
 
 Add `import { ChevronLeft } from 'lucide-react'` to imports.
 
@@ -642,12 +642,12 @@ Add before the existing `<div className="flex items-center justify-between">`:
 </Link>
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `npm run build`
 Expected: Build succeeds.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/app/judge/\[eventId\]/page.tsx
@@ -658,17 +658,17 @@ git commit -m "feat: add back navigation to judge event page"
 
 ### Task 12: Final verification
 
-- [ ] **Step 1: Run full build**
+- [x] **Step 1: Run full build**
 
 Run: `npm run build`
 Expected: Build succeeds with all routes rendering.
 
-- [ ] **Step 2: Run all tests**
+- [x] **Step 2: Run all tests**
 
 Run: `npm test`
 Expected: All 97 tests pass. No test changes needed — this is a UI-only restructure.
 
-- [ ] **Step 3: Manual smoke test**
+- [x] **Step 3: Manual smoke test**
 
 Open `http://localhost:3000/dashboard` and verify:
 1. Click into an event — see layout with back arrow, header, 4 context cards, segmented tab bar

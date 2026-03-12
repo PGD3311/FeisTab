@@ -1,6 +1,17 @@
 # FeisTab — Project Rules
 
-Scoring and results engine for Irish dance competitions (feiseanna). Phase 1 prototype: judge entry → tabulation → verification → sign-off → results publishing.
+**Goal: Make tabulation and results trustworthy, fast, and hard to screw up.** Remove manual chaos from the most painful part of the competition workflow. Phase 1 is the scoring/results engine — not the whole feis, not registration, not full live event ops.
+
+**The Phase 1 chain:** judge scores → tabulation → anomaly checks → verification → sign-off → official results
+
+**What Phase 1 must deliver:**
+- Collect judge scoring data cleanly
+- Detect obvious blockers before results are finalized
+- Calculate results consistently using the rules
+- Show warnings/review signals without stopping everything
+- Block sign-off or publish when integrity/rules issues exist
+- Produce official results that can be reproduced from stored inputs
+- Leave an audit trail so the output is defensible
 
 ## Tech Stack
 - **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui v4
