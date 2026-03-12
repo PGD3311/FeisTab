@@ -18,6 +18,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
+import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +48,7 @@ export default function CompetitionDetailPage({
   const [unlockReason, setUnlockReason] = useState('')
   const [unlockNote, setUnlockNote] = useState('')
   const [unlocking, setUnlocking] = useState(false)
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -113,6 +115,33 @@ export default function CompetitionDetailPage({
     } else {
       setAnomalies([])
     }
+
+    // Fetch audit entries for this competition
+    const { data: auditByEntity } = await supabase
+      .from('audit_log')
+      .select('*')
+      .eq('entity_id', compId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    const { data: auditByPayload } = await supabase
+      .from('audit_log')
+      .select('*')
+      .contains('after_data', { competition_id: compId })
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    // Deduplicate by id
+    const auditMap = new Map<string, AuditEntry>()
+    for (const row of [...(auditByEntity ?? []), ...(auditByPayload ?? [])]) {
+      if (!auditMap.has(row.id)) {
+        auditMap.set(row.id, row as AuditEntry)
+      }
+    }
+    const sorted = [...auditMap.values()].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    setAuditEntries(sorted)
 
     setLoading(false)
   }
@@ -447,6 +476,25 @@ export default function CompetitionDetailPage({
     return msg
   }
 
+  const nameMaps: NameMaps = {
+    judges: new Map(judges.map(j => [j.id, `${j.first_name} ${j.last_name}`])),
+    dancers: new Map(registrations.map(r => [
+      r.dancer_id,
+      r.dancers ? `${r.dancers.first_name} ${r.dancers.last_name} (#${r.competitor_number})` : r.dancer_id,
+    ])),
+  }
+
+  function relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins} min ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
   if (loading) return <p className="text-muted-foreground">Loading...</p>
   if (!comp) return <p>Competition not found.</p>
 
@@ -677,6 +725,61 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Recent Activity */}
+      <Card className="feis-card">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>Recent Activity</span>
+            {auditEntries.length > 0 && (
+              <Link
+                href={`/dashboard/events/${eventId}/competitions/${compId}/audit`}
+                className="text-sm font-normal text-feis-green hover:underline"
+              >
+                View full audit trail →
+              </Link>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {auditEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No audit entries yet. Entries appear as scores are entered, sign-offs recorded, and actions taken.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 pr-3 font-medium text-xs">When</th>
+                  <th className="pb-2 pr-3 font-medium text-xs">Action</th>
+                  <th className="pb-2 font-medium text-xs">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditEntries.slice(0, 5).map(entry => {
+                  const formatted = formatAuditEntry(entry, nameMaps)
+                  return (
+                    <tr key={entry.id} className={`border-b last:border-0 ${formatted.isCorrection ? 'bg-orange-50' : ''}`}>
+                      <td
+                        className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap"
+                        title={new Date(entry.created_at).toLocaleString()}
+                      >
+                        {relativeTime(entry.created_at)}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${formatted.badgeColor}`}>
+                          {formatted.badgeText}
+                        </span>
+                      </td>
+                      <td className="py-2 text-xs">{formatted.summary}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Corrections */}
       {(comp.status === 'ready_to_tabulate' || comp.status === 'complete_unpublished') && (
