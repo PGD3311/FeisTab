@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
+import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -188,6 +189,20 @@ export default function TabulatorEntryPage({
       return
     }
 
+    void logAudit(supabase, {
+      userId: null,
+      entityType: 'score_entry',
+      entityId: compId,
+      action: 'score_transcribe',
+      afterData: {
+        dancer_id: dancerId,
+        judge_id: selectedJudgeId,
+        raw_score: score,
+        flagged,
+        entry_mode: 'tabulator_transcription',
+      },
+    })
+
     await loadJudgeScores(selectedJudgeId)
   }
 
@@ -227,6 +242,19 @@ export default function TabulatorEntryPage({
 
         if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
       }
+
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'round',
+        entityId: round.id,
+        action: 'sign_off',
+        afterData: {
+          judge_id: selectedJudgeId,
+          competition_id: compId,
+          entry_mode: 'tabulator_transcription',
+          all_judges_done: allDone,
+        },
+      })
 
       setSignedOff(true)
       setRound({ ...round, judge_sign_offs: updatedSignOffs })
