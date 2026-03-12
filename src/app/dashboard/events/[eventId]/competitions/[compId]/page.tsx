@@ -431,18 +431,18 @@ export default function CompetitionDetailPage({
 
   function resolveAnomalyMessage(anomaly: Anomaly): string {
     let msg = anomaly.message
-    const judgeId = anomaly.entity_ids.judge_id
-    if (judgeId) {
-      const judge = judges.find(j => j.id === judgeId)
-      if (judge) msg = msg.replace(judgeId, `${judge.first_name} ${judge.last_name}`)
+    for (const j of judges) {
+      if (msg.includes(j.id)) {
+        msg = msg.replaceAll(j.id, `${j.first_name} ${j.last_name}`)
+      }
     }
-    const dancerId = anomaly.entity_ids.dancer_id
-    if (dancerId) {
-      const reg = registrations.find(r => r.dancer_id === dancerId)
-      const name = reg?.dancers
-        ? `${reg.dancers.first_name} ${reg.dancers.last_name} (#${reg.competitor_number})`
-        : dancerId
-      msg = msg.replace(dancerId, name)
+    for (const reg of registrations) {
+      if (msg.includes(reg.dancer_id)) {
+        const name = reg.dancers
+          ? `${reg.dancers.first_name} ${reg.dancers.last_name} (#${reg.competitor_number})`
+          : reg.dancer_id
+        msg = msg.replaceAll(reg.dancer_id, name)
+      }
     }
     return msg
   }
