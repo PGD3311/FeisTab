@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
-import { tabulate, type ScoreInput } from '@/lib/engine/tabulate'
+import { tabulate, type ScoreInput, type TabulationResult } from '@/lib/engine/tabulate'
 import { generateRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
 import { detectAnomalies, type Anomaly, type AnomalyInput } from '@/lib/engine/anomalies'
@@ -42,6 +42,11 @@ export default function CompetitionDetailPage({
   const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [advancing, setAdvancing] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [previewResults, setPreviewResults] = useState<TabulationResult[] | null>(null)
+  const [unlockJudgeId, setUnlockJudgeId] = useState<string | null>(null)
+  const [unlockReason, setUnlockReason] = useState('')
+  const [unlockNote, setUnlockNote] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
@@ -114,7 +119,7 @@ export default function CompetitionDetailPage({
 
   useEffect(() => { loadData() }, [])
 
-  async function handleTabulate() {
+  async function handlePreviewTabulation() {
     if (!ruleset || !comp) return
 
     const currentStatus = comp.status as CompetitionStatus
@@ -125,19 +130,29 @@ export default function CompetitionDetailPage({
 
     setActionError(null)
 
+    const roundScores: ScoreInput[] = scores
+      .filter(s => s.round_id === latestRound.id)
+      .map(s => ({
+        dancer_id: s.dancer_id,
+        judge_id: s.judge_id,
+        raw_score: Number(s.raw_score),
+        flagged: s.flagged ?? false,
+      }))
+
+    const tabulationResults = tabulate(roundScores, ruleset)
+    setPreviewResults(tabulationResults)
+  }
+
+  async function handleApproveResults() {
+    if (!previewResults || !ruleset || !comp) return
+
+    const latestRound = rounds[rounds.length - 1]
+    if (!latestRound) return
+
+    setActionError(null)
+
     try {
-      const roundScores: ScoreInput[] = scores
-        .filter(s => s.round_id === latestRound.id)
-        .map(s => ({
-          dancer_id: s.dancer_id,
-          judge_id: s.judge_id,
-          raw_score: Number(s.raw_score),
-          flagged: s.flagged ?? false,
-        }))
-
-      const tabulationResults = tabulate(roundScores, ruleset)
-
-      for (const r of tabulationResults) {
+      for (const r of previewResults) {
         const { error } = await supabase.from('results').upsert(
           {
             competition_id: compId,
@@ -166,12 +181,13 @@ export default function CompetitionDetailPage({
         entityType: 'competition',
         entityId: compId,
         action: 'tabulate',
-        afterData: { result_count: tabulationResults.length, round_id: latestRound.id },
+        afterData: { result_count: previewResults.length, round_id: latestRound.id },
       })
 
+      setPreviewResults(null)
       await loadData()
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Tabulation failed')
+      setActionError(err instanceof Error ? err.message : 'Failed to save results')
     }
   }
 
@@ -324,6 +340,91 @@ export default function CompetitionDetailPage({
     }
   }
 
+  const UNLOCK_REASONS = [
+    { value: 'wrong_score', label: 'Wrong score entered' },
+    { value: 'wrong_dancer', label: 'Wrong dancer selected' },
+    { value: 'judge_requested', label: 'Judge requested change' },
+    { value: 'data_entry_error', label: 'Data entry error' },
+    { value: 'other', label: 'Other' },
+  ] as const
+
+  async function handleUnlockForCorrection() {
+    if (!unlockJudgeId || !unlockReason || !comp) return
+    if (unlockReason === 'other' && !unlockNote.trim()) return
+
+    const currentStatus = comp.status as CompetitionStatus
+    if (!canTransition(currentStatus, 'awaiting_scores')) return
+
+    const latestRnd = rounds[rounds.length - 1]
+    if (!latestRnd) return
+
+    setUnlocking(true)
+    setActionError(null)
+
+    try {
+      // 1. Remove judge's sign-off
+      const currentSignOffs = latestRnd.judge_sign_offs ?? {}
+      const { [unlockJudgeId]: _, ...remainingSignOffs } = currentSignOffs
+      const { error: signOffErr } = await supabase
+        .from('rounds')
+        .update({ judge_sign_offs: remainingSignOffs })
+        .eq('id', latestRnd.id)
+      if (signOffErr) throw new Error(`Failed to remove sign-off: ${signOffErr.message}`)
+
+      // 2. Unlock judge's scores (clear locked_at)
+      const { error: unlockErr } = await supabase
+        .from('score_entries')
+        .update({ locked_at: null })
+        .eq('round_id', latestRnd.id)
+        .eq('judge_id', unlockJudgeId)
+      if (unlockErr) throw new Error(`Failed to unlock scores: ${unlockErr.message}`)
+
+      // 3. If complete_unpublished, clear stale results
+      if (currentStatus === 'complete_unpublished') {
+        const { error: clearErr } = await supabase
+          .from('results')
+          .delete()
+          .eq('competition_id', compId)
+        if (clearErr) throw new Error(`Failed to clear stale results: ${clearErr.message}`)
+      }
+
+      // 4. Transition back to awaiting_scores
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({ status: 'awaiting_scores' })
+        .eq('id', compId)
+      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+
+      // 5. Audit log
+      const unlockJudge = judges.find(j => j.id === unlockJudgeId)
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'unlock_for_correction',
+        beforeData: { status: currentStatus, judge_id: unlockJudgeId },
+        afterData: {
+          status: 'awaiting_scores',
+          judge_id: unlockJudgeId,
+          judge_name: unlockJudge ? `${unlockJudge.first_name} ${unlockJudge.last_name}` : null,
+          reason: unlockReason,
+          note: unlockNote.trim() || null,
+          results_cleared: currentStatus === 'complete_unpublished',
+        },
+      })
+
+      // Reset form
+      setUnlockJudgeId(null)
+      setUnlockReason('')
+      setUnlockNote('')
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Unlock failed')
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
   const latestRound = rounds[rounds.length - 1]
   const allSignedOff = latestRound && judges.length > 0 &&
     judges.every(j => latestRound.judge_sign_offs?.[j.id])
@@ -387,9 +488,10 @@ export default function CompetitionDetailPage({
         const currentStatus = comp.status as CompetitionStatus
         const nextStates = getNextStates(currentStatus)
         // Only show operator-driven transitions (not tabulate/recalls/publish — those have their own buttons)
-        const operatorTransitions = nextStates.filter(s =>
-          ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
-        )
+        const operatorTransitions = nextStates.filter(s => {
+          if (s === 'awaiting_scores' && currentStatus !== 'in_progress') return false
+          return ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
+        })
 
         if (operatorTransitions.length === 0) return null
 
@@ -576,6 +678,99 @@ export default function CompetitionDetailPage({
         </Card>
       )}
 
+      {/* Corrections */}
+      {(comp.status === 'ready_to_tabulate' || comp.status === 'complete_unpublished') && (
+        <Card className="feis-card border-feis-orange/30">
+          <CardHeader>
+            <CardTitle className="text-lg">Corrections</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {comp.status === 'complete_unpublished' && (
+              <div className="p-3 rounded-md bg-feis-orange/10 border border-feis-orange/30 text-sm">
+                <p className="font-medium text-feis-orange">Results have been tabulated.</p>
+                <p className="text-muted-foreground mt-1">
+                  Unlocking a judge&apos;s scores will clear all current results and require re-tabulation.
+                </p>
+              </div>
+            )}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Judge to unlock</label>
+                <select
+                  value={unlockJudgeId ?? ''}
+                  onChange={e => setUnlockJudgeId(e.target.value || null)}
+                  className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                >
+                  <option value="">Select judge...</option>
+                  {judges.map(j => {
+                    const signedOff = latestRound?.judge_sign_offs?.[j.id]
+                    return (
+                      <option key={j.id} value={j.id} disabled={!signedOff}>
+                        {j.first_name} {j.last_name}
+                        {signedOff ? '' : ' (not signed off)'}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+              {unlockJudgeId && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium">Reason for correction</label>
+                    <select
+                      value={unlockReason}
+                      onChange={e => setUnlockReason(e.target.value)}
+                      className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                    >
+                      <option value="">Select reason...</option>
+                      {UNLOCK_REASONS.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {unlockReason === 'other' && (
+                    <div>
+                      <label className="text-sm font-medium">Note (required for &quot;Other&quot;)</label>
+                      <input
+                        type="text"
+                        value={unlockNote}
+                        onChange={e => setUnlockNote(e.target.value)}
+                        placeholder="Briefly describe the correction needed..."
+                        className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                      />
+                    </div>
+                  )}
+                  {unlockReason && unlockReason !== 'other' && (
+                    <div>
+                      <label className="text-sm font-medium">Optional note</label>
+                      <input
+                        type="text"
+                        value={unlockNote}
+                        onChange={e => setUnlockNote(e.target.value)}
+                        placeholder="Additional context (optional)..."
+                        className="w-full max-w-md border rounded-md px-3 py-2 text-sm mt-1"
+                      />
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleUnlockForCorrection}
+                    variant="outline"
+                    disabled={
+                      !unlockReason ||
+                      (unlockReason === 'other' && !unlockNote.trim()) ||
+                      unlocking
+                    }
+                    className="border-feis-orange text-feis-orange hover:bg-feis-orange/10"
+                  >
+                    {unlocking ? 'Unlocking...' : 'Unlock for Correction'}
+                  </Button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Actions */}
       <Card className="feis-card">
         <CardHeader>
@@ -594,15 +789,17 @@ export default function CompetitionDetailPage({
             </Link>
           )}
           <Button
-            onClick={handleTabulate}
+            onClick={handlePreviewTabulation}
             variant="default"
-            disabled={!allSignedOff || anomalies.some(a => a.blocking)}
+            disabled={!allSignedOff || anomalies.some(a => a.blocking) || !!previewResults}
           >
             {anomalies.some(a => a.blocking)
               ? 'Resolve blockers before tabulation'
               : !allSignedOff
                 ? 'Waiting for judge sign-offs...'
-                : 'Run Tabulation'}
+                : previewResults
+                  ? 'Preview shown below'
+                  : 'Run Tabulation'}
           </Button>
           {ruleset && ruleset.recall_top_percent > 0 && (
             <Button onClick={handleGenerateRecalls} variant="outline">
@@ -617,6 +814,70 @@ export default function CompetitionDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Tabulation Preview */}
+      {previewResults && (
+        <Card className="feis-card border-feis-orange/50 bg-feis-orange/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Tabulation Preview</span>
+              <Badge variant="outline" className="border-feis-orange text-feis-orange">
+                Not saved — not official
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="border rounded-md overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="feis-thead">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Place</th>
+                    <th className="px-4 py-2 text-left">Dancer</th>
+                    <th className="px-4 py-2 text-right">Points</th>
+                    {judges.map(j => (
+                      <th key={j.id} className="px-4 py-2 text-right text-xs">
+                        {j.first_name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="feis-tbody">
+                  {previewResults.map(r => {
+                    const reg = registrations.find(reg => reg.dancer_id === r.dancer_id)
+                    return (
+                      <tr key={r.dancer_id} className="border-t">
+                        <td className={`px-4 py-2 font-bold ${r.final_rank === 1 ? 'feis-place-1' : r.final_rank === 2 ? 'feis-place-2' : r.final_rank === 3 ? 'feis-place-3' : ''}`}>
+                          {r.final_rank}
+                        </td>
+                        <td className="px-4 py-2">
+                          {reg?.dancers?.first_name} {reg?.dancers?.last_name}
+                        </td>
+                        <td className="px-4 py-2 text-right">{r.total_points}</td>
+                        {judges.map(j => {
+                          const jr = r.individual_ranks.find(ir => ir.judge_id === j.id)
+                          return (
+                            <td key={j.id} className="px-4 py-2 text-right text-xs text-muted-foreground">
+                              {jr ? `#${jr.rank} (${jr.irish_points}pts)` : '—'}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleApproveResults} variant="default">
+                Approve & Save Results
+              </Button>
+              <Button onClick={() => setPreviewResults(null)} variant="outline">
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results Preview */}
       {results.length > 0 && (

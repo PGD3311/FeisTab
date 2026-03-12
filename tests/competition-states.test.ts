@@ -39,6 +39,14 @@ describe('competition state machine', () => {
     const next = getNextStates('awaiting_scores')
     expect(next).toContain('ready_to_tabulate')
   })
+
+  it('allows ready_to_tabulate -> awaiting_scores (correction)', () => {
+    expect(canTransition('ready_to_tabulate', 'awaiting_scores')).toBe(true)
+  })
+
+  it('allows complete_unpublished -> awaiting_scores (correction)', () => {
+    expect(canTransition('complete_unpublished', 'awaiting_scores')).toBe(true)
+  })
 })
 
 describe('getTransitionLabel', () => {
@@ -60,6 +68,14 @@ describe('getTransitionLabel', () => {
 
   it('returns generic label for unmapped transitions', () => {
     expect(getTransitionLabel('published', 'locked')).toBe('Advance to Locked')
+  })
+
+  it('returns label for ready_to_tabulate -> awaiting_scores', () => {
+    expect(getTransitionLabel('ready_to_tabulate', 'awaiting_scores')).toBe('Unlock for Correction')
+  })
+
+  it('returns label for complete_unpublished -> awaiting_scores', () => {
+    expect(getTransitionLabel('complete_unpublished', 'awaiting_scores')).toBe('Unlock for Correction')
   })
 })
 
