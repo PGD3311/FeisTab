@@ -413,7 +413,7 @@ export default function TabulatorEntryPage({
               const existing = scores.find(s => s.dancer_id === reg.dancer_id)
               return (
                 <ScoreEntryForm
-                  key={reg.id}
+                  key={`${selectedJudgeId}-${reg.id}`}
                   dancerId={reg.dancer_id}
                   dancerName={`${reg.dancers?.first_name ?? ''} ${reg.dancers?.last_name ?? ''}`}
                   competitorNumber={reg.competitor_number}
