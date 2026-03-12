@@ -49,7 +49,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       const { data: defaultRuleset } = await supabase
         .from('rule_sets')
         .select('id')
-        .eq('name', 'Default - Raw Score Average')
+        .eq('name', 'Default - Irish Points')
         .single()
 
       // --- Step 1: Batch upsert all unique dancers ---
