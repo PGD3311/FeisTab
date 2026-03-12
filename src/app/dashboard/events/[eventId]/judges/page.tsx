@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,14 +82,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
 
   return (
     <div className="max-w-2xl">
-      <Link href={`/dashboard/events/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
-        <ChevronLeft className="h-4 w-4" /> Event
-      </Link>
-      <h1 className="text-3xl font-bold mb-2">Judges</h1>
-      <p className="text-muted-foreground text-sm mb-6">
-        Add judges and share their access codes. Judges go to <span className="font-mono text-feis-green">/judge</span> and enter their code.
-      </p>
-
       <Card className="feis-card mb-6">
         <CardHeader>
           <CardTitle className="text-lg">Add Judge</CardTitle>

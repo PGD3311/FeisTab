@@ -7,6 +7,7 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ChevronLeft } from 'lucide-react'
 
 interface JudgeSession {
   judge_id: string
@@ -64,6 +65,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/judge"
+        className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1"
+      >
+        <ChevronLeft className="h-4 w-4" /> Back
+      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{event?.name}</h1>

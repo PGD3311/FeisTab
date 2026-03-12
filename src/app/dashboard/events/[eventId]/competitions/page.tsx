@@ -1,20 +1,12 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
+
+export const dynamic = 'force-dynamic'
 
 export default async function CompetitionsPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params
   const supabase = await createClient()
-
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name')
-    .eq('id', eventId)
-    .single()
-
-  if (!event) notFound()
 
   const { data: competitions } = await supabase
     .from('competitions')
@@ -32,63 +24,53 @@ export default async function CompetitionsPage({ params }: { params: Promise<{ e
     .order('code')
 
   return (
-    <div>
-      <Link href={`/dashboard/events/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
-        <ChevronLeft className="h-4 w-4" /> Event
-      </Link>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Competition Control</h1>
-          <p className="text-sm text-muted-foreground">{event.name}</p>
-        </div>
-      </div>
-
-      <div className="feis-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="feis-thead">
-            <tr>
-              <th className="text-left font-medium">Code</th>
-              <th className="text-left font-medium">Competition</th>
-              <th className="text-left font-medium">Age/Level</th>
-              <th className="text-center font-medium">Dancers</th>
-              <th className="text-center font-medium">Scores</th>
-              <th className="text-center font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="feis-tbody">
-            {competitions?.map(comp => {
-              const totalScores = comp.rounds?.reduce(
+    <div className="feis-card overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="feis-thead">
+          <tr>
+            <th className="text-left font-medium">Code</th>
+            <th className="text-left font-medium">Competition</th>
+            <th className="text-left font-medium">Age/Level</th>
+            <th className="text-center font-medium">Dancers</th>
+            <th className="text-center font-medium">Scores</th>
+            <th className="text-center font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody className="feis-tbody">
+          {competitions?.map((comp) => {
+            const totalScores =
+              comp.rounds?.reduce(
                 (sum: number, r: { score_entries: { count: number }[] }) =>
-                  sum + (r.score_entries?.[0]?.count ?? 0), 0
+                  sum + (r.score_entries?.[0]?.count ?? 0),
+                0
               ) ?? 0
 
-              return (
-                <tr key={comp.id} className="border-t">
-                  <td className="px-4 py-3 font-mono text-xs text-feis-green/70">{comp.code}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/events/${eventId}/competitions/${comp.id}`}
-                      className="font-medium text-feis-green hover:underline"
-                    >
-                      {comp.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {comp.age_group} · {comp.level}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {comp.registrations?.[0]?.count ?? 0}
-                  </td>
-                  <td className="px-4 py-3 text-center">{totalScores}</td>
-                  <td className="px-4 py-3 text-center">
-                    <CompetitionStatusBadge status={comp.status} />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+            return (
+              <tr key={comp.id} className="border-t">
+                <td className="px-4 py-3 font-mono text-xs text-feis-green/70">{comp.code}</td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/dashboard/events/${eventId}/competitions/${comp.id}`}
+                    className="font-medium text-feis-green hover:underline"
+                  >
+                    {comp.name}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {comp.age_group} · {comp.level}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {comp.registrations?.[0]?.count ?? 0}
+                </td>
+                <td className="px-4 py-3 text-center">{totalScores}</td>
+                <td className="px-4 py-3 text-center">
+                  <CompetitionStatusBadge status={comp.status} />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

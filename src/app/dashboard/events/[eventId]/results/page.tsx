@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
@@ -64,11 +62,6 @@ export default function ResultsPublishingPage({
 
   return (
     <div>
-      <Link href={`/dashboard/events/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1 mb-4">
-        <ChevronLeft className="h-4 w-4" /> Event
-      </Link>
-      <h1 className="text-3xl font-bold mb-6">Results Publishing</h1>
-
       <div className="flex items-center gap-4 mb-6">
         <span className="text-sm text-muted-foreground">
           Public results page:
