@@ -227,4 +227,39 @@
     line-height: 1;
     color: #0B4D2C;
   }
+
+  /* Segmented tab bar */
+  .feis-segmented-bar {
+    display: inline-flex;
+    background-color: var(--color-feis-green-light);
+    border-radius: 8px;
+    padding: 3px;
+    overflow-x: auto;
+  }
+
+  .feis-segmented-tab {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    transition: all 0.15s ease;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .feis-segmented-tab-active {
+    background: white;
+    color: var(--color-feis-green);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Context card */
+  .feis-context-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
 }
