@@ -173,15 +173,27 @@ export default function JudgeScoringPage({
         .eq('id', round.id)
       if (signOffErr) throw new Error(`Failed to record sign-off: ${signOffErr.message}`)
 
-      // Check if all judges have now signed off
-      const { data: allJudges, error: judgesErr } = await supabase
-        .from('judges')
-        .select('id')
-        .eq('event_id', eventId)
-      if (judgesErr) throw new Error(`Failed to check judges: ${judgesErr.message}`)
+      // Check if all ASSIGNED judges (not all event judges) have signed off
+      const { data: assignments, error: assignErr } = await supabase
+        .from('judge_assignments')
+        .select('judge_id')
+        .eq('competition_id', compId)
+      if (assignErr) throw new Error(`Failed to check judge assignments: ${assignErr.message}`)
 
-      const allJudgeIds = allJudges?.map(j => j.id) ?? []
-      const allDone = allJudgeIds.length > 0 && allJudgeIds.every(id => updatedSignOffs[id])
+      // Fall back to all event judges if no assignments exist
+      let assignedJudgeIds: string[]
+      if (assignments && assignments.length > 0) {
+        assignedJudgeIds = assignments.map((a: { judge_id: string }) => a.judge_id)
+      } else {
+        const { data: allJudges, error: judgesErr } = await supabase
+          .from('judges')
+          .select('id')
+          .eq('event_id', eventId)
+        if (judgesErr) throw new Error(`Failed to check judges: ${judgesErr.message}`)
+        assignedJudgeIds = allJudges?.map(j => j.id) ?? []
+      }
+
+      const allDone = assignedJudgeIds.length > 0 && assignedJudgeIds.every(id => updatedSignOffs[id])
 
       if (allDone) {
         const { data: currentComp, error: compErr } = await supabase
@@ -349,7 +361,26 @@ export default function JudgeScoringPage({
               </div>
               {(!isHeatComplete || isCurrentHeat) && (
                 <div className="p-2 space-y-2">
-                  {heatRegs.map(reg => renderScoreEntry(reg))}
+                  {heatRegs.map(reg => {
+                    const slot = heat.slots.find(s => s.dancer_id === reg.dancer_id)
+                    const isInactive = slot && slot.status !== 'active'
+                    if (isInactive) {
+                      return (
+                        <div key={reg.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/50 opacity-60">
+                          <span className="font-mono text-base w-12 text-right text-muted-foreground">
+                            #{reg.competitor_number ?? '—'}
+                          </span>
+                          <span className="text-muted-foreground line-through">
+                            {reg.dancers?.first_name} {reg.dancers?.last_name}
+                          </span>
+                          <Badge variant="outline" className="text-orange-600 border-orange-300 ml-auto">
+                            {slot.status === 'scratched' ? 'Scratched' : slot.status === 'no_show' ? 'No Show' : slot.status}
+                          </Badge>
+                        </div>
+                      )
+                    }
+                    return renderScoreEntry(reg)
+                  })}
                 </div>
               )}
             </div>
