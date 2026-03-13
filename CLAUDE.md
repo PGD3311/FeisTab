@@ -110,6 +110,7 @@ FeisTab is planned in 3 phases. **Only Phase 1 exists now.**
 - Verification and sign-off workflow
 - Results publishing
 - Judge management (setup for scoring)
+- Registration desk check-in (competitor number assignment)
 
 ### Phase 2 — Registration and Pre-Event Setup (FUTURE)
 School/teacher registration, dancer entry, competition assignment, payment, pre-event validation.
