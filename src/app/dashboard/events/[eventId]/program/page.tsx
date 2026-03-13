@@ -1,0 +1,358 @@
+'use client'
+
+import { useEffect, useState, use } from 'react'
+import { ChevronUp, ChevronDown } from 'lucide-react'
+import { useSupabase } from '@/hooks/use-supabase'
+import { showSuccess, showError } from '@/lib/feedback'
+import { type CompetitionStatus } from '@/lib/competition-states'
+import { CompetitionStatusBadge } from '@/components/competition-status-badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+
+interface Stage {
+  id: string
+  name: string
+  display_order: number
+}
+
+interface Competition {
+  id: string
+  code: string | null
+  name: string
+  age_group: string | null
+  level: string | null
+  status: string
+  stage_id: string | null
+  schedule_position: number | null
+  dance_type: string | null
+  group_size: number | null
+  registrations: { count: number }[] | null
+}
+
+export default function ProgramPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>
+}) {
+  const { eventId } = use(params)
+  const supabase = useSupabase()
+  const [stages, setStages] = useState<Stage[]>([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [loading, setLoading] = useState(true)
+  const [reordering, setReordering] = useState(false)
+
+  async function loadData() {
+    const [stagesRes, compsRes] = await Promise.all([
+      supabase
+        .from('stages')
+        .select('id, name, display_order')
+        .eq('event_id', eventId)
+        .order('display_order'),
+      supabase
+        .from('competitions')
+        .select('id, code, name, age_group, level, status, stage_id, schedule_position, dance_type, group_size, registrations(count)')
+        .eq('event_id', eventId)
+        .order('schedule_position', { nullsFirst: false }),
+    ])
+
+    if (stagesRes.error) {
+      console.error('Failed to load stages:', stagesRes.error.message)
+    }
+    if (compsRes.error) {
+      console.error('Failed to load competitions:', compsRes.error.message)
+    }
+
+    setStages(stagesRes.data ?? [])
+    setCompetitions((compsRes.data as Competition[] | null) ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [eventId])
+
+  function getCompsForStage(stageId: string): Competition[] {
+    return competitions
+      .filter(c => c.stage_id === stageId)
+      .sort((a, b) => (a.schedule_position ?? 9999) - (b.schedule_position ?? 9999))
+  }
+
+  function getUnassignedComps(): Competition[] {
+    return competitions
+      .filter(c => !c.stage_id)
+      .sort((a, b) => {
+        const codeA = a.code ?? ''
+        const codeB = b.code ?? ''
+        return codeA.localeCompare(codeB)
+      })
+  }
+
+  async function handleMoveUp(stageId: string, compId: string) {
+    const stageComps = getCompsForStage(stageId)
+    const idx = stageComps.findIndex(c => c.id === compId)
+    if (idx <= 0) return
+
+    setReordering(true)
+    try {
+      // Swap positions
+      const newOrder = [...stageComps]
+      const temp = newOrder[idx]
+      newOrder[idx] = newOrder[idx - 1]
+      newOrder[idx - 1] = temp
+
+      // Batch update positions
+      const updates = newOrder.map((c, i) => ({
+        id: c.id,
+        schedule_position: i + 1,
+      }))
+
+      for (const u of updates) {
+        const { error } = await supabase
+          .from('competitions')
+          .update({ schedule_position: u.schedule_position })
+          .eq('id', u.id)
+        if (error) {
+          throw new Error(`Failed to update position for ${u.id}: ${error.message}`)
+        }
+      }
+
+      await loadData()
+      showSuccess('Order updated')
+    } catch (err) {
+      showError('Failed to reorder', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setReordering(false)
+    }
+  }
+
+  async function handleMoveDown(stageId: string, compId: string) {
+    const stageComps = getCompsForStage(stageId)
+    const idx = stageComps.findIndex(c => c.id === compId)
+    if (idx < 0 || idx >= stageComps.length - 1) return
+
+    setReordering(true)
+    try {
+      // Swap positions
+      const newOrder = [...stageComps]
+      const temp = newOrder[idx]
+      newOrder[idx] = newOrder[idx + 1]
+      newOrder[idx + 1] = temp
+
+      // Batch update positions
+      const updates = newOrder.map((c, i) => ({
+        id: c.id,
+        schedule_position: i + 1,
+      }))
+
+      for (const u of updates) {
+        const { error } = await supabase
+          .from('competitions')
+          .update({ schedule_position: u.schedule_position })
+          .eq('id', u.id)
+        if (error) {
+          throw new Error(`Failed to update position for ${u.id}: ${error.message}`)
+        }
+      }
+
+      await loadData()
+      showSuccess('Order updated')
+    } catch (err) {
+      showError('Failed to reorder', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setReordering(false)
+    }
+  }
+
+  async function handleQuickAssign(compId: string, stageId: string) {
+    const stageComps = getCompsForStage(stageId)
+    const nextPosition = stageComps.length > 0
+      ? Math.max(...stageComps.map(c => c.schedule_position ?? 0)) + 1
+      : 1
+
+    const { error } = await supabase
+      .from('competitions')
+      .update({ stage_id: stageId, schedule_position: nextPosition })
+      .eq('id', compId)
+
+    if (error) {
+      showError('Failed to assign stage', { description: error.message })
+      return
+    }
+
+    await loadData()
+    showSuccess('Stage assigned')
+  }
+
+  function formatDanceType(dt: string | null): string {
+    if (!dt) return ''
+    return dt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  }
+
+  if (loading) return <p className="text-muted-foreground">Loading...</p>
+
+  const unassigned = getUnassignedComps()
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Program / Schedule</h2>
+        <span className="text-sm text-muted-foreground">
+          {competitions.length} competition{competitions.length !== 1 ? 's' : ''} total
+        </span>
+      </div>
+
+      {/* Stage sections */}
+      {stages.map(stage => {
+        const stageComps = getCompsForStage(stage.id)
+
+        return (
+          <Card key={stage.id} className="feis-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>{stage.name}</span>
+                <Badge variant="outline">
+                  {stageComps.length} competition{stageComps.length !== 1 ? 's' : ''}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stageComps.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No competitions assigned to this stage yet.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {stageComps.map((comp, idx) => (
+                    <div
+                      key={comp.id}
+                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-feis-green-light/30 transition-colors group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="font-mono text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
+                          {comp.schedule_position ?? idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="font-medium text-sm">
+                            {comp.code && (
+                              <span className="font-mono text-feis-green/50 mr-1.5">
+                                {comp.code}
+                              </span>
+                            )}
+                            {comp.name}
+                          </span>
+                          <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                            {comp.age_group} · {comp.level}
+                            {comp.dance_type && ` · ${formatDanceType(comp.dance_type)}`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-3 shrink-0">
+                        <span className="text-xs text-muted-foreground hidden sm:inline tabular-nums">
+                          {comp.registrations?.[0]?.count ?? 0}
+                        </span>
+                        {comp.group_size && comp.group_size !== 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            grp {comp.group_size}
+                          </Badge>
+                        )}
+                        <CompetitionStatusBadge status={comp.status as CompetitionStatus} />
+                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0"
+                            disabled={idx === 0 || reordering}
+                            onClick={() => handleMoveUp(stage.id, comp.id)}
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0"
+                            disabled={idx === stageComps.length - 1 || reordering}
+                            onClick={() => handleMoveDown(stage.id, comp.id)}
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
+
+      {/* Unassigned competitions */}
+      {unassigned.length > 0 && (
+        <Card className="feis-card border-feis-orange/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Unassigned</span>
+              <Badge variant="outline" className="border-feis-orange/40 text-feis-orange">
+                {unassigned.length} competition{unassigned.length !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              {unassigned.map(comp => (
+                <div
+                  key={comp.id}
+                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-feis-orange/5 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-sm">
+                      {comp.code && (
+                        <span className="font-mono text-feis-green/50 mr-1.5">
+                          {comp.code}
+                        </span>
+                      )}
+                      {comp.name}
+                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                      {comp.age_group} · {comp.level}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    <CompetitionStatusBadge status={comp.status as CompetitionStatus} />
+                    {stages.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleQuickAssign(comp.id, e.target.value)
+                          }
+                        }}
+                        className="text-xs border rounded px-2 py-1"
+                      >
+                        <option value="">Assign to...</option>
+                        {stages.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {competitions.length === 0 && (
+        <p className="text-center text-muted-foreground py-8">
+          No competitions yet. Import competitions first.
+        </p>
+      )}
+    </div>
+  )
+}

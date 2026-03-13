@@ -52,9 +52,10 @@ export default function CompetitionDetailPage({
   const [unlocking, setUnlocking] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [loadWarning, setLoadWarning] = useState(false)
+  const [stages, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
 
   async function loadData() {
-    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes] = await Promise.all([
+    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes, stagesRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
       supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number'),
@@ -62,6 +63,7 @@ export default function CompetitionDetailPage({
       supabase.from('results').select('*, dancers(*)').eq('competition_id', compId).order('final_rank'),
       supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
       supabase.from('judge_assignments').select('judge_id').eq('competition_id', compId),
+      supabase.from('stages').select('id, name, display_order').eq('event_id', eventId).order('display_order'),
     ])
 
     if (compRes.error) {
@@ -75,6 +77,7 @@ export default function CompetitionDetailPage({
     if (resultRes.error) console.error('Failed to load results:', resultRes.error.message)
     if (judgesRes.error) console.error('Failed to load judges:', judgesRes.error.message)
     if (assignRes.error) console.error('Failed to load judge assignments:', assignRes.error.message)
+    if (stagesRes.error) console.error('Failed to load stages:', stagesRes.error.message)
 
     if (regRes.error || roundRes.error || scoreRes.error || resultRes.error || judgesRes.error) {
       setLoadWarning(true)
@@ -90,6 +93,7 @@ export default function CompetitionDetailPage({
     setRuleset(compRes.data?.rule_sets?.config as RuleSetConfig | null ?? null)
     setJudges(judgesRes.data ?? [])
     setAssignedJudgeIds((assignRes.data ?? []).map((a: { judge_id: string }) => a.judge_id))
+    setStages(stagesRes.data ?? [])
 
     const latestRound = roundRes.data?.[roundRes.data.length - 1]
     if (latestRound && judgesRes.data) {
@@ -565,6 +569,117 @@ export default function CompetitionDetailPage({
           Some competition data could not be loaded. Roster, scores, or judge details may be incomplete. Refresh to try again.
         </div>
       )}
+
+      {/* Schedule */}
+      <Card className="feis-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Schedule</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Stage</label>
+              <select
+                value={comp.stage_id ?? ''}
+                onChange={async (e) => {
+                  const val = e.target.value || null
+                  const { error } = await supabase
+                    .from('competitions')
+                    .update({ stage_id: val })
+                    .eq('id', compId)
+                  if (error) {
+                    showError('Failed to update stage', { description: error.message })
+                    return
+                  }
+                  await loadData()
+                  showSuccess('Stage updated')
+                }}
+                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+              >
+                <option value="">Unassigned</option>
+                {stages.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Schedule Position</label>
+              <input
+                type="number"
+                min={1}
+                value={comp.schedule_position ?? ''}
+                onChange={async (e) => {
+                  const val = e.target.value ? parseInt(e.target.value, 10) : null
+                  const { error } = await supabase
+                    .from('competitions')
+                    .update({ schedule_position: val })
+                    .eq('id', compId)
+                  if (error) {
+                    showError('Failed to update position', { description: error.message })
+                    return
+                  }
+                  await loadData()
+                  showSuccess('Position updated')
+                }}
+                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                placeholder="Run order within stage"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Dance Type</label>
+              <select
+                value={comp.dance_type ?? ''}
+                onChange={async (e) => {
+                  const val = e.target.value || null
+                  const { error } = await supabase
+                    .from('competitions')
+                    .update({ dance_type: val })
+                    .eq('id', compId)
+                  if (error) {
+                    showError('Failed to update dance type', { description: error.message })
+                    return
+                  }
+                  await loadData()
+                  showSuccess('Dance type updated')
+                }}
+                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+              >
+                <option value="">Not set</option>
+                <option value="reel">Reel</option>
+                <option value="jig">Jig</option>
+                <option value="hornpipe">Hornpipe</option>
+                <option value="slip_jig">Slip Jig</option>
+                <option value="treble_jig">Treble Jig</option>
+                <option value="set_dance">Set Dance</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Group Size</label>
+              <select
+                value={comp.group_size ?? 2}
+                onChange={async (e) => {
+                  const val = parseInt(e.target.value, 10)
+                  const { error } = await supabase
+                    .from('competitions')
+                    .update({ group_size: val })
+                    .eq('id', compId)
+                  if (error) {
+                    showError('Failed to update group size', { description: error.message })
+                    return
+                  }
+                  await loadData()
+                  showSuccess('Group size updated')
+                }}
+                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+              >
+                <option value={1}>1 (solo)</option>
+                <option value={2}>2 (pairs)</option>
+                <option value={3}>3 (trios)</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Next Step */}
       {(() => {
