@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FeisTab — Kill the Envelope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #0B4D2C;
+    --green-light: #EBF4EF;
+    --green-mid: #1a7a4a;
+    --cream: #F7F8FA;
+    --orange: #D4652A;
+    --gold: #C59D5F;
+    --charcoal: #1A1D23;
+    --muted: #6B7280;
+    --border: #E5E7EB;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--cream);
+    color: var(--charcoal);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: var(--green);
+    color: white;
+    padding: 100px 40px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    right: -20%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero h1 {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 span {
+    color: var(--gold);
+  }
+
+  .hero p.subtitle {
+    font-size: 20px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.8);
+    max-width: 620px;
+    line-height: 1.55;
+  }
+
+  /* ── SECTIONS ── */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  section {
+    padding: 72px 0;
+  }
+
+  section + section {
+    border-top: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  .section-desc {
+    font-size: 16px;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  /* ── PROBLEM ── */
+  .problem-text {
+    font-size: 20px;
+    line-height: 1.6;
+    color: var(--charcoal);
+    max-width: 700px;
+  }
+
+  .problem-text strong {
+    color: var(--orange);
+    font-weight: 600;
+  }
+
+  /* ── ENVELOPE DIAGRAM ── */
+  .envelope-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 32px 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .envelope-step {
+    padding: 16px 20px;
+    background: white;
+    border: 1px solid var(--border);
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    position: relative;
+  }
+
+  .envelope-step:first-child { border-radius: 10px 0 0 10px; }
+  .envelope-step:last-child { border-radius: 0 10px 10px 0; }
+
+  .envelope-step.killed {
+    background: #FEF2F2;
+    border-color: #FECACA;
+    color: #DC2626;
+    text-decoration: line-through;
+  }
+
+  .envelope-step.kept {
+    background: var(--green-light);
+    border-color: var(--green);
+    color: var(--green);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .envelope-arrow {
+    color: var(--muted);
+    font-size: 16px;
+    padding: 0 4px;
+  }
+
+  .envelope-caption {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .envelope-caption strong {
+    color: var(--green);
+  }
+
+  /* ── ROLE CARDS ── */
+  .role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .role-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 24px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .role-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--green);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .role-card:hover::before { opacity: 1; }
+  .role-card:hover {
+    border-color: var(--green);
+    box-shadow: 0 4px 20px rgba(11, 77, 44, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .role-card .role-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .role-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+
+  .role-card .role-where {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    background: var(--green-light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+
+  .role-card p {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .role-card ul {
+    margin-top: 8px;
+    padding-left: 18px;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── PIPELINE ── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    margin-bottom: 12px;
+  }
+
+  .pipeline-step {
+    flex: 1;
+    padding: 20px 14px;
+    background: white;
+    border: 1px solid var(--border);
+    text-align: center;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+
+  .pipeline-step:first-child { border-radius: 10px 0 0 10px; }
+  .pipeline-step:last-child { border-radius: 0 10px 10px 0; }
+
+  .pipeline-step:hover {
+    background: var(--green-light);
+    border-color: var(--green);
+    z-index: 1;
+  }
+
+  .pipeline-step .icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .pipeline-step .step-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--charcoal);
+    margin-bottom: 4px;
+  }
+
+  .pipeline-step .step-detail {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .pipeline-step .step-who {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--green);
+    margin-top: 6px;
+  }
+
+  .pipeline-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--green);
+    font-size: 18px;
+    padding: 0 2px;
+  }
+
+  /* ── OUTCOME LIST ── */
+  .outcome-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .outcome-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px 22px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: all 0.2s ease;
+  }
+
+  .outcome-item:hover {
+    border-color: var(--green);
+    box-shadow: 0 2px 12px rgba(11, 77, 44, 0.08);
+  }
+
+  .outcome-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--green-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .outcome-text h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .outcome-text p {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── TRUST QUOTE ── */
+  .trust-banner {
+    background: var(--green);
+    color: white;
+    padding: 64px 40px;
+    text-align: center;
+  }
+
+  .trust-banner blockquote {
+    max-width: 700px;
+    margin: 0 auto;
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1.4;
+    letter-spacing: -0.3px;
+  }
+
+  .trust-banner blockquote strong {
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  /* ── PROOF POINTS ── */
+  .proof-bar {
+    display: flex;
+    gap: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: white;
+  }
+
+  .proof-item {
+    flex: 1;
+    padding: 28px 20px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+
+  .proof-item:last-child { border-right: none; }
+
+  .proof-item .proof-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--green);
+  }
+
+  .proof-item .proof-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── SCOPE ── */
+  .scope-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    max-width: 640px;
+  }
+
+  .scope-box p {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .scope-box p + p {
+    margin-top: 12px;
+  }
+
+  .scope-box strong {
+    color: var(--charcoal);
+  }
+
+  /* ── APPENDIX ── */
+  .appendix-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--charcoal);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .appendix-toggle:hover {
+    border-color: var(--green);
+    box-shadow: 0 2px 12px rgba(11, 77, 44, 0.08);
+  }
+
+  .appendix-toggle::after {
+    content: '+';
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 22px;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+  }
+
+  .appendix-toggle.open::after {
+    content: '\2212';
+  }
+
+  .appendix-content {
+    display: none;
+    margin-top: 16px;
+  }
+
+  .appendix-content.open {
+    display: block;
+  }
+
+  /* ── TRUTH TEST (appendix) ── */
+  .truth-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .truth-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .truth-item.done .check {
+    background: var(--green);
+    color: white;
+  }
+
+  .truth-item.partial .check {
+    background: var(--orange);
+    color: white;
+  }
+
+  .check {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .truth-text {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--charcoal);
+  }
+
+  /* ── DETAIL CARDS (appendix) ── */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .detail-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .detail-card .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--green);
+    background: var(--green-light);
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+
+  .detail-card h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .detail-card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 32px 40px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  footer a {
+    color: var(--green);
+    text-decoration: none;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .hero { padding: 56px 24px 48px; }
+    .hero h1 { font-size: 34px; }
+    .container { padding: 0 24px; }
+    .outcome-grid, .role-grid, .truth-grid, .detail-grid { grid-template-columns: 1fr; }
+    .pipeline { flex-wrap: wrap; }
+    .pipeline-arrow { display: none; }
+    .pipeline-step { border-radius: 8px !important; }
+    .proof-bar { flex-wrap: wrap; }
+    .proof-item { min-width: 50%; }
+    .envelope-flow { flex-direction: column; align-items: stretch; }
+    .envelope-step { border-radius: 8px !important; }
+    .envelope-arrow { transform: rotate(90deg); text-align: center; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-in {
+    opacity: 0;
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <h1 class="animate-in">Kill the envelope.<br><span>Get results in minutes,<br>not hours.</span></h1>
+    <p class="subtitle animate-in delay-1">FeisTab replaces the paper-envelope-box-transcription pipeline with a system where scores go straight from the judge to the results. Four roles, four screens, one system.</p>
+  </div>
+</div>
+
+<!-- THE PROBLEM -->
+<section>
+  <div class="container">
+    <div class="section-label">The Problem</div>
+    <h2 class="section-title">The envelope is the bottleneck</h2>
+    <p class="problem-text">
+      At most feiseanna, a judge writes scores on paper. The paper goes in an <strong>envelope</strong>. The envelope gets carried to a <strong>collection box</strong>. Someone opens it and <strong>manually types</strong> every score into a system. Then tabulation runs. Every step adds latency. Every hand-off adds error risk. Every minute a score sits in an envelope is a minute <strong>dancers, parents, and organizers are waiting</strong>.
+    </p>
+
+    <div class="envelope-flow">
+      <div class="envelope-step kept">Judge scores</div>
+      <div class="envelope-arrow">&rarr;</div>
+      <div class="envelope-step killed">Paper in envelope</div>
+      <div class="envelope-arrow">&rarr;</div>
+      <div class="envelope-step killed">Carried to box</div>
+      <div class="envelope-arrow">&rarr;</div>
+      <div class="envelope-step killed">Opened &amp; transcribed</div>
+      <div class="envelope-arrow">&rarr;</div>
+      <div class="envelope-step kept">Tabulation &amp; results</div>
+    </div>
+    <p class="envelope-caption"><strong>FeisTab eliminates the middle.</strong> Score goes from judge to system instantly.</p>
+  </div>
+</section>
+
+<!-- FOUR ROLES -->
+<section>
+  <div class="container">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Four people, four screens, one feis</h2>
+    <p class="section-desc">FeisTab matches how a real feis actually runs. Each role gets their own view with exactly what they need.</p>
+
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-icon">&#128187;</div>
+        <h3>Registration Desk</h3>
+        <div class="role-where">/registration</div>
+        <p>Dancer walks up, desk person searches by name, assigns the next number. One tap = checked in across all their competitions.</p>
+        <ul>
+          <li>Search by name or school</li>
+          <li>Auto-incrementing numbers</li>
+          <li>Progress tracker</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-icon">&#128203;</div>
+        <h3>Side-Stage</h3>
+        <div class="role-where">/checkin</div>
+        <p>The person at the stage confirms who's present for each competition before the judge starts. Marks no-shows and scratches.</p>
+        <ul>
+          <li>Competitions grouped by urgency</li>
+          <li>Per-dancer status dropdowns</li>
+          <li>Roster confirmation gate</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-icon">&#9997;&#65039;</div>
+        <h3>Judge</h3>
+        <div class="role-where">/judge</div>
+        <p>Sees their assigned competitions. Taps "Start" when ready. Enters scores on their phone. Signs off when done. The system handles the rest.</p>
+        <ul>
+          <li>Assignment-based competition list</li>
+          <li>One-tap score entry per dancer</li>
+          <li>Sign-off locks scores</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-icon">&#127919;</div>
+        <h3>Organizer</h3>
+        <div class="role-where">/dashboard</div>
+        <p>Imports rosters, assigns judges, monitors progress. Once all judges sign off, previews results, approves, and publishes.</p>
+        <ul>
+          <li>CSV roster import</li>
+          <li>Judge assignment</li>
+          <li>Tabulation &amp; publish control</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THE PIPELINE -->
+<section>
+  <div class="container">
+    <div class="section-label">The Flow</div>
+    <h2 class="section-title">From door to results, start to finish</h2>
+    <p class="section-desc">Every step shows who does it and what happens next. No hidden state changes.</p>
+
+    <div class="pipeline">
+      <div class="pipeline-step">
+        <div class="icon">&#128203;</div>
+        <div class="step-name">Import</div>
+        <div class="step-detail">CSV from registration system</div>
+        <div class="step-who">Organizer</div>
+      </div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step">
+        <div class="icon">&#127915;</div>
+        <div class="step-name">Check In</div>
+        <div class="step-detail">Assign numbers at the door</div>
+        <div class="step-who">Reg Desk</div>
+      </div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step">
+        <div class="icon">&#9989;</div>
+        <div class="step-name">Confirm</div>
+        <div class="step-detail">Roster confirmed at stage</div>
+        <div class="step-who">Side-Stage</div>
+      </div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step">
+        <div class="icon">&#9997;&#65039;</div>
+        <div class="step-name">Score</div>
+        <div class="step-detail">Judge enters on phone</div>
+        <div class="step-who">Judge</div>
+      </div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step">
+        <div class="icon">&#128270;</div>
+        <div class="step-name">Check</div>
+        <div class="step-detail">Auto anomaly detection</div>
+        <div class="step-who">System</div>
+      </div>
+      <div class="pipeline-arrow">&rarr;</div>
+      <div class="pipeline-step">
+        <div class="icon">&#127919;</div>
+        <div class="step-name">Tabulate</div>
+        <div class="step-detail">Preview, approve, publish</div>
+        <div class="step-who">Organizer</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT MAKES IT DIFFERENT -->
+<section>
+  <div class="container">
+    <div class="section-label">Why It's Different</div>
+    <h2 class="section-title">Built for how feiseanna actually work</h2>
+    <p class="section-desc">Not a generic scoring app. Built from conversations with real organizers about real problems.</p>
+
+    <div class="outcome-grid">
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128247;</div>
+        <div class="outcome-text">
+          <h3>Numbers assigned at the door</h3>
+          <p>Dancers get their competitor number when they check in on event day. Just like it's always been done, but now it's in the system instantly.</p>
+        </div>
+      </div>
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128196;</div>
+        <div class="outcome-text">
+          <h3>Paper judges still welcome</h3>
+          <p>Tabulator mode lets someone enter scores from paper sheets. Judges who aren't ready for phones don't have to change. The system adapts.</p>
+        </div>
+      </div>
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128274;</div>
+        <div class="outcome-text">
+          <h3>Judges control their own start</h3>
+          <p>No waiting for the organizer to click buttons. The judge taps "Start" when they're ready. Roster confirmed = ready to go.</p>
+        </div>
+      </div>
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128270;</div>
+        <div class="outcome-text">
+          <h3>Problems caught before results</h3>
+          <p>Missing scores, incomplete packets, suspicious patterns. Flagged automatically before tabulation runs. Not after results are posted.</p>
+        </div>
+      </div>
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128220;</div>
+        <div class="outcome-text">
+          <h3>Full audit trail</h3>
+          <p>Every score entry, sign-off, correction, and publish is logged. If a parent asks how their dancer placed 4th, you can show them exactly.</p>
+        </div>
+      </div>
+      <div class="outcome-item">
+        <div class="outcome-icon">&#128260;</div>
+        <div class="outcome-text">
+          <h3>Safe corrections</h3>
+          <p>Need to fix a score after sign-off? Unlock, document the reason, fix, re-tabulate. Every change on the record. Clean.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST QUOTE -->
+<div class="trust-banner">
+  <blockquote>
+    The score goes from the judge's phone <strong>directly into the system</strong>. No envelope, no box, no transcription. What used to take 30 minutes <strong>takes seconds</strong>.
+  </blockquote>
+</div>
+
+<!-- CREDIBILITY / PROOF -->
+<section>
+  <div class="container">
+    <div class="section-label">Under the Hood</div>
+    <h2 class="section-title">Rigorously tested, zero shortcuts</h2>
+    <p class="section-desc">The math and logic that produces your results has been tested exhaustively. This is competition software &mdash; wrong results are not acceptable.</p>
+
+    <div class="proof-bar">
+      <div class="proof-item">
+        <div class="proof-number">142</div>
+        <div class="proof-label">Automated tests passing</div>
+      </div>
+      <div class="proof-item">
+        <div class="proof-number">4</div>
+        <div class="proof-label">Role-specific views</div>
+      </div>
+      <div class="proof-item">
+        <div class="proof-number">10</div>
+        <div class="proof-label">Anomaly detectors</div>
+      </div>
+      <div class="proof-item">
+        <div class="proof-number">19</div>
+        <div class="proof-label">Audit action types</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCOPE / HONESTY -->
+<section>
+  <div class="container">
+    <div class="section-label">Where We Are</div>
+    <h2 class="section-title">Built for local feiseanna first</h2>
+
+    <div class="scope-box">
+      <p>
+        FeisTab covers the <strong>full competition-day workflow</strong> &mdash; from check-in at the door to published results. Registration desk, side-stage confirmation, judge scoring, anomaly detection, tabulation, and results publishing.
+      </p>
+      <p>
+        It works with your <strong>existing registration system</strong>. Import the CSV, assign numbers at the door, and go. No need to switch registration platforms.
+      </p>
+      <p>
+        <strong>What's next:</strong> Mobile polish for judges, faster tabulator entry speed, and SMS notifications so dancers get updates on their phone &mdash; which stage, estimated time, and their scores.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- APPENDIX (collapsible) -->
+<section>
+  <div class="container">
+    <button class="appendix-toggle" onclick="toggleAppendix('truth-test')">
+      Appendix: 15-Question Truth Test
+    </button>
+    <div id="truth-test" class="appendix-content">
+      <div style="padding: 24px 0;">
+        <p style="font-size: 14px; color: var(--muted); margin-bottom: 20px;">These are the 15 questions we hold ourselves to. If any answer is no, we're not ready for a real feis.</p>
+        <div class="truth-grid">
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can an organizer run a competition from scoring to published results without touching the database?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can the app support both judge self-entry and tabulator entry?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Is every competition state clear and manually controllable from the UI?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Are blockers obvious and actionable?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can dancers be marked scratched, no-show, or disqualified cleanly?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can incomplete or bad score packets be detected before tabulation?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can results be previewed before approval?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Is publish an explicit controlled action?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can a score correction be made safely after submission?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Can tabulation be re-run after a correction?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Is there an audit trail for who entered, changed, approved, and published?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">Does the app fail safely on network or database issues?</div></div>
+          <div class="truth-item partial"><div class="check">&#9679;</div><div class="truth-text">Is tabulator entry fast enough for a real local feis?</div></div>
+          <div class="truth-item partial"><div class="check">&#9679;</div><div class="truth-text">Is judge entry actually usable on tablet and phone?</div></div>
+          <div class="truth-item done"><div class="check">&#10003;</div><div class="truth-text">If someone questions a result, can the organizer explain exactly how it happened?</div></div>
+        </div>
+        <div style="display: flex; gap: 24px; margin-top: 16px; font-size: 13px; color: var(--muted);">
+          <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--green); border-radius: 3px; vertical-align: middle; margin-right: 6px;"></span> Complete</span>
+          <span><span style="display: inline-block; width: 12px; height: 12px; background: var(--orange); border-radius: 3px; vertical-align: middle; margin-right: 6px;"></span> In progress</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height: 16px;"></div>
+
+    <button class="appendix-toggle" onclick="toggleAppendix('tech-detail')">
+      Appendix: Technical Detail
+    </button>
+    <div id="tech-detail" class="appendix-content">
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="tag">Score Integrity</div>
+          <h4>Irish Points Tabulation</h4>
+          <p>Raw scores to per-judge rank to Irish Points lookup. Precision integer math for all comparisons. Tie-breaking, recall generation, configurable rules.</p>
+        </div>
+        <div class="detail-card">
+          <div class="tag">Workflow</div>
+          <h4>Competition State Machine</h4>
+          <p>21 tested state transitions. Prerequisites enforced. Every status change goes through validation. Human-readable labels for operators.</p>
+        </div>
+        <div class="detail-card">
+          <div class="tag">Detection</div>
+          <h4>Anomaly Engine</h4>
+          <p>10 detectors: missing scores, duplicates, score-count mismatches, unsigned packets, non-roster scores, suspicious patterns. Smart suppression based on competition stage.</p>
+        </div>
+        <div class="detail-card">
+          <div class="tag">Trust</div>
+          <h4>Audit Trail</h4>
+          <p>19 action types logged: score entry, sign-off, status change, correction, check-in, publish. Filterable, paginated, correction rows highlighted, actor names resolved.</p>
+        </div>
+        <div class="detail-card">
+          <div class="tag">Day-Of</div>
+          <h4>Four-Role System</h4>
+          <p>Registration desk (number assignment), side-stage (roster confirmation), judge (scoring), organizer (tabulation/results). Each with their own optimized view and controls.</p>
+        </div>
+        <div class="detail-card">
+          <div class="tag">Real-Time</div>
+          <h4>Live Sync</h4>
+          <p>5-second polling across all views. Judge starts a competition, organizer sees it update. Roster confirmed at the stage, judge sees "Ready to Start." Visibility-aware &mdash; pauses when tab is hidden.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>FeisTab &middot; Built March 2026 &middot; <a href="http://localhost:3000">Open the app</a></p>
+</footer>
+
+<script>
+function toggleAppendix(id) {
+  const content = document.getElementById(id);
+  const allButtons = document.querySelectorAll('.appendix-toggle');
+  allButtons.forEach(btn => {
+    const next = btn.nextElementSibling;
+    if (next && next.id === id) {
+      btn.classList.toggle('open');
+    }
+  });
+  content.classList.toggle('open');
+}
+</script>
+
+</body>
+</html>
