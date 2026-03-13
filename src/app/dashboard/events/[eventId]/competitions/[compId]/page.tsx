@@ -582,6 +582,7 @@ export default function CompetitionDetailPage({
           registrationCount: registrations.length,
           judgeCount: judges.length,
           roundCount: rounds.length,
+          rosterConfirmedAt: comp.roster_confirmed_at ?? (comp.roster_confirmed ? new Date().toISOString() : null),
         }
 
         return (

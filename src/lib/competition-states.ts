@@ -2,6 +2,7 @@ export type CompetitionStatus =
   | 'draft'
   | 'imported'
   | 'ready_for_day_of'
+  | 'released_to_judge'
   | 'in_progress'
   | 'awaiting_scores'
   | 'ready_to_tabulate'
@@ -13,7 +14,8 @@ export type CompetitionStatus =
 const transitions: Record<CompetitionStatus, CompetitionStatus[]> = {
   draft: ['imported'],
   imported: ['ready_for_day_of'],
-  ready_for_day_of: ['in_progress'],
+  ready_for_day_of: ['released_to_judge', 'in_progress'],
+  released_to_judge: ['in_progress', 'ready_for_day_of'],
   in_progress: ['awaiting_scores'],
   awaiting_scores: ['ready_to_tabulate'],
   ready_to_tabulate: ['recalled_round_pending', 'complete_unpublished', 'awaiting_scores'],
@@ -45,7 +47,10 @@ export const BLOCKED_STATUSES: CompetitionStatus[] = ['ready_to_tabulate', 'reca
 /** Human-readable labels for operator-facing transition buttons */
 const transitionLabels: Partial<Record<string, string>> = {
   'imported→ready_for_day_of': 'Mark Ready for Day-Of',
-  'ready_for_day_of→in_progress': 'Start Competition',
+  'ready_for_day_of→released_to_judge': 'Send to Judge',
+  'ready_for_day_of→in_progress': 'Start Scoring',
+  'released_to_judge→in_progress': 'Start Scoring',
+  'released_to_judge→ready_for_day_of': 'Recall to Side-Stage',
   'in_progress→awaiting_scores': 'Open for Scoring',
   'ready_to_tabulate→complete_unpublished': 'Run Tabulation',
   'ready_to_tabulate→recalled_round_pending': 'Generate Recalls',
@@ -67,6 +72,7 @@ export interface TransitionContext {
   registrationCount: number
   judgeCount: number
   roundCount: number
+  rosterConfirmedAt: string | null
 }
 
 /**
@@ -83,7 +89,13 @@ export function getTransitionBlockReason(
     if (context.registrationCount === 0) return 'Import dancers before advancing'
   }
 
+  if (from === 'ready_for_day_of' && to === 'released_to_judge') {
+    if (!context.rosterConfirmedAt) return 'Roster must be confirmed before sending to judge'
+    if (context.judgeCount === 0) return 'No judges assigned'
+  }
+
   if (from === 'ready_for_day_of' && to === 'in_progress') {
+    if (!context.rosterConfirmedAt) return 'Roster must be confirmed before starting'
     if (context.judgeCount === 0) return 'Assign judges before starting'
   }
 

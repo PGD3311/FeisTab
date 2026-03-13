@@ -38,6 +38,7 @@ export default function EventOverviewPage() {
     draft: 0,
     imported: 10,
     ready_for_day_of: 15,
+    released_to_judge: 20,
     in_progress: 30,
     awaiting_scores: 40,
     ready_to_tabulate: 60,
