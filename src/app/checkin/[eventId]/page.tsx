@@ -8,7 +8,8 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import Link from 'next/link'
 
 // --- Interfaces ---
 
@@ -711,7 +712,14 @@ export default function RosterConfirmationPage({
     <div className="max-w-2xl mx-auto p-4 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Roster Confirmation</h1>
+        <Link
+          href={`/dashboard/events/${eventId}`}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-feis-green transition-colors mb-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Link>
+        <h1 className="text-2xl font-bold">Side-Stage</h1>
         {event && <p className="text-lg text-muted-foreground">{event.name}</p>}
       </div>
 
