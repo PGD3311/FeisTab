@@ -991,11 +991,6 @@ export default function CompetitionDetailPage({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2 flex-wrap">
-          {(comp.status === 'awaiting_scores' || comp.status === 'in_progress') && (
-            <Link href={`/dashboard/events/${eventId}/competitions/${compId}/tabulator`}>
-              <Button variant="outline">Enter Scores (Tabulator)</Button>
-            </Link>
-          )}
           <Button
             onClick={handlePreviewTabulation}
             variant="default"
