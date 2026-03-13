@@ -41,6 +41,27 @@ Aoife,Kelly,101,U12,Beginner,B-U12-R1,Beginner U12 Reel`
     expect(result.warnings[0].message).toContain('duplicate')
   })
 
+  it('parses CSV without competitor_number column', () => {
+    const csv = `first_name,last_name,age_group,level,competition_code,competition_name
+Siobhan,Murphy,U12,Beginner,B-U12-R1,Beginner U12 Reel
+Aoife,Kelly,U12,Beginner,B-U12-R1,Beginner U12 Reel`
+
+    const result = parseRegistrationCSV(csv)
+    expect(result.valid).toHaveLength(2)
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid[0].competitor_number).toBeUndefined()
+    expect(result.valid[0].first_name).toBe('Siobhan')
+  })
+
+  it('does not warn about duplicate numbers when competitor_number is absent', () => {
+    const csv = `first_name,last_name,age_group,level,competition_code,competition_name
+Siobhan,Murphy,U12,Beginner,B-U12-R1,Beginner U12 Reel
+Aoife,Kelly,U12,Beginner,B-U12-R1,Beginner U12 Reel`
+
+    const result = parseRegistrationCSV(csv)
+    expect(result.warnings.filter(w => w.message.includes('duplicate'))).toHaveLength(0)
+  })
+
   it('warns when same name appears with different schools', () => {
     const csv = `first_name,last_name,competitor_number,age_group,level,competition_code,competition_name,school_name
 Siobhan,Murphy,101,U12,Beginner,B-U12-R1,Beginner U12 Reel,Murphy Academy

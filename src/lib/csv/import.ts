@@ -3,7 +3,7 @@ import Papa from 'papaparse'
 export interface ImportRow {
   first_name: string
   last_name: string
-  competitor_number: string
+  competitor_number?: string
   age_group: string
   level: string
   competition_code: string
@@ -30,7 +30,6 @@ export interface ImportResult {
 const REQUIRED_FIELDS: (keyof ImportRow)[] = [
   'first_name',
   'last_name',
-  'competitor_number',
   'age_group',
   'level',
   'competition_code',
@@ -62,7 +61,7 @@ export function parseRegistrationCSV(csvText: string): ImportResult {
     valid.push({
       first_name: raw.first_name.trim(),
       last_name: raw.last_name.trim(),
-      competitor_number: raw.competitor_number.trim(),
+      competitor_number: raw.competitor_number?.trim() || undefined,
       age_group: raw.age_group.trim(),
       level: raw.level.trim(),
       competition_code: raw.competition_code.trim(),
@@ -74,6 +73,7 @@ export function parseRegistrationCSV(csvText: string): ImportResult {
   // Check for duplicate competitor numbers within same competition
   const seen = new Map<string, number>()
   for (let i = 0; i < valid.length; i++) {
+    if (!valid[i].competitor_number) continue
     const key = `${valid[i].competition_code}:${valid[i].competitor_number}`
     if (seen.has(key)) {
       warnings.push({
