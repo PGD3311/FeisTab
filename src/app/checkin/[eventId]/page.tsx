@@ -256,7 +256,7 @@ export default function RosterConfirmationPage({
     void loadJudgeAssignments(selectedJudgeId)
   }, [selectedJudgeId, loadJudgeAssignments])
 
-  // Polling with visibility-aware interval
+  // Polling with visibility-aware interval (fallback if Realtime drops)
   useEffect(() => {
     if (loading || competitions.length === 0) return
 
@@ -291,6 +291,53 @@ export default function RosterConfirmationPage({
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [loading, competitions.length, pollStatuses])
+
+  // Supabase Realtime subscription for near-instant competition status updates.
+  // NOTE: Requires Realtime to be enabled on the `competitions` table in the
+  // Supabase dashboard (Database → Replication → enable `competitions`).
+  useEffect(() => {
+    if (loading || competitions.length === 0) return
+
+    const compIds = competitions.map((c) => c.id)
+
+    const channel = supabase
+      .channel('side-stage-competitions')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'competitions',
+        },
+        (payload) => {
+          const updated = payload.new as {
+            id: string
+            status: CompetitionStatus
+            roster_confirmed_at: string | null
+            roster_confirmed_by: string | null
+          }
+          if (!compIds.includes(updated.id)) return
+
+          setCompetitions((prev) =>
+            prev.map((c) =>
+              c.id === updated.id
+                ? {
+                    ...c,
+                    status: updated.status,
+                    roster_confirmed_at: updated.roster_confirmed_at,
+                    roster_confirmed_by: updated.roster_confirmed_by,
+                  }
+                : c
+            )
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loading, competitions.length, supabase])
 
   // --- Actions ---
 
