@@ -7,6 +7,7 @@ import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { getCurrentHeat, type Heat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
@@ -282,6 +283,90 @@ export default function JudgeScoringPage({
   const scoredCount = scores.length
   const totalDancers = activeDancers.length
 
+  // Heat grouping
+  const heatSnapshot = (round?.heat_snapshot as HeatSnapshot) ?? null
+  const scoredDancerIds = new Set(scores.map(s => s.dancer_id))
+  const currentHeat = heatSnapshot ? getCurrentHeat(heatSnapshot, scoredDancerIds) : null
+  const totalHeats = heatSnapshot?.heats.length ?? 0
+  const currentHeatNumber = currentHeat?.heat_number ?? (totalHeats > 0 ? totalHeats : 0)
+
+  function renderScoreEntry(reg: (typeof registrations)[number]) {
+    const existing = scores.find(s => s.dancer_id === reg.dancer_id)
+    return (
+      <ScoreEntryForm
+        key={reg.id}
+        dancerId={reg.dancer_id}
+        dancerName={`${reg.dancers?.first_name} ${reg.dancers?.last_name}`}
+        competitorNumber={reg.competitor_number}
+        existingScore={existing?.raw_score}
+        existingFlagged={existing?.flagged ?? false}
+        existingFlagReason={existing?.flag_reason}
+        scoreMin={scoreMin}
+        scoreMax={scoreMax}
+        onSubmit={handleScoreSubmit}
+        locked={submitted}
+      />
+    )
+  }
+
+  function renderHeatGrouped() {
+    if (!heatSnapshot) return null
+
+    return (
+      <div className="space-y-4 mb-6">
+        {heatSnapshot.heats.map((heat) => {
+          const heatDancerIds = new Set(heat.slots.map(s => s.dancer_id))
+          const heatRegs = registrations.filter(r => heatDancerIds.has(r.dancer_id))
+          const isCurrentHeat = heat.heat_number === currentHeat?.heat_number
+          const heatActiveSlots = heat.slots.filter(s => s.status === 'active')
+          const heatScoredCount = heatActiveSlots.filter(s => scoredDancerIds.has(s.dancer_id)).length
+          const isHeatComplete = heatScoredCount === heatActiveSlots.length && heatActiveSlots.length > 0
+          const isUpcoming = !isCurrentHeat && !isHeatComplete
+
+          return (
+            <div
+              key={heat.heat_number}
+              className={`rounded-lg border-2 ${
+                isCurrentHeat
+                  ? 'border-feis-green bg-feis-green-light/30'
+                  : isHeatComplete
+                    ? 'border-border/50 bg-muted/30 opacity-60'
+                    : 'border-border/30'
+              }`}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <div className="flex items-center gap-2">
+                  {isCurrentHeat && (
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-feis-green animate-pulse" />
+                  )}
+                  <span className={`text-base font-semibold ${isCurrentHeat ? 'text-feis-green' : 'text-muted-foreground'}`}>
+                    Heat {heat.heat_number} of {totalHeats}
+                  </span>
+                </div>
+                <Badge variant={isHeatComplete ? 'secondary' : isCurrentHeat ? 'default' : 'outline'}>
+                  {isHeatComplete ? 'Complete' : `${heatScoredCount}/${heatActiveSlots.length}`}
+                </Badge>
+              </div>
+              {(!isHeatComplete || isCurrentHeat) && (
+                <div className="p-2 space-y-2">
+                  {heatRegs.map(reg => renderScoreEntry(reg))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function renderFlatList() {
+    return (
+      <div className="space-y-2 mb-6">
+        {registrations.map(reg => renderScoreEntry(reg))}
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="mb-4">
@@ -296,6 +381,11 @@ export default function JudgeScoringPage({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Round {round?.round_number}</span>
             <Badge variant="outline">{scoredCount}/{totalDancers} scored</Badge>
+            {heatSnapshot && totalHeats > 0 && (
+              <Badge variant="outline">
+                Heat {currentHeat ? currentHeatNumber : totalHeats} of {totalHeats}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Scoring as <span className="font-medium text-feis-green">{session?.name}</span>
@@ -332,26 +422,7 @@ export default function JudgeScoringPage({
 
           {!packetBlocked && (
             <>
-              <div className="space-y-2 mb-6">
-                {registrations.map(reg => {
-                  const existing = scores.find(s => s.dancer_id === reg.dancer_id)
-                  return (
-                    <ScoreEntryForm
-                      key={reg.id}
-                      dancerId={reg.dancer_id}
-                      dancerName={`${reg.dancers?.first_name} ${reg.dancers?.last_name}`}
-                      competitorNumber={reg.competitor_number}
-                      existingScore={existing?.raw_score}
-                      existingFlagged={existing?.flagged ?? false}
-                      existingFlagReason={existing?.flag_reason}
-                      scoreMin={scoreMin}
-                      scoreMax={scoreMax}
-                      onSubmit={handleScoreSubmit}
-                      locked={submitted}
-                    />
-                  )
-                })}
-              </div>
+              {heatSnapshot ? renderHeatGrouped() : renderFlatList()}
 
               <Button
                 onClick={handleSignOff}
