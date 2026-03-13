@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { logAudit } from '@/lib/audit'
+import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, CheckCircle2 } from 'lucide-react'
 
 interface JudgeSession {
   judge_id: string
@@ -15,15 +18,133 @@ interface JudgeSession {
   name: string
 }
 
+interface Competition {
+  id: string
+  code: string | null
+  name: string
+  age_group: string
+  level: string
+  status: CompetitionStatus
+  roster_confirmed: boolean
+}
+
+const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
+const DONE_STATUSES: CompetitionStatus[] = [
+  'ready_to_tabulate',
+  'complete_unpublished',
+  'published',
+  'locked',
+  'recalled_round_pending',
+]
+const POLL_INTERVAL_MS = 5000
+
 export default function JudgeEventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
   const router = useRouter()
   const [session, setSession] = useState<JudgeSession | null>(null)
-  const [event, setEvent] = useState<any>(null)
-  const [competitions, setCompetitions] = useState<any[]>([])
+  const [event, setEvent] = useState<Record<string, unknown> | null>(null) // TODO: type when Supabase types generated
+  const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
+  const [starting, setStarting] = useState<string | null>(null)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Classify competitions into the four groups
+  const scoringComps = competitions.filter((c) => SCORING_STATUSES.includes(c.status))
+  const readyToStartComps = competitions.filter(
+    (c) => c.status === 'ready_for_day_of' && c.roster_confirmed
+  )
+  const waitingComps = competitions.filter(
+    (c) =>
+      (c.status === 'ready_for_day_of' && !c.roster_confirmed) ||
+      c.status === 'imported'
+  )
+  const doneComps = competitions.filter((c) => DONE_STATUSES.includes(c.status))
+
+  const loadCompetitions = useCallback(
+    async (judgeId: string) => {
+      // Check judge assignments first
+      const { data: assignments, error: assignError } = await supabase
+        .from('judge_assignments')
+        .select('competition_id')
+        .eq('judge_id', judgeId)
+
+      if (assignError) {
+        console.error('Failed to load judge assignments:', assignError.message)
+      }
+
+      const hasAssignments = assignments && assignments.length > 0
+
+      let compData: Competition[]
+
+      if (hasAssignments) {
+        const assignedIds = assignments.map((a: { competition_id: string }) => a.competition_id)
+        const { data, error } = await supabase
+          .from('competitions')
+          .select('id, code, name, age_group, level, status, roster_confirmed')
+          .in('id', assignedIds)
+          .order('code')
+
+        if (error) {
+          console.error('Failed to load competitions:', error.message)
+        }
+        compData = (data as Competition[] | null) ?? []
+      } else {
+        // Fallback: show all competitions for the event
+        const { data, error } = await supabase
+          .from('competitions')
+          .select('id, code, name, age_group, level, status, roster_confirmed')
+          .eq('event_id', eventId)
+          .order('code')
+
+        if (error) {
+          console.error('Failed to load competitions:', error.message)
+        }
+        compData = (data as Competition[] | null) ?? []
+      }
+
+      return compData
+    },
+    [supabase, eventId]
+  )
+
+  // Poll for status updates
+  const pollStatuses = useCallback(
+    async (comps: Competition[]) => {
+      if (comps.length === 0) return comps
+
+      const ids = comps.map((c) => c.id)
+      const { data, error } = await supabase
+        .from('competitions')
+        .select('id, status, roster_confirmed')
+        .in('id', ids)
+
+      if (error) {
+        console.error('Poll failed:', error.message)
+        return comps
+      }
+
+      if (!data) return comps
+
+      const updates = new Map(
+        data.map((d: { id: string; status: CompetitionStatus; roster_confirmed: boolean }) => [
+          d.id,
+          { status: d.status, roster_confirmed: d.roster_confirmed },
+        ])
+      )
+
+      return comps.map((c) => {
+        const update = updates.get(c.id)
+        if (update) {
+          return { ...c, status: update.status, roster_confirmed: update.roster_confirmed }
+        }
+        return c
+      })
+    },
+    [supabase]
+  )
+
+  // Initial load
   useEffect(() => {
     const stored = localStorage.getItem('judge_session')
     if (!stored) {
@@ -38,16 +159,111 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     setSession(parsed)
 
     async function load() {
-      const [eventRes, compRes] = await Promise.all([
+      const [eventRes, comps] = await Promise.all([
         supabase.from('events').select('*').eq('id', eventId).single(),
-        supabase.from('competitions').select('*').eq('event_id', eventId).order('code'),
+        loadCompetitions(parsed.judge_id),
       ])
-      setEvent(eventRes.data)
-      setCompetitions(compRes.data ?? [])
+      if (eventRes.error) {
+        console.error('Failed to load event:', eventRes.error.message)
+      }
+      setEvent(eventRes.data as Record<string, unknown> | null)
+      setCompetitions(comps)
       setLoading(false)
     }
     load()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling with visibility-aware interval
+  useEffect(() => {
+    if (loading || competitions.length === 0) return
+
+    function startPolling() {
+      if (pollTimerRef.current) return
+      pollTimerRef.current = setInterval(async () => {
+        const updated = await pollStatuses(competitions)
+        setCompetitions(updated)
+      }, POLL_INTERVAL_MS)
+    }
+
+    function stopPolling() {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        // Poll immediately on re-focus, then resume interval
+        pollStatuses(competitions).then((updated) => setCompetitions(updated))
+        startPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loading, competitions, pollStatuses])
+
+  async function handleStart(comp: Competition) {
+    if (!session) return
+    setStarting(comp.id)
+
+    try {
+      // If already scoring, just navigate (panel judging — second judge)
+      if (SCORING_STATUSES.includes(comp.status)) {
+        router.push(`/judge/${eventId}/${comp.id}`)
+        return
+      }
+
+      // Validate transition
+      if (!canTransition(comp.status, 'in_progress')) {
+        showCritical('Cannot start this competition', {
+          description: `Current status "${comp.status}" cannot transition to "in_progress".`,
+        })
+        setStarting(null)
+        return
+      }
+
+      // Transition to in_progress
+      const { error } = await supabase
+        .from('competitions')
+        .update({ status: 'in_progress' })
+        .eq('id', comp.id)
+
+      if (error) {
+        showCritical('Failed to start competition', {
+          description: error.message,
+        })
+        setStarting(null)
+        return
+      }
+
+      // Audit log
+      await logAudit(supabase, {
+        userId: session.judge_id,
+        entityType: 'competition',
+        entityId: comp.id,
+        action: 'status_change',
+        beforeData: { status: comp.status, trigger: 'judge_start' },
+        afterData: { status: 'in_progress', trigger: 'judge_start' },
+      })
+
+      showSuccess('Competition started')
+      router.push(`/judge/${eventId}/${comp.id}`)
+    } catch (err) {
+      showCritical('Unexpected error starting competition', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+      setStarting(null)
+    }
+  }
 
   function handleLogout() {
     localStorage.removeItem('judge_session')
@@ -56,12 +272,11 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
 
-  const activeComps = competitions.filter(c =>
-    ['in_progress', 'awaiting_scores'].includes(c.status)
-  )
-  const otherComps = competitions.filter(c =>
-    !['in_progress', 'awaiting_scores'].includes(c.status)
-  )
+  const hasNoComps =
+    scoringComps.length === 0 &&
+    readyToStartComps.length === 0 &&
+    waitingComps.length === 0 &&
+    doneComps.length === 0
 
   return (
     <div className="space-y-6">
@@ -73,7 +288,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       </Link>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{event?.name}</h1>
+          <h1 className="text-2xl font-bold">{(event as Record<string, unknown>)?.name as string}</h1>
           <p className="text-sm text-muted-foreground">
             Signed in as <span className="font-medium text-feis-green">{session?.name}</span>
           </p>
@@ -83,21 +298,27 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Button>
       </div>
 
-      {activeComps.length > 0 && (
+      {/* Scoring — active competitions */}
+      {scoringComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg">Ready to Score</CardTitle>
+            <CardTitle className="text-lg">Scoring</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {activeComps.map(comp => (
+            {scoringComps.map((comp) => (
               <Link
                 key={comp.id}
                 href={`/judge/${eventId}/${comp.id}`}
                 className="flex items-center justify-between p-4 rounded-md border border-feis-green/30 bg-feis-green-light/30 hover:bg-feis-green-light/60 transition-colors"
               >
                 <div>
-                  <span className="font-medium">{comp.code && `${comp.code} — `}{comp.name}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">{comp.age_group} · {comp.level}</span>
+                  <span className="font-medium">
+                    {comp.code && `${comp.code} — `}
+                    {comp.name}
+                  </span>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {comp.age_group} · {comp.level}
+                  </span>
                 </div>
                 <Badge variant="default">Score Now</Badge>
               </Link>
@@ -106,33 +327,106 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
-      {activeComps.length === 0 && (
+      {/* Ready to Start */}
+      {readyToStartComps.length > 0 && (
         <Card className="feis-card">
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No competitions ready for scoring right now.</p>
-            <p className="text-sm text-muted-foreground mt-1">Check back when the organizer opens a competition.</p>
+          <CardHeader>
+            <CardTitle className="text-lg">Ready to Start</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {readyToStartComps.map((comp) => (
+              <div
+                key={comp.id}
+                className="flex items-center justify-between p-4 rounded-md border border-feis-orange/30 bg-feis-orange/5"
+              >
+                <div>
+                  <span className="font-medium">
+                    {comp.code && `${comp.code} — `}
+                    {comp.name}
+                  </span>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {comp.age_group} · {comp.level}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleStart(comp)}
+                  disabled={starting === comp.id}
+                >
+                  {starting === comp.id ? 'Starting...' : 'Start'}
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {otherComps.length > 0 && (
+      {/* Waiting */}
+      {waitingComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg text-muted-foreground">Other Competitions</CardTitle>
+            <CardTitle className="text-lg text-muted-foreground">Waiting</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {otherComps.map(comp => (
+            {waitingComps.map((comp) => (
               <div
                 key={comp.id}
                 className="flex items-center justify-between p-3 rounded-md border opacity-60"
               >
                 <div>
-                  <span className="font-medium">{comp.code && `${comp.code} — `}{comp.name}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">{comp.age_group} · {comp.level}</span>
+                  <span className="font-medium">
+                    {comp.code && `${comp.code} — `}
+                    {comp.name}
+                  </span>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {comp.age_group} · {comp.level}
+                  </span>
                 </div>
-                <Badge variant="outline">{comp.status}</Badge>
+                <Badge variant="outline">
+                  {comp.status === 'imported' ? 'Not ready' : 'Roster not confirmed yet'}
+                </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Done */}
+      {doneComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader>
+            <CardTitle className="text-lg text-muted-foreground">Done</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {doneComps.map((comp) => (
+              <div
+                key={comp.id}
+                className="flex items-center justify-between p-3 rounded-md border opacity-60"
+              >
+                <div>
+                  <span className="font-medium">
+                    {comp.code && `${comp.code} — `}
+                    {comp.name}
+                  </span>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {comp.age_group} · {comp.level}
+                  </span>
+                </div>
+                <CheckCircle2 className="h-5 w-5 text-feis-green" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty state */}
+      {hasNoComps && (
+        <Card className="feis-card">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">No competitions assigned yet.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Check back when the organizer assigns you to competitions.
+            </p>
           </CardContent>
         </Card>
       )}
