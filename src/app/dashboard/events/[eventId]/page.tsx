@@ -123,6 +123,32 @@ export default function EventOverviewPage() {
         </div>
       </div>
 
+      {/* Quick Links — share with side-stage person or open in another tab */}
+      <div className="flex gap-3">
+        <Link
+          href={`/checkin/${eventId}`}
+          target="_blank"
+          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group"
+        >
+          <div>
+            <p className="font-medium text-sm group-hover:text-feis-green transition-colors">Side-Stage</p>
+            <p className="text-xs text-muted-foreground">Roster confirm + send to judge</p>
+          </div>
+          <span className="text-xs text-muted-foreground">↗</span>
+        </Link>
+        <Link
+          href={`/registration/${eventId}`}
+          target="_blank"
+          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group"
+        >
+          <div>
+            <p className="font-medium text-sm group-hover:text-feis-green transition-colors">Registration Desk</p>
+            <p className="text-xs text-muted-foreground">Check-in + number assignment</p>
+          </div>
+          <span className="text-xs text-muted-foreground">↗</span>
+        </Link>
+      </div>
+
       {/* Needs Attention */}
       {needsAttention.length > 0 && (
         <div>
