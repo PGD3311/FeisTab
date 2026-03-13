@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, use } from 'react'
-import { type CompetitionStatus } from '@/lib/competition-states'
+import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { logAudit } from '@/lib/audit'
 import { showSuccess, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,7 +30,8 @@ interface Competition {
   age_group: string | null
   level: string | null
   status: CompetitionStatus
-  roster_confirmed: boolean
+  roster_confirmed_at: string | null
+  roster_confirmed_by: string | null
 }
 
 interface Registration {
@@ -43,10 +45,10 @@ interface Registration {
 
 // --- Status grouping ---
 
-const NOW_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
-const NEXT_STATUSES: CompetitionStatus[] = ['ready_for_day_of']
+const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
+const SENT_STATUSES: CompetitionStatus[] = ['released_to_judge']
 const UPCOMING_STATUSES: CompetitionStatus[] = ['imported', 'draft']
-const DONE_STATUSES: CompetitionStatus[] = [
+const COMPLETE_STATUSES: CompetitionStatus[] = [
   'ready_to_tabulate',
   'complete_unpublished',
   'published',
@@ -121,7 +123,7 @@ export default function RosterConfirmationPage({
         .order('last_name'),
       supabase
         .from('competitions')
-        .select('id, code, name, age_group, level, status, roster_confirmed')
+        .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
         .eq('event_id', eventId)
         .order('code'),
     ])
@@ -217,7 +219,7 @@ export default function RosterConfirmationPage({
     const ids = comps.map((c) => c.id)
     const { data, error } = await supabase
       .from('competitions')
-      .select('id, status, roster_confirmed')
+      .select('id, status, roster_confirmed_at')
       .in('id', ids)
 
     if (error) {
@@ -229,15 +231,15 @@ export default function RosterConfirmationPage({
 
     const updates = new Map(
       (
-        data as Array<{ id: string; status: CompetitionStatus; roster_confirmed: boolean }>
-      ).map((d) => [d.id, { status: d.status, roster_confirmed: d.roster_confirmed }])
+        data as Array<{ id: string; status: CompetitionStatus; roster_confirmed_at: string | null }>
+      ).map((d) => [d.id, { status: d.status, roster_confirmed_at: d.roster_confirmed_at }])
     )
 
     setCompetitions((prev) =>
       prev.map((c) => {
         const update = updates.get(c.id)
         if (update) {
-          return { ...c, status: update.status, roster_confirmed: update.roster_confirmed }
+          return { ...c, status: update.status, roster_confirmed_at: update.roster_confirmed_at }
         }
         return c
       })
@@ -325,9 +327,10 @@ export default function RosterConfirmationPage({
   async function handleConfirmRoster(compId: string) {
     setConfirmingRoster(compId)
 
+    const now = new Date().toISOString()
     const { error } = await supabase
       .from('competitions')
-      .update({ roster_confirmed: true })
+      .update({ roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' })
       .eq('id', compId)
 
     if (error) {
@@ -337,7 +340,9 @@ export default function RosterConfirmationPage({
     }
 
     setCompetitions((prev) =>
-      prev.map((c) => (c.id === compId ? { ...c, roster_confirmed: true } : c))
+      prev.map((c) =>
+        c.id === compId ? { ...c, roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' } : c
+      )
     )
     showSuccess('Roster confirmed')
     setConfirmingRoster(null)
@@ -348,7 +353,7 @@ export default function RosterConfirmationPage({
 
     const { error } = await supabase
       .from('competitions')
-      .update({ roster_confirmed: false })
+      .update({ roster_confirmed_at: null, roster_confirmed_by: null })
       .eq('id', compId)
 
     if (error) {
@@ -358,10 +363,87 @@ export default function RosterConfirmationPage({
     }
 
     setCompetitions((prev) =>
-      prev.map((c) => (c.id === compId ? { ...c, roster_confirmed: false } : c))
+      prev.map((c) =>
+        c.id === compId ? { ...c, roster_confirmed_at: null, roster_confirmed_by: null } : c
+      )
     )
     showSuccess('Roster un-confirmed')
     setConfirmingRoster(null)
+  }
+
+  async function handleSendToJudge(compId: string) {
+    const comp = competitions.find((c) => c.id === compId)
+    if (!comp) return
+
+    if (!canTransition(comp.status, 'released_to_judge')) {
+      showError('Cannot send to judge from current status')
+      return
+    }
+
+    // Atomic conditional update: only transitions if still in expected state
+    const { error } = await supabase
+      .from('competitions')
+      .update({ status: 'released_to_judge' })
+      .eq('id', compId)
+      .eq('status', 'ready_for_day_of')
+
+    if (error) {
+      showError('Failed to send to judge', { description: error.message })
+      return
+    }
+
+    void logAudit(supabase, {
+      userId: null,
+      entityType: 'competition',
+      entityId: compId,
+      action: 'status_change',
+      beforeData: { status: 'ready_for_day_of' },
+      afterData: { status: 'released_to_judge', released_to_judge_at: new Date().toISOString() },
+    })
+
+    setCompetitions((prev) =>
+      prev.map((c) =>
+        c.id === compId ? { ...c, status: 'released_to_judge' as CompetitionStatus } : c
+      )
+    )
+    showSuccess('Sent to judge')
+  }
+
+  async function handleRecall(compId: string) {
+    const comp = competitions.find((c) => c.id === compId)
+    if (!comp) return
+
+    if (!canTransition(comp.status, 'ready_for_day_of')) {
+      showError('Cannot recall — judge may have already started')
+      return
+    }
+
+    const { error } = await supabase
+      .from('competitions')
+      .update({ status: 'ready_for_day_of' })
+      .eq('id', compId)
+      .eq('status', 'released_to_judge')
+
+    if (error) {
+      showError('Failed to recall', { description: error.message })
+      return
+    }
+
+    void logAudit(supabase, {
+      userId: null,
+      entityType: 'competition',
+      entityId: compId,
+      action: 'status_change',
+      beforeData: { status: 'released_to_judge' },
+      afterData: { status: 'ready_for_day_of', trigger: 'side_stage_recall' },
+    })
+
+    setCompetitions((prev) =>
+      prev.map((c) =>
+        c.id === compId ? { ...c, status: 'ready_for_day_of' as CompetitionStatus } : c
+      )
+    )
+    showSuccess('Recalled to side-stage')
   }
 
   // --- Filtering & Grouping ---
@@ -371,16 +453,23 @@ export default function RosterConfirmationPage({
       ? competitions.filter((c) => assignedCompIds.has(c.id))
       : competitions
 
-  const nowComps = filteredCompetitions.filter((c) => NOW_STATUSES.includes(c.status))
-  const nextComps = filteredCompetitions.filter((c) => NEXT_STATUSES.includes(c.status))
-  const upcomingComps = filteredCompetitions.filter((c) => UPCOMING_STATUSES.includes(c.status))
-  const doneComps = filteredCompetitions.filter((c) => DONE_STATUSES.includes(c.status))
+  const scoringComps = filteredCompetitions.filter((c) => SCORING_STATUSES.includes(c.status))
+  const sentComps = filteredCompetitions.filter((c) => SENT_STATUSES.includes(c.status))
+  const readyComps = filteredCompetitions.filter(
+    (c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at
+  )
+  const upcomingComps = filteredCompetitions.filter(
+    (c) =>
+      UPCOMING_STATUSES.includes(c.status) ||
+      (c.status === 'ready_for_day_of' && !c.roster_confirmed_at)
+  )
+  const completeComps = filteredCompetitions.filter((c) => COMPLETE_STATUSES.includes(c.status))
 
   // --- Render helpers ---
 
   function getStatusColor(status: CompetitionStatus): string {
-    if (NOW_STATUSES.includes(status)) return 'border-feis-green/40 bg-feis-green-light/40'
-    if (NEXT_STATUSES.includes(status)) return 'border-feis-orange/30 bg-feis-orange/5'
+    if (SCORING_STATUSES.includes(status)) return 'border-feis-green/40 bg-feis-green-light/40'
+    if (status === 'ready_for_day_of') return 'border-feis-orange/30 bg-feis-orange/5'
     return 'border-border'
   }
 
@@ -416,9 +505,9 @@ export default function RosterConfirmationPage({
       : 0
     const totalCount = isExpanded ? registrations.length : 0
 
-    const canConfirm = CONFIRMABLE_STATUSES.includes(comp.status) && !comp.roster_confirmed
-    const canUnconfirm = UNCONFIRMABLE_STATUSES.includes(comp.status) && comp.roster_confirmed
-    const isConfirmed = comp.roster_confirmed
+    const canConfirm = CONFIRMABLE_STATUSES.includes(comp.status) && !comp.roster_confirmed_at
+    const canUnconfirm = UNCONFIRMABLE_STATUSES.includes(comp.status) && !!comp.roster_confirmed_at
+    const isConfirmed = !!comp.roster_confirmed_at
 
     return (
       <div key={comp.id} className={`rounded-lg border ${getStatusColor(comp.status)}`}>
@@ -544,6 +633,16 @@ export default function RosterConfirmationPage({
                 </div>
               )}
             </div>
+
+            {/* Send to Judge button — only for confirmed ready_for_day_of */}
+            {isConfirmed && comp.status === 'ready_for_day_of' && (
+              <Button
+                className="w-full bg-feis-green hover:bg-feis-green/90 text-white min-h-[48px] text-lg mt-3"
+                onClick={() => void handleSendToJudge(comp.id)}
+              >
+                Send to Judge →
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -555,10 +654,11 @@ export default function RosterConfirmationPage({
   if (loading) return <p className="text-muted-foreground p-6 text-lg">Loading...</p>
 
   const hasNoComps =
-    nowComps.length === 0 &&
-    nextComps.length === 0 &&
+    scoringComps.length === 0 &&
+    sentComps.length === 0 &&
+    readyComps.length === 0 &&
     upcomingComps.length === 0 &&
-    doneComps.length === 0
+    completeComps.length === 0
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
@@ -590,37 +690,83 @@ export default function RosterConfirmationPage({
         </div>
       )}
 
-      {/* NOW section */}
-      {nowComps.length > 0 && (
+      {/* Scoring section */}
+      {scoringComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-feis-green flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-feis-green" />
-              NOW
+              Scoring ({scoringComps.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">{nowComps.map(renderCompetitionRow)}</CardContent>
+          <CardContent className="space-y-3">
+            {scoringComps.map(renderCompetitionRow)}
+          </CardContent>
         </Card>
       )}
 
-      {/* NEXT section */}
-      {nextComps.length > 0 && (
+      {/* Sent section */}
+      {sentComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-feis-green flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-feis-green animate-pulse" />
+              Sent ({sentComps.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sentComps.map((comp) => (
+              <div
+                key={comp.id}
+                className="rounded-lg border border-feis-green/30 bg-feis-green-light/30 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-lg font-medium">
+                      {comp.code && <span className="font-mono">{comp.code}</span>}
+                      {comp.code && ' — '}
+                      {comp.name}
+                    </span>
+                    <p className="text-sm text-feis-green mt-1">
+                      Waiting for judge to start scoring...
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleRecall(comp.id)}
+                  >
+                    Recall
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ready section */}
+      {readyComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-feis-orange" />
-              NEXT
+              Ready ({readyComps.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">{nextComps.map(renderCompetitionRow)}</CardContent>
+          <CardContent className="space-y-3">
+            {readyComps.map(renderCompetitionRow)}
+          </CardContent>
         </Card>
       )}
 
-      {/* UPCOMING section */}
+      {/* Upcoming section */}
       {upcomingComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-muted-foreground">UPCOMING</CardTitle>
+            <CardTitle className="text-lg text-muted-foreground">
+              Upcoming ({upcomingComps.length})
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingComps.map(renderCompetitionRow)}
@@ -628,8 +774,8 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* DONE section — collapsed by default */}
-      {doneComps.length > 0 && (
+      {/* Complete section — collapsed by default */}
+      {completeComps.length > 0 && (
         <Card className="feis-card opacity-70">
           <CardHeader className="pb-2">
             <button
@@ -643,12 +789,14 @@ export default function RosterConfirmationPage({
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               )}
               <CardTitle className="text-lg text-muted-foreground">
-                DONE ({doneComps.length})
+                Complete ({completeComps.length})
               </CardTitle>
             </button>
           </CardHeader>
           {doneExpanded && (
-            <CardContent className="space-y-3">{doneComps.map(renderCompetitionRow)}</CardContent>
+            <CardContent className="space-y-3">
+              {completeComps.map(renderCompetitionRow)}
+            </CardContent>
           )}
         </Card>
       )}
