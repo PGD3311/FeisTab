@@ -296,11 +296,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         return
       }
 
-      // Transition to in_progress
+      // Transition to in_progress (atomic conditional update prevents race with concurrent recall)
       const { error } = await supabase
         .from('competitions')
         .update({ status: 'in_progress' })
         .eq('id', comp.id)
+        .eq('status', comp.status)
 
       if (error) {
         showCritical('Failed to start competition', {
@@ -317,7 +318,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         entityId: comp.id,
         action: 'status_change',
         beforeData: { status: comp.status, trigger: 'judge_start' },
-        afterData: { status: 'in_progress', trigger: 'judge_start' },
+        afterData: { status: 'in_progress', trigger: 'judge_start', judge_started_at: new Date().toISOString() },
       })
 
       showSuccess('Competition started')
