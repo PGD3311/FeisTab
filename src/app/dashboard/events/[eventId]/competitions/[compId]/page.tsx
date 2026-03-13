@@ -127,11 +127,11 @@ export default function CompetitionDetailPage({
       }
       const detected = detectAnomalies(anomalyInput)
       const status = compRes.data.status as string
-      const isActiveScoring = status === 'in_progress' || status === 'awaiting_scores'
-      // During active scoring, suppress noise: missing scores and incomplete packets are expected
-      const filtered = isActiveScoring
-        ? detected.filter(a => a.type !== 'unexplained_no_scores' && a.type !== 'incomplete_judge_packet')
-        : detected
+      const postScoring = ['ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(status)
+      // Only show "no scores" and "incomplete packet" warnings after scoring is done
+      const filtered = postScoring
+        ? detected
+        : detected.filter(a => a.type !== 'unexplained_no_scores' && a.type !== 'incomplete_judge_packet')
       setAnomalies(filtered)
     } else {
       setAnomalies([])
