@@ -53,13 +53,14 @@ export default function CompetitionDetailPage({
   const [loadWarning, setLoadWarning] = useState(false)
 
   async function loadData() {
-    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes] = await Promise.all([
+    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
       supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number'),
       supabase.from('score_entries').select('*').eq('competition_id', compId),
       supabase.from('results').select('*, dancers(*)').eq('competition_id', compId).order('final_rank'),
       supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
+      supabase.from('judge_assignments').select('judge_id').eq('competition_id', compId),
     ])
 
     if (compRes.error) {
@@ -72,6 +73,7 @@ export default function CompetitionDetailPage({
     if (scoreRes.error) console.error('Failed to load scores:', scoreRes.error.message)
     if (resultRes.error) console.error('Failed to load results:', resultRes.error.message)
     if (judgesRes.error) console.error('Failed to load judges:', judgesRes.error.message)
+    if (assignRes.error) console.error('Failed to load judge assignments:', assignRes.error.message)
 
     if (regRes.error || roundRes.error || scoreRes.error || resultRes.error || judgesRes.error) {
       setLoadWarning(true)
@@ -110,7 +112,9 @@ export default function CompetitionDetailPage({
           status_reason: r.status_reason ?? null,
         })),
         rounds: [{ id: latestRound.id, competition_id: compId, round_number: latestRound.round_number, round_type: latestRound.round_type, judge_sign_offs: latestRound.judge_sign_offs ?? {} }],
-        judge_ids: judgesRes.data.map((j: { id: string }) => j.id),
+        judge_ids: assignRes.data && assignRes.data.length > 0
+          ? assignRes.data.map((a: { judge_id: string }) => a.judge_id)
+          : judgesRes.data.map((j: { id: string }) => j.id),
         results: (resultRes.data ?? []).map(r => ({
           dancer_id: r.dancer_id,
           final_rank: r.final_rank,
@@ -119,7 +123,14 @@ export default function CompetitionDetailPage({
         rules: compRes.data?.rule_sets?.config as RuleSetConfig ?? DEFAULT_RULES,
         recalls: [],
       }
-      setAnomalies(detectAnomalies(anomalyInput))
+      const detected = detectAnomalies(anomalyInput)
+      const status = compRes.data.status as string
+      const isActiveScoring = status === 'in_progress' || status === 'awaiting_scores'
+      // During active scoring, suppress noise: missing scores and incomplete packets are expected
+      const filtered = isActiveScoring
+        ? detected.filter(a => a.type !== 'unexplained_no_scores' && a.type !== 'incomplete_judge_packet')
+        : detected
+      setAnomalies(filtered)
     } else {
       setAnomalies([])
     }
