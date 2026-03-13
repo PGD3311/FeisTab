@@ -602,6 +602,66 @@ export default function CompetitionDetailPage({
         )
       })()}
 
+      {/* Roster Status */}
+      {(['draft', 'imported', 'ready_for_day_of', 'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published'].includes(comp.status)) && (
+        <Card className="feis-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Roster Status</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Roster:</span>
+              {comp.roster_confirmed ? (
+                <Badge className="bg-feis-green-light text-feis-green border-feis-green/30">Confirmed ✓</Badge>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">Not confirmed</Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {!comp.roster_confirmed && ['draft', 'imported', 'ready_for_day_of'].includes(comp.status) && (
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('competitions')
+                      .update({ roster_confirmed: true })
+                      .eq('id', compId)
+                    if (error) {
+                      showError('Failed to confirm roster', { description: error.message })
+                      return
+                    }
+                    await loadData()
+                    showSuccess('Roster confirmed')
+                  }}
+                >
+                  Confirm Roster
+                </Button>
+              )}
+              {comp.roster_confirmed && comp.status === 'ready_for_day_of' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('competitions')
+                      .update({ roster_confirmed: false })
+                      .eq('id', compId)
+                    if (error) {
+                      showError('Failed to un-confirm roster', { description: error.message })
+                      return
+                    }
+                    await loadData()
+                    showSuccess('Roster un-confirmed')
+                  }}
+                >
+                  Un-confirm
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Roster */}
       <Card className="feis-card">
         <CardHeader>
