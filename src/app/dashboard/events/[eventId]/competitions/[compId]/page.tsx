@@ -573,7 +573,7 @@ export default function CompetitionDetailPage({
         // Only show operator-driven transitions (not tabulate/recalls/publish — those have their own buttons)
         const operatorTransitions = nextStates.filter(s => {
           if (s === 'awaiting_scores' && currentStatus !== 'in_progress') return false
-          return ['ready_for_day_of', 'in_progress', 'awaiting_scores'].includes(s)
+          return ['ready_for_day_of', 'in_progress', 'awaiting_scores', 'released_to_judge'].includes(s)
         })
 
         if (operatorTransitions.length === 0) return null
@@ -582,7 +582,7 @@ export default function CompetitionDetailPage({
           registrationCount: registrations.length,
           judgeCount: judges.length,
           roundCount: rounds.length,
-          rosterConfirmedAt: comp.roster_confirmed_at ?? (comp.roster_confirmed ? new Date().toISOString() : null),
+          rosterConfirmedAt: comp.roster_confirmed_at ?? null,
         }
 
         return (
@@ -625,20 +625,20 @@ export default function CompetitionDetailPage({
           <CardContent className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Roster:</span>
-              {comp.roster_confirmed ? (
+              {comp.roster_confirmed_at ? (
                 <Badge className="bg-feis-green-light text-feis-green border-feis-green/30">Confirmed ✓</Badge>
               ) : (
                 <Badge variant="outline" className="text-muted-foreground">Not confirmed</Badge>
               )}
             </div>
             <div className="flex gap-2">
-              {!comp.roster_confirmed && ['draft', 'imported', 'ready_for_day_of'].includes(comp.status) && (
+              {!comp.roster_confirmed_at && ['draft', 'imported', 'ready_for_day_of'].includes(comp.status) && (
                 <Button
                   size="sm"
                   onClick={async () => {
                     const { error } = await supabase
                       .from('competitions')
-                      .update({ roster_confirmed: true })
+                      .update({ roster_confirmed_at: new Date().toISOString(), roster_confirmed_by: 'Organizer' })
                       .eq('id', compId)
                     if (error) {
                       showError('Failed to confirm roster', { description: error.message })
@@ -651,14 +651,14 @@ export default function CompetitionDetailPage({
                   Confirm Roster
                 </Button>
               )}
-              {comp.roster_confirmed && comp.status === 'ready_for_day_of' && (
+              {comp.roster_confirmed_at && comp.status === 'ready_for_day_of' && (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={async () => {
                     const { error } = await supabase
                       .from('competitions')
-                      .update({ roster_confirmed: false })
+                      .update({ roster_confirmed_at: null, roster_confirmed_by: null })
                       .eq('id', compId)
                     if (error) {
                       showError('Failed to un-confirm roster', { description: error.message })
