@@ -325,17 +325,26 @@ async function main() {
     console.log(`Created event: ${event.id}`)
   }
 
-  // 2. Find default ruleset
-  const { data: ruleset } = await supabase
+  // 2. Find default ruleset (handle both old and new name)
+  let { data: ruleset } = await supabase
     .from('rule_sets')
     .select('id')
     .eq('name', 'Default - Irish Points')
     .limit(1)
     .single()
 
+  if (!ruleset) {
+    const res = await supabase
+      .from('rule_sets')
+      .select('id')
+      .limit(1)
+      .single()
+    ruleset = res.data
+  }
+
   const rulesetId = ruleset?.id
   if (!rulesetId) {
-    console.warn('WARNING: No "Default - Irish Points" ruleset found. Competitions will have null ruleset_id.')
+    console.warn('WARNING: No ruleset found. Competitions will have null ruleset_id.')
   }
 
   // 3. Create all competitions from syllabus
