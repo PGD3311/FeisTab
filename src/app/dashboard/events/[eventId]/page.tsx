@@ -124,11 +124,21 @@ export default function EventOverviewPage() {
       </div>
 
       {/* Quick Links — share with side-stage person or open in another tab */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
+        <Link
+          href={`/dashboard/events/${eventId}/program`}
+          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group min-w-[200px]"
+        >
+          <div>
+            <p className="font-medium text-sm group-hover:text-feis-green transition-colors">Program</p>
+            <p className="text-xs text-muted-foreground">Stage assignment + run order</p>
+          </div>
+          <span className="text-xs text-muted-foreground">&rarr;</span>
+        </Link>
         <Link
           href={`/checkin/${eventId}`}
           target="_blank"
-          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group"
+          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group min-w-[200px]"
         >
           <div>
             <p className="font-medium text-sm group-hover:text-feis-green transition-colors">Side-Stage</p>
@@ -139,7 +149,7 @@ export default function EventOverviewPage() {
         <Link
           href={`/registration/${eventId}`}
           target="_blank"
-          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group"
+          className="feis-card flex-1 flex items-center justify-between p-3.5 rounded-lg hover:border-feis-green/40 transition-all group min-w-[200px]"
         >
           <div>
             <p className="font-medium text-sm group-hover:text-feis-green transition-colors">Registration Desk</p>
