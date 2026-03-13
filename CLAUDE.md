@@ -1,28 +1,40 @@
 # FeisTab — Project Rules
 
-**Goal: Make tabulation and results trustworthy, fast, and hard to screw up.** Remove manual chaos from the most painful part of the competition workflow. Phase 1 is the scoring/results engine — not the whole feis, not registration, not full live event ops.
+**Goal: Kill the envelope. Make competition day trustworthy, fast, and hard to screw up.** Replace the paper-envelope-box-transcription chaos with a connected digital flow from registration desk to published results.
 
-**The Phase 1 chain:** judge scores → tabulation → anomaly checks → verification → sign-off → official results
+**The Phase 1 chain:** check-in → side-stage → judge scores → tabulation → anomaly checks → verification → sign-off → official results
 
 ## Phase 1 Truth Test
 
-Phase 1 is done when the app can answer YES to all 15 of these. If it can't, it's still a demo with good posture.
+Phase 1 is done when the app can answer YES to all of these. If it can't, it's still a demo with good posture.
 
-1. Can an organizer run a competition from scoring to published results without touching the database?
-2. Can the app support both judge self-entry and tabulator entry?
-3. Is every competition state clear and manually controllable from the UI?
-4. Are blockers obvious and actionable?
-5. Can dancers be marked scratched, no-show, or disqualified cleanly?
-6. Can incomplete or bad score packets be detected before tabulation?
-7. Can results be previewed before approval?
-8. Is publish an explicit controlled action?
-9. Can a score correction be made safely after submission?
-10. Can tabulation be re-run after a correction?
-11. Is there an audit trail for who entered, changed, approved, and published?
-12. Does the app fail safely on network or database issues?
-13. Is tabulator entry fast enough for a real local feis?
-14. Is judge entry actually usable on tablet and phone?
-15. If someone questions a result, can the organizer explain exactly how it happened?
+**Registration Desk**
+1. Can a registration desk check in dancers and assign competitor numbers without touching the database?
+2. Can rosters be imported from existing registration systems via CSV?
+
+**Side-Stage**
+3. Can a side-stage person confirm which dancers are present for a competition?
+4. Do dancers appear in official order (competitor number) on all screens?
+
+**Judges**
+5. Can the app support both judge self-entry and tabulator entry?
+6. Is judge entry actually usable on tablet and phone?
+7. Is tabulator entry fast enough for a real local feis?
+8. Can dancers be marked scratched, no-show, or disqualified cleanly?
+
+**Organizer**
+9. Is every competition state clear and manually controllable from the UI?
+10. Are blockers obvious and actionable?
+11. Can incomplete or bad score packets be detected before tabulation?
+12. Can results be previewed before approval?
+13. Is publish an explicit controlled action?
+14. Can a score correction be made safely after submission?
+15. Can tabulation be re-run after a correction?
+
+**Trust & Safety**
+16. Is there an audit trail for who entered, changed, approved, and published?
+17. Does the app fail safely on network or database issues?
+18. If someone questions a result, can the organizer explain exactly how it happened?
 
 ## Tech Stack
 - **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui v4
@@ -103,22 +115,38 @@ These rules are absolute. Violating any of them is a bug.
 
 FeisTab is planned in 3 phases. **Only Phase 1 exists now.**
 
-### Phase 1 — Scoring and Results Engine (CURRENT)
+### Phase 1 — Competition Day (CURRENT)
+Everything needed to run one feis day from door to results. The full chain:
+
+**Registration Desk** — import rosters, check in dancers, assign competitor numbers
 - CSV roster import from existing registration systems
-- Judge score entry with flagging
-- Tabulation engine (Irish Points)
-- Verification and sign-off workflow
-- Results publishing
-- Judge management (setup for scoring)
-- Registration desk check-in (competitor number assignment)
+- Registration desk check-in + number assignment
+- Dancer status handling (scratched, no-show, DNC, medical, DQ)
+
+**Side-Stage** — confirm who's present, maintain official dance order
+- Roster confirmation per competition
+- Competitor number order = dance order (official rotation)
+
+**Judges** — score dancers as they perform
+- Judge assignment to competitions
+- Judge-driven flow (judge starts their own comps)
+- Score entry — judge self-service and tabulator transcription
+- Per-judge sign-off (locks scores)
+
+**Organizer** — oversee, verify, publish
+- Competition state machine (full lifecycle control)
+- Anomaly detection (missing scores, outliers, incomplete packets)
+- Tabulation engine (Irish Points, drop rules, tie-breaking)
+- Results verification and publishing
+- Audit trail (every action logged and explainable)
 
 ### Phase 2 — Registration and Pre-Event Setup (FUTURE)
 School/teacher registration, dancer entry, competition assignment, payment, pre-event validation.
 
-### Phase 3 — Live Event Operations (FUTURE)
-Live check-in, stage management, competitor flow, on-deck tracking, real-time event control.
+### Phase 3 — Live Event Enhancements (FUTURE)
+NOW/NEXT/missing tracking, SMS notifications to dancers, multi-stage coordination, live results streaming, real-time stage management.
 
-**Rule:** Do not build Phase 2 or Phase 3 features. No registration portals, no stage managers, no live check-in screens. If a feature doesn't serve the scoring → tabulation → verification → results pipeline, it's out of scope.
+**Rule:** Do not build Phase 2 or Phase 3 features. If a feature doesn't serve the competition-day chain (check-in → side-stage → scoring → tabulation → results), it's out of scope.
 
 ---
 
@@ -143,7 +171,7 @@ For any non-trivial change:
 
 Never do these. If tempted, stop and reconsider.
 
-- **Don't build Phase 2/3 features.** No registration portals, school pages, stage managers, check-in screens.
+- **Don't build Phase 2/3 features.** No registration portals, school pages, payment, SMS, live streaming.
 - **Don't commit `any` types in new code.** Type it properly or add a `// TODO` legacy exemption.
 - **Don't commit dead code.** Delete unused components, functions, and imports immediately.
 - **Don't bypass the state machine.** Every status change goes through `canTransition()`.
