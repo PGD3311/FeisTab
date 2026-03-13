@@ -16,6 +16,8 @@ import {
   getScheduleBlockReasons,
   type ScheduleCompetition,
 } from '@/lib/engine/schedule'
+import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
+import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 
 interface JudgeSession {
   judge_id: string
@@ -34,6 +36,7 @@ interface Competition {
   roster_confirmed_by: string | null
   schedule_position: number | null
   stage_id: string | null
+  group_size: number
 }
 
 const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
@@ -127,7 +130,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         const { data, error } = await supabase
           .from('competitions')
           .select(
-            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id'
+            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, group_size'
           )
           .in('id', assignedIds)
           .order('code')
@@ -141,7 +144,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         const { data, error } = await supabase
           .from('competitions')
           .select(
-            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id'
+            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, group_size'
           )
           .eq('event_id', eventId)
           .order('code')
@@ -400,6 +403,69 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
           judge_started_at: new Date().toISOString(),
         },
       })
+
+      // Best-effort: create Round 1 + heat snapshot
+      // Don't block scoring if this fails
+      try {
+        // Check if a round already exists
+        const { data: existingRound } = await supabase
+          .from('rounds')
+          .select('id')
+          .eq('competition_id', comp.id)
+          .limit(1)
+          .maybeSingle()
+
+        let roundId = existingRound?.id ?? null
+
+        // Create Round 1 if it doesn't exist
+        if (!roundId) {
+          const { data: newRound, error: roundErr } = await supabase
+            .from('rounds')
+            .insert({ competition_id: comp.id, round_number: 1, round_type: 'standard' })
+            .select('id')
+            .single()
+
+          if (roundErr) {
+            console.error('Failed to create Round 1:', roundErr.message)
+          } else {
+            roundId = newRound.id
+          }
+        }
+
+        // Generate and persist heat snapshot
+        if (roundId) {
+          const { data: regs, error: regErr } = await supabase
+            .from('registrations')
+            .select('dancer_id, competitor_number, display_order')
+            .eq('competition_id', comp.id)
+            .not('status', 'in', `(${NON_ACTIVE_STATUSES.join(',')})`)
+
+          if (regErr) {
+            console.error('Failed to fetch registrations for heat snapshot:', regErr.message)
+          } else {
+            const activeDancers: HeatDancer[] = (regs ?? []).map(
+              (r: { dancer_id: string; competitor_number: string | null; display_order: number | null }, idx: number) => ({
+                dancer_id: r.dancer_id,
+                competitor_number: r.competitor_number ?? String(idx + 1),
+                display_order: r.display_order ?? (parseInt(r.competitor_number ?? '0', 10) || idx),
+              })
+            )
+
+            const snapshot = generateHeats(activeDancers, comp.group_size ?? 2)
+
+            const { error: snapErr } = await supabase
+              .from('rounds')
+              .update({ heat_snapshot: snapshot })
+              .eq('id', roundId)
+
+            if (snapErr) {
+              console.error('Failed to persist heat snapshot:', snapErr.message)
+            }
+          }
+        }
+      } catch (snapshotErr) {
+        console.error('Heat snapshot generation failed (non-blocking):', snapshotErr)
+      }
 
       showSuccess('Competition started')
       router.push(`/judge/${eventId}/${comp.id}`)
