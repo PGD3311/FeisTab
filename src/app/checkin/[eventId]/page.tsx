@@ -556,6 +556,7 @@ export default function RosterConfirmationPage({
     const canConfirm = CONFIRMABLE_STATUSES.includes(comp.status) && !comp.roster_confirmed_at
     const canUnconfirm = UNCONFIRMABLE_STATUSES.includes(comp.status) && !!comp.roster_confirmed_at
     const isConfirmed = !!comp.roster_confirmed_at
+    const isRosterLocked = !CONFIRMABLE_STATUSES.includes(comp.status)
 
     return (
       <div key={comp.id} className={`rounded-lg border ${getStatusColor(comp.status)}`}>
@@ -614,27 +615,35 @@ export default function RosterConfirmationPage({
                         </span>
                       </div>
                       <div className="shrink-0">
-                        <select
-                          value={
-                            reg.status === 'present' ||
-                            reg.status === 'no_show' ||
-                            reg.status === 'scratched'
-                              ? reg.status
-                              : 'registered'
-                          }
-                          onChange={(e) =>
-                            void handleDancerStatusChange(reg.id, e.target.value)
-                          }
-                          disabled={updatingStatus === reg.id}
-                          className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}
-                        >
-                          <option value="registered">—</option>
-                          {DANCER_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {DANCER_STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        {isRosterLocked ? (
+                          <span
+                            className={`inline-block min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium leading-7 text-center ${getDancerStatusColor(reg.status)}`}
+                          >
+                            {DANCER_STATUS_LABELS[reg.status as DancerStatus] ?? reg.status}
+                          </span>
+                        ) : (
+                          <select
+                            value={
+                              reg.status === 'present' ||
+                              reg.status === 'no_show' ||
+                              reg.status === 'scratched'
+                                ? reg.status
+                                : 'registered'
+                            }
+                            onChange={(e) =>
+                              void handleDancerStatusChange(reg.id, e.target.value)
+                            }
+                            disabled={updatingStatus === reg.id}
+                            className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}
+                          >
+                            <option value="registered">—</option>
+                            {DANCER_STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {DANCER_STATUS_LABELS[s]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                   ))}
