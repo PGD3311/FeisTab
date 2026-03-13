@@ -8,7 +8,13 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
+import Link from 'next/link'
+import {
+  groupBySchedule,
+  getScheduleBlockReasons,
+  type ScheduleCompetition,
+} from '@/lib/engine/schedule'
 
 // --- Interfaces ---
 
@@ -32,6 +38,8 @@ interface Competition {
   status: CompetitionStatus
   roster_confirmed_at: string | null
   roster_confirmed_by: string | null
+  schedule_position: number | null
+  stage_id: string | null
 }
 
 interface Registration {
@@ -57,11 +65,7 @@ const COMPLETE_STATUSES: CompetitionStatus[] = [
 ]
 
 // Statuses where roster can be confirmed
-const CONFIRMABLE_STATUSES: CompetitionStatus[] = [
-  'draft',
-  'imported',
-  'ready_for_day_of',
-]
+const CONFIRMABLE_STATUSES: CompetitionStatus[] = ['draft', 'imported', 'ready_for_day_of']
 
 // Statuses where roster can be un-confirmed
 const UNCONFIRMABLE_STATUSES: CompetitionStatus[] = ['ready_for_day_of']
@@ -99,6 +103,10 @@ export default function RosterConfirmationPage({
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const [confirmingRoster, setConfirmingRoster] = useState<string | null>(null)
 
+  // Schedule awareness
+  const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
+  const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
+
   // Done section collapsed state
   const [doneExpanded, setDoneExpanded] = useState(false)
 
@@ -114,7 +122,7 @@ export default function RosterConfirmationPage({
   // --- Data Loading ---
 
   const loadInitialData = useCallback(async () => {
-    const [eventRes, judgesRes, compsRes] = await Promise.all([
+    const [eventRes, judgesRes, compsRes, stagesRes] = await Promise.all([
       supabase.from('events').select('id, name').eq('id', eventId).single(),
       supabase
         .from('judges')
@@ -123,9 +131,16 @@ export default function RosterConfirmationPage({
         .order('last_name'),
       supabase
         .from('competitions')
-        .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
+        .select(
+          'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id'
+        )
         .eq('event_id', eventId)
         .order('code'),
+      supabase
+        .from('stages')
+        .select('id, name')
+        .eq('event_id', eventId)
+        .order('display_order'),
     ])
 
     if (eventRes.error) {
@@ -138,10 +153,38 @@ export default function RosterConfirmationPage({
     if (compsRes.error) {
       console.error('Failed to load competitions:', compsRes.error.message)
     }
+    if (stagesRes.error) {
+      console.error('Failed to load stages:', stagesRes.error.message)
+    }
+
+    const loadedComps = (compsRes.data as Competition[] | null) ?? []
 
     setEvent(eventRes.data as EventInfo | null)
     setJudges((judgesRes.data as Judge[] | null) ?? [])
-    setCompetitions((compsRes.data as Competition[] | null) ?? [])
+    setCompetitions(loadedComps)
+    setStages((stagesRes.data as Array<{ id: string; name: string }> | null) ?? [])
+
+    // Load judge assignment counts
+    if (loadedComps.length > 0) {
+      const { data: jaData, error: jaError } = await supabase
+        .from('judge_assignments')
+        .select('competition_id')
+        .in(
+          'competition_id',
+          loadedComps.map((c) => c.id)
+        )
+
+      if (jaError) {
+        console.error('Failed to load judge assignments:', jaError.message)
+      } else {
+        const counts = new Map<string, number>()
+        for (const row of (jaData ?? []) as Array<{ competition_id: string }>) {
+          counts.set(row.competition_id, (counts.get(row.competition_id) ?? 0) + 1)
+        }
+        setJudgeCounts(counts)
+      }
+    }
+
     setLoading(false)
   }, [supabase, eventId])
 
@@ -231,7 +274,11 @@ export default function RosterConfirmationPage({
 
     const updates = new Map(
       (
-        data as Array<{ id: string; status: CompetitionStatus; roster_confirmed_at: string | null }>
+        data as Array<{
+          id: string
+          status: CompetitionStatus
+          roster_confirmed_at: string | null
+        }>
       ).map((d) => [d.id, { status: d.status, roster_confirmed_at: d.roster_confirmed_at }])
     )
 
@@ -293,8 +340,6 @@ export default function RosterConfirmationPage({
   }, [loading, competitions.length, pollStatuses])
 
   // Supabase Realtime subscription for near-instant competition status updates.
-  // NOTE: Requires Realtime to be enabled on the `competitions` table in the
-  // Supabase dashboard (Database → Replication → enable `competitions`).
   useEffect(() => {
     if (loading || competitions.length === 0) return
 
@@ -337,7 +382,7 @@ export default function RosterConfirmationPage({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loading, competitions.length, supabase])
+  }, [loading, competitions.length, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Actions ---
 
@@ -388,7 +433,9 @@ export default function RosterConfirmationPage({
 
     setCompetitions((prev) =>
       prev.map((c) =>
-        c.id === compId ? { ...c, roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' } : c
+        c.id === compId
+          ? { ...c, roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' }
+          : c
       )
     )
     showSuccess('Roster confirmed')
@@ -445,7 +492,10 @@ export default function RosterConfirmationPage({
       entityId: compId,
       action: 'status_change',
       beforeData: { status: 'ready_for_day_of' },
-      afterData: { status: 'released_to_judge', released_to_judge_at: new Date().toISOString() },
+      afterData: {
+        status: 'released_to_judge',
+        released_to_judge_at: new Date().toISOString(),
+      },
     })
 
     setCompetitions((prev) =>
@@ -461,7 +511,7 @@ export default function RosterConfirmationPage({
     if (!comp) return
 
     if (!canTransition(comp.status, 'ready_for_day_of')) {
-      showError('Cannot recall — judge may have already started')
+      showError('Cannot recall -- judge may have already started')
       return
     }
 
@@ -500,17 +550,57 @@ export default function RosterConfirmationPage({
       ? competitions.filter((c) => assignedCompIds.has(c.id))
       : competitions
 
-  const scoringComps = filteredCompetitions.filter((c) => SCORING_STATUSES.includes(c.status))
-  const sentComps = filteredCompetitions.filter((c) => SENT_STATUSES.includes(c.status))
-  const readyComps = filteredCompetitions.filter(
-    (c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at
+  // Sort helper: schedule_position first (nulls last), then code
+  function sortBySchedule(comps: Competition[]): Competition[] {
+    return [...comps].sort((a, b) => {
+      if (a.schedule_position !== null && b.schedule_position !== null) {
+        return a.schedule_position - b.schedule_position
+      }
+      if (a.schedule_position !== null) return -1
+      if (b.schedule_position !== null) return 1
+      return (a.code ?? '').localeCompare(b.code ?? '')
+    })
+  }
+
+  const scoringComps = sortBySchedule(
+    filteredCompetitions.filter((c) => SCORING_STATUSES.includes(c.status))
   )
-  const upcomingComps = filteredCompetitions.filter(
-    (c) =>
-      UPCOMING_STATUSES.includes(c.status) ||
-      (c.status === 'ready_for_day_of' && !c.roster_confirmed_at)
+  const sentComps = sortBySchedule(
+    filteredCompetitions.filter((c) => SENT_STATUSES.includes(c.status))
   )
-  const completeComps = filteredCompetitions.filter((c) => COMPLETE_STATUSES.includes(c.status))
+  const readyComps = sortBySchedule(
+    filteredCompetitions.filter(
+      (c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at
+    )
+  )
+  const upcomingComps = sortBySchedule(
+    filteredCompetitions.filter(
+      (c) =>
+        UPCOMING_STATUSES.includes(c.status) ||
+        (c.status === 'ready_for_day_of' && !c.roster_confirmed_at)
+    )
+  )
+  const completeComps = sortBySchedule(
+    filteredCompetitions.filter((c) => COMPLETE_STATUSES.includes(c.status))
+  )
+
+  // Schedule grouping for NOW/NEXT indicator
+  const hasSchedulePositions = competitions.some((c) => c.schedule_position !== null)
+
+  const scheduleComps: ScheduleCompetition[] = competitions.map((c) => ({
+    id: c.id,
+    status: c.status,
+    schedule_position: c.schedule_position,
+    stage_id: c.stage_id,
+    roster_confirmed_at: c.roster_confirmed_at,
+    judge_count: judgeCounts.get(c.id) ?? 0,
+  }))
+
+  // Compute per-stage groupings
+  const stageGroupings = stages.map((stage) => ({
+    stage,
+    grouping: groupBySchedule(scheduleComps, stage.id),
+  }))
 
   // --- Render helpers ---
 
@@ -553,12 +643,13 @@ export default function RosterConfirmationPage({
     const totalCount = isExpanded ? registrations.length : 0
 
     const canConfirm = CONFIRMABLE_STATUSES.includes(comp.status) && !comp.roster_confirmed_at
-    const canUnconfirm = UNCONFIRMABLE_STATUSES.includes(comp.status) && !!comp.roster_confirmed_at
+    const canUnconfirm =
+      UNCONFIRMABLE_STATUSES.includes(comp.status) && !!comp.roster_confirmed_at
     const isConfirmed = !!comp.roster_confirmed_at
+    const isRosterLocked = isConfirmed || !CONFIRMABLE_STATUSES.includes(comp.status)
 
     return (
       <div key={comp.id} className={`rounded-lg border ${getStatusColor(comp.status)}`}>
-        {/* Competition header — tap to expand */}
         <button
           type="button"
           className="flex w-full items-center justify-between p-4 text-left min-h-[56px]"
@@ -570,15 +661,20 @@ export default function RosterConfirmationPage({
             ) : (
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
             )}
+            {hasSchedulePositions && comp.schedule_position !== null && (
+              <span className="font-mono text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
+                {comp.schedule_position}
+              </span>
+            )}
             <div>
               <span className="text-lg font-medium">
                 {comp.code && <span className="font-mono">{comp.code}</span>}
-                {comp.code && ' — '}
+                {comp.code && ' \u2014 '}
                 {comp.name}
               </span>
               {(comp.age_group || comp.level) && (
                 <span className="ml-2 text-sm text-muted-foreground">
-                  {[comp.age_group, comp.level].filter(Boolean).join(' · ')}
+                  {[comp.age_group, comp.level].filter(Boolean).join(' \u00b7 ')}
                 </span>
               )}
             </div>
@@ -588,7 +684,6 @@ export default function RosterConfirmationPage({
           </div>
         </button>
 
-        {/* Expanded roster */}
         {isExpanded && (
           <div className="border-t px-4 pb-4 pt-3 space-y-3">
             {loadingRegistrations ? (
@@ -597,7 +692,6 @@ export default function RosterConfirmationPage({
               <p className="text-muted-foreground text-sm py-2">No dancers registered.</p>
             ) : (
               <>
-                {/* Dancer list */}
                 <div className="space-y-2">
                   {registrations.map((reg) => (
                     <div
@@ -606,47 +700,53 @@ export default function RosterConfirmationPage({
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-lg font-medium w-14 text-right shrink-0">
-                          #{reg.competitor_number ?? '—'}
+                          #{reg.competitor_number ?? '\u2014'}
                         </span>
                         <span className="text-lg">
                           {reg.first_name} {reg.last_name}
                         </span>
                       </div>
                       <div className="shrink-0">
-                        <select
-                          value={
-                            reg.status === 'present' ||
-                            reg.status === 'no_show' ||
-                            reg.status === 'scratched'
-                              ? reg.status
-                              : 'registered'
-                          }
-                          onChange={(e) =>
-                            void handleDancerStatusChange(reg.id, e.target.value)
-                          }
-                          disabled={updatingStatus === reg.id}
-                          className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}
-                        >
-                          <option value="registered">—</option>
-                          {DANCER_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {DANCER_STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        {isRosterLocked ? (
+                          <span
+                            className={`inline-block min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium leading-7 text-center ${getDancerStatusColor(reg.status)}`}
+                          >
+                            {DANCER_STATUS_LABELS[reg.status as DancerStatus] ?? reg.status}
+                          </span>
+                        ) : (
+                          <select
+                            value={
+                              reg.status === 'present' ||
+                              reg.status === 'no_show' ||
+                              reg.status === 'scratched'
+                                ? reg.status
+                                : 'registered'
+                            }
+                            onChange={(e) =>
+                              void handleDancerStatusChange(reg.id, e.target.value)
+                            }
+                            disabled={updatingStatus === reg.id}
+                            className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}
+                          >
+                            <option value="registered">{'\u2014'}</option>
+                            {DANCER_STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {DANCER_STATUS_LABELS[s]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Present count */}
                 <div className="text-base text-muted-foreground font-medium pt-1">
                   {presentCount}/{totalCount} present
                 </div>
               </>
             )}
 
-            {/* Confirm / Un-confirm buttons */}
             <div className="pt-2 flex gap-3">
               {canConfirm && (
                 <Button
@@ -681,13 +781,12 @@ export default function RosterConfirmationPage({
               )}
             </div>
 
-            {/* Send to Judge button — only for confirmed ready_for_day_of */}
             {isConfirmed && comp.status === 'ready_for_day_of' && (
               <Button
                 className="w-full bg-feis-green hover:bg-feis-green/90 text-white min-h-[48px] text-lg mt-3"
                 onClick={() => void handleSendToJudge(comp.id)}
               >
-                Send to Judge →
+                {'Send to Judge \u2192'}
               </Button>
             )}
           </div>
@@ -709,13 +808,18 @@ export default function RosterConfirmationPage({
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Roster Confirmation</h1>
+        <Link
+          href={`/dashboard/events/${eventId}`}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-feis-green transition-colors mb-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Link>
+        <h1 className="text-2xl font-bold">Side-Stage</h1>
         {event && <p className="text-lg text-muted-foreground">{event.name}</p>}
       </div>
 
-      {/* Judge filter */}
       {judges.length > 0 && (
         <div>
           <label htmlFor="judge-filter" className="text-sm font-medium block mb-1">
@@ -737,7 +841,75 @@ export default function RosterConfirmationPage({
         </div>
       )}
 
-      {/* Scoring section */}
+      {hasSchedulePositions && stageGroupings.length > 0 && (
+        <div className="space-y-2">
+          {stageGroupings.map(({ stage, grouping }) => {
+            const nowComp = grouping.now
+              ? competitions.find((c) => c.id === grouping.now!.id)
+              : null
+            const nextComp = grouping.next
+              ? competitions.find((c) => c.id === grouping.next!.id)
+              : null
+            const nextBlockReasons = grouping.next
+              ? getScheduleBlockReasons(grouping.next)
+              : []
+
+            return (
+              <Card key={stage.id} className="feis-card border-feis-green/30">
+                <CardContent className="py-3 px-4">
+                  {stages.length > 1 && (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                      {stage.name}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-green text-white">
+                        NOW
+                      </span>
+                      <span className="text-base font-medium">
+                        {nowComp ? (
+                          <>
+                            {nowComp.code && (
+                              <span className="font-mono mr-1">{nowComp.code}</span>
+                            )}
+                            {nowComp.name}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{'\u2014'}</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange">
+                        NEXT
+                      </span>
+                      <span className="text-base font-medium">
+                        {nextComp ? (
+                          <>
+                            {nextComp.code && (
+                              <span className="font-mono mr-1">{nextComp.code}</span>
+                            )}
+                            {nextComp.name}
+                            {nextBlockReasons.length > 0 && (
+                              <span className="text-xs text-feis-orange ml-2">
+                                {nextBlockReasons.join(' \u00b7 ')}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{'\u2014'}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
       {scoringComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
@@ -752,7 +924,6 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* Sent section */}
       {sentComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
@@ -770,8 +941,13 @@ export default function RosterConfirmationPage({
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-lg font-medium">
+                      {hasSchedulePositions && comp.schedule_position !== null && (
+                        <span className="font-mono text-sm text-muted-foreground mr-2">
+                          {comp.schedule_position}
+                        </span>
+                      )}
                       {comp.code && <span className="font-mono">{comp.code}</span>}
-                      {comp.code && ' — '}
+                      {comp.code && ' \u2014 '}
                       {comp.name}
                     </span>
                     <p className="text-sm text-feis-green mt-1">
@@ -792,7 +968,6 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* Ready section */}
       {readyComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
@@ -807,7 +982,6 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* Upcoming section */}
       {upcomingComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
@@ -821,7 +995,6 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* Complete section — collapsed by default */}
       {completeComps.length > 0 && (
         <Card className="feis-card opacity-70">
           <CardHeader className="pb-2">
@@ -848,7 +1021,6 @@ export default function RosterConfirmationPage({
         </Card>
       )}
 
-      {/* Empty state */}
       {hasNoComps && (
         <Card className="feis-card">
           <CardContent className="py-12 text-center">
