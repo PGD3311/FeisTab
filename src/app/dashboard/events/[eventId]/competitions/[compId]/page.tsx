@@ -41,6 +41,7 @@ export default function CompetitionDetailPage({
   const [results, setResults] = useState<any[]>([])
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
   const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [assignedJudgeIds, setAssignedJudgeIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [advancing, setAdvancing] = useState(false)
@@ -88,6 +89,7 @@ export default function CompetitionDetailPage({
     setResults(resultRes.data ?? [])
     setRuleset(compRes.data?.rule_sets?.config as RuleSetConfig | null ?? null)
     setJudges(judgesRes.data ?? [])
+    setAssignedJudgeIds((assignRes.data ?? []).map((a: { judge_id: string }) => a.judge_id))
 
     const latestRound = roundRes.data?.[roundRes.data.length - 1]
     if (latestRound && judgesRes.data) {
@@ -672,6 +674,25 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Judges */}
+      <Card className="feis-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Judges</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {(assignedJudgeIds.length > 0
+              ? judges.filter(j => assignedJudgeIds.includes(j.id))
+              : judges
+            ).map(j => (
+              <Badge key={j.id} variant="outline" className="text-sm">
+                {j.first_name} {j.last_name}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Roster */}
       <Card className="feis-card">
