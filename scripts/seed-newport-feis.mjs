@@ -308,6 +308,17 @@ async function main() {
         await supabase.from('competitions').delete().eq('event_id', event.id)
       }
 
+      // Delete judge assignments for this event's judges
+      const { data: judgeIds } = await supabase
+        .from('judges')
+        .select('id')
+        .eq('event_id', event.id)
+      if (judgeIds && judgeIds.length > 0) {
+        for (const j of judgeIds) {
+          await supabase.from('judge_assignments').delete().eq('judge_id', j.id)
+        }
+      }
+
       // Delete judges for this event
       await supabase.from('judges').delete().eq('event_id', event.id)
 
@@ -529,6 +540,51 @@ async function main() {
   )
   console.log(`Created ${judges.length} judges`)
 
+  // 7b. Create judge assignments
+  const assignmentRanges = [
+    { judgeIdx: 0, start: 1, end: 80 },      // Margaret: Pre-Beg + Beg
+    { judgeIdx: 1, start: 101, end: 150 },    // Patrick: Adv Beg
+    { judgeIdx: 2, start: 201, end: 260 },    // Teresa: Novice
+    { judgeIdx: 3, start: 301, end: 360 },    // Colm: Prizewinner
+    { judgeIdx: 4, start: 901, end: 906 },    // Bernadette: Adult
+  ]
+
+  const CHAMP_START = 400
+  const CHAMP_END = 519
+
+  const assignmentInserts = []
+
+  // Grade-level competitions: one assigned judge per range
+  for (const { judgeIdx, start, end } of assignmentRanges) {
+    const judge = judges[judgeIdx]
+    for (const comp of allComps) {
+      const codeNum = parseInt(comp.code, 10)
+      if (codeNum >= start && codeNum <= end) {
+        assignmentInserts.push({ judge_id: judge.id, competition_id: comp.id })
+      }
+    }
+  }
+
+  // Championship panel: codes 400-519, all 5 judges
+  for (const comp of allComps) {
+    const codeNum = parseInt(comp.code, 10)
+    if (codeNum >= CHAMP_START && codeNum <= CHAMP_END) {
+      for (const judge of judges) {
+        assignmentInserts.push({ judge_id: judge.id, competition_id: comp.id })
+      }
+    }
+  }
+
+  // Insert in batches of 100
+  for (let i = 0; i < assignmentInserts.length; i += 100) {
+    const batch = assignmentInserts.slice(i, i + 100)
+    check(
+      `Insert judge assignments batch ${Math.floor(i / 100) + 1}`,
+      await supabase.from('judge_assignments').insert(batch)
+    )
+  }
+  console.log(`Created ${assignmentInserts.length} judge assignments`)
+
   // 8. Summary
   const uniqueDancerIds = new Set()
   for (const stats of Object.values(levelStats)) {
@@ -542,6 +598,7 @@ async function main() {
   console.log(`  Competitions:   ${allComps.length}`)
   console.log(`  Unique dancers: ${uniqueDancerIds.size}`)
   console.log(`  Registrations:  ${totalRegs}`)
+  console.log(`  Assignments:    ${assignmentInserts.length}`)
   console.log('')
   console.log('  Judge Access Codes:')
   for (const j of judges) {
