@@ -25,7 +25,8 @@ interface Competition {
   age_group: string
   level: string
   status: CompetitionStatus
-  roster_confirmed: boolean
+  roster_confirmed_at: string | null
+  roster_confirmed_by: string | null
 }
 
 const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
@@ -49,14 +50,15 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   const [starting, setStarting] = useState<string | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Classify competitions into the four groups
+  // Classify competitions into five groups
   const scoringComps = competitions.filter((c) => SCORING_STATUSES.includes(c.status))
+  const incomingComps = competitions.filter((c) => c.status === 'released_to_judge')
   const readyToStartComps = competitions.filter(
-    (c) => c.status === 'ready_for_day_of' && c.roster_confirmed
+    (c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at
   )
   const waitingComps = competitions.filter(
     (c) =>
-      (c.status === 'ready_for_day_of' && !c.roster_confirmed) ||
+      (c.status === 'ready_for_day_of' && !c.roster_confirmed_at) ||
       c.status === 'imported'
   )
   const doneComps = competitions.filter((c) => DONE_STATUSES.includes(c.status))
@@ -81,7 +83,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         const assignedIds = assignments.map((a: { competition_id: string }) => a.competition_id)
         const { data, error } = await supabase
           .from('competitions')
-          .select('id, code, name, age_group, level, status, roster_confirmed')
+          .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
           .in('id', assignedIds)
           .order('code')
 
@@ -93,7 +95,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         // Fallback: show all competitions for the event
         const { data, error } = await supabase
           .from('competitions')
-          .select('id, code, name, age_group, level, status, roster_confirmed')
+          .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
           .eq('event_id', eventId)
           .order('code')
 
@@ -116,7 +118,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       const ids = comps.map((c) => c.id)
       const { data, error } = await supabase
         .from('competitions')
-        .select('id, status, roster_confirmed')
+        .select('id, status, roster_confirmed_at, roster_confirmed_by')
         .in('id', ids)
 
       if (error) {
@@ -127,16 +129,32 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       if (!data) return comps
 
       const updates = new Map(
-        data.map((d: { id: string; status: CompetitionStatus; roster_confirmed: boolean }) => [
-          d.id,
-          { status: d.status, roster_confirmed: d.roster_confirmed },
-        ])
+        data.map(
+          (d: {
+            id: string
+            status: CompetitionStatus
+            roster_confirmed_at: string | null
+            roster_confirmed_by: string | null
+          }) => [
+            d.id,
+            {
+              status: d.status,
+              roster_confirmed_at: d.roster_confirmed_at,
+              roster_confirmed_by: d.roster_confirmed_by,
+            },
+          ]
+        )
       )
 
       return comps.map((c) => {
         const update = updates.get(c.id)
         if (update) {
-          return { ...c, status: update.status, roster_confirmed: update.roster_confirmed }
+          return {
+            ...c,
+            status: update.status,
+            roster_confirmed_at: update.roster_confirmed_at,
+            roster_confirmed_by: update.roster_confirmed_by,
+          }
         }
         return c
       })
@@ -274,6 +292,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
   const hasNoComps =
     scoringComps.length === 0 &&
+    incomingComps.length === 0 &&
     readyToStartComps.length === 0 &&
     waitingComps.length === 0 &&
     doneComps.length === 0
@@ -322,6 +341,44 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                 </div>
                 <Badge variant="default">Score Now</Badge>
               </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Incoming — sent by side-stage */}
+      {incomingComps.length > 0 && (
+        <Card className="feis-card border-feis-orange">
+          <CardHeader>
+            <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-feis-orange animate-pulse" />
+              Incoming
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {incomingComps.map((comp) => (
+              <div
+                key={comp.id}
+                className="flex items-center justify-between p-4 rounded-md border border-feis-orange/30 bg-feis-orange/5"
+              >
+                <div>
+                  <span className="font-medium">
+                    {comp.code && `${comp.code} — `}
+                    {comp.name}
+                  </span>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {comp.age_group} · {comp.level}
+                  </span>
+                  <p className="text-sm text-feis-orange mt-1">Sent by side-stage</p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleStart(comp)}
+                  disabled={starting === comp.id}
+                >
+                  {starting === comp.id ? 'Starting...' : 'Start Scoring'}
+                </Button>
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -391,11 +448,11 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
-      {/* Done */}
+      {/* Complete */}
       {doneComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg text-muted-foreground">Done</CardTitle>
+            <CardTitle className="text-lg text-muted-foreground">Complete</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {doneComps.map((comp) => (
