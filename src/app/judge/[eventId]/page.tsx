@@ -11,6 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
+import {
+  groupBySchedule,
+  getScheduleBlockReasons,
+  type ScheduleCompetition,
+} from '@/lib/engine/schedule'
+import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
+import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 
 interface JudgeSession {
   judge_id: string
@@ -27,6 +34,9 @@ interface Competition {
   status: CompetitionStatus
   roster_confirmed_at: string | null
   roster_confirmed_by: string | null
+  schedule_position: number | null
+  stage_id: string | null
+  group_size: number
 }
 
 const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
@@ -48,20 +58,56 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState<string | null>(null)
+  const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
+  const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Classify competitions into five groups
-  const scoringComps = competitions.filter((c) => SCORING_STATUSES.includes(c.status))
-  const incomingComps = competitions.filter((c) => c.status === 'released_to_judge')
-  const readyToStartComps = competitions.filter(
-    (c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at
+  // Sort helper: schedule_position first (nulls last), then code
+  function sortBySchedule(comps: Competition[]): Competition[] {
+    return [...comps].sort((a, b) => {
+      if (a.schedule_position !== null && b.schedule_position !== null) {
+        return a.schedule_position - b.schedule_position
+      }
+      if (a.schedule_position !== null) return -1
+      if (b.schedule_position !== null) return 1
+      return (a.code ?? '').localeCompare(b.code ?? '')
+    })
+  }
+
+  // Classify competitions into five groups (sorted by schedule position)
+  const scoringComps = sortBySchedule(
+    competitions.filter((c) => SCORING_STATUSES.includes(c.status))
   )
-  const waitingComps = competitions.filter(
-    (c) =>
-      (c.status === 'ready_for_day_of' && !c.roster_confirmed_at) ||
-      c.status === 'imported'
+  const incomingComps = sortBySchedule(
+    competitions.filter((c) => c.status === 'released_to_judge')
   )
-  const doneComps = competitions.filter((c) => DONE_STATUSES.includes(c.status))
+  const readyToStartComps = sortBySchedule(
+    competitions.filter((c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at)
+  )
+  const waitingComps = sortBySchedule(
+    competitions.filter(
+      (c) =>
+        (c.status === 'ready_for_day_of' && !c.roster_confirmed_at) || c.status === 'imported'
+    )
+  )
+  const doneComps = sortBySchedule(competitions.filter((c) => DONE_STATUSES.includes(c.status)))
+
+  // Schedule grouping for NOW/NEXT
+  const hasSchedulePositions = competitions.some((c) => c.schedule_position !== null)
+
+  const scheduleComps: ScheduleCompetition[] = competitions.map((c) => ({
+    id: c.id,
+    status: c.status,
+    schedule_position: c.schedule_position,
+    stage_id: c.stage_id,
+    roster_confirmed_at: c.roster_confirmed_at,
+    judge_count: judgeCounts.get(c.id) ?? 0,
+  }))
+
+  const stageGroupings = stages.map((stage) => ({
+    stage,
+    grouping: groupBySchedule(scheduleComps, stage.id),
+  }))
 
   const loadCompetitions = useCallback(
     async (judgeId: string) => {
@@ -83,7 +129,9 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         const assignedIds = assignments.map((a: { competition_id: string }) => a.competition_id)
         const { data, error } = await supabase
           .from('competitions')
-          .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
+          .select(
+            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, group_size'
+          )
           .in('id', assignedIds)
           .order('code')
 
@@ -95,7 +143,9 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         // Fallback: show all competitions for the event
         const { data, error } = await supabase
           .from('competitions')
-          .select('id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by')
+          .select(
+            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, group_size'
+          )
           .eq('event_id', eventId)
           .order('code')
 
@@ -177,15 +227,46 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     setSession(parsed)
 
     async function load() {
-      const [eventRes, comps] = await Promise.all([
+      const [eventRes, comps, stagesRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', eventId).single(),
         loadCompetitions(parsed.judge_id),
+        supabase
+          .from('stages')
+          .select('id, name')
+          .eq('event_id', eventId)
+          .order('display_order'),
       ])
       if (eventRes.error) {
         console.error('Failed to load event:', eventRes.error.message)
       }
+      if (stagesRes.error) {
+        console.error('Failed to load stages:', stagesRes.error.message)
+      }
       setEvent(eventRes.data as Record<string, unknown> | null)
       setCompetitions(comps)
+      setStages((stagesRes.data as Array<{ id: string; name: string }> | null) ?? [])
+
+      // Load judge assignment counts for schedule
+      if (comps.length > 0) {
+        const { data: jaData, error: jaError } = await supabase
+          .from('judge_assignments')
+          .select('competition_id')
+          .in(
+            'competition_id',
+            comps.map((c) => c.id)
+          )
+
+        if (jaError) {
+          console.error('Failed to load judge assignment counts:', jaError.message)
+        } else {
+          const counts = new Map<string, number>()
+          for (const row of (jaData ?? []) as Array<{ competition_id: string }>) {
+            counts.set(row.competition_id, (counts.get(row.competition_id) ?? 0) + 1)
+          }
+          setJudgeCounts(counts)
+        }
+      }
+
       setLoading(false)
     }
     load()
@@ -230,8 +311,6 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   }, [loading, competitions, pollStatuses])
 
   // Supabase Realtime subscription for near-instant competition status updates.
-  // NOTE: Requires Realtime to be enabled on the `competitions` table in the
-  // Supabase dashboard (Database → Replication → enable `competitions`).
   useEffect(() => {
     if (loading || competitions.length === 0) return
 
@@ -274,14 +353,14 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loading, competitions.length, supabase])
+  }, [loading, competitions.length, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStart(comp: Competition) {
     if (!session) return
     setStarting(comp.id)
 
     try {
-      // If already scoring, just navigate (panel judging — second judge)
+      // If already scoring, just navigate (panel judging -- second judge)
       if (SCORING_STATUSES.includes(comp.status)) {
         router.push(`/judge/${eventId}/${comp.id}`)
         return
@@ -318,8 +397,75 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         entityId: comp.id,
         action: 'status_change',
         beforeData: { status: comp.status, trigger: 'judge_start' },
-        afterData: { status: 'in_progress', trigger: 'judge_start', judge_started_at: new Date().toISOString() },
+        afterData: {
+          status: 'in_progress',
+          trigger: 'judge_start',
+          judge_started_at: new Date().toISOString(),
+        },
       })
+
+      // Best-effort: create Round 1 + heat snapshot
+      // Don't block scoring if this fails
+      try {
+        // Check if a round already exists
+        const { data: existingRound } = await supabase
+          .from('rounds')
+          .select('id')
+          .eq('competition_id', comp.id)
+          .limit(1)
+          .maybeSingle()
+
+        let roundId = existingRound?.id ?? null
+
+        // Create Round 1 if it doesn't exist
+        if (!roundId) {
+          const { data: newRound, error: roundErr } = await supabase
+            .from('rounds')
+            .insert({ competition_id: comp.id, round_number: 1, round_type: 'standard' })
+            .select('id')
+            .single()
+
+          if (roundErr) {
+            console.error('Failed to create Round 1:', roundErr.message)
+          } else {
+            roundId = newRound.id
+          }
+        }
+
+        // Generate and persist heat snapshot
+        if (roundId) {
+          const { data: regs, error: regErr } = await supabase
+            .from('registrations')
+            .select('dancer_id, competitor_number, display_order')
+            .eq('competition_id', comp.id)
+            .not('status', 'in', `(${NON_ACTIVE_STATUSES.join(',')})`)
+
+          if (regErr) {
+            console.error('Failed to fetch registrations for heat snapshot:', regErr.message)
+          } else {
+            const activeDancers: HeatDancer[] = (regs ?? []).map(
+              (r: { dancer_id: string; competitor_number: string | null; display_order: number | null }, idx: number) => ({
+                dancer_id: r.dancer_id,
+                competitor_number: r.competitor_number ?? String(idx + 1),
+                display_order: r.display_order ?? (parseInt(r.competitor_number ?? '0', 10) || idx),
+              })
+            )
+
+            const snapshot = generateHeats(activeDancers, comp.group_size ?? 2)
+
+            const { error: snapErr } = await supabase
+              .from('rounds')
+              .update({ heat_snapshot: snapshot })
+              .eq('id', roundId)
+
+            if (snapErr) {
+              console.error('Failed to persist heat snapshot:', snapErr.message)
+            }
+          }
+        }
+      } catch (snapshotErr) {
+        console.error('Heat snapshot generation failed (non-blocking):', snapshotErr)
+      }
 
       showSuccess('Competition started')
       router.push(`/judge/${eventId}/${comp.id}`)
@@ -334,6 +480,16 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   function handleLogout() {
     localStorage.removeItem('judge_session')
     router.push('/judge')
+  }
+
+  // Render helper for schedule position badge
+  function renderPositionBadge(comp: Competition) {
+    if (!hasSchedulePositions || comp.schedule_position === null) return null
+    return (
+      <span className="font-mono text-xs text-muted-foreground mr-1">
+        {comp.schedule_position}.
+      </span>
+    )
   }
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
@@ -355,9 +511,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       </Link>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{(event as Record<string, unknown>)?.name as string}</h1>
+          <h1 className="text-2xl font-bold">
+            {(event as Record<string, unknown>)?.name as string}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Signed in as <span className="font-medium text-feis-green">{session?.name}</span>
+            Signed in as{' '}
+            <span className="font-medium text-feis-green">{session?.name}</span>
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -365,7 +524,77 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Button>
       </div>
 
-      {/* Scoring — active competitions */}
+      {/* NOW / NEXT indicator */}
+      {hasSchedulePositions && stageGroupings.length > 0 && (
+        <div className="space-y-2">
+          {stageGroupings.map(({ stage, grouping }) => {
+            const nowComp = grouping.now
+              ? competitions.find((c) => c.id === grouping.now!.id)
+              : null
+            const nextComp = grouping.next
+              ? competitions.find((c) => c.id === grouping.next!.id)
+              : null
+            const nextBlockReasons = grouping.next
+              ? getScheduleBlockReasons(grouping.next)
+              : []
+
+            return (
+              <Card key={stage.id} className="feis-card border-feis-green/30">
+                <CardContent className="py-3 px-4">
+                  {stages.length > 1 && (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                      {stage.name}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-green text-white">
+                        NOW
+                      </span>
+                      <span className="text-sm font-medium">
+                        {nowComp ? (
+                          <>
+                            {nowComp.code && (
+                              <span className="font-mono mr-1">{nowComp.code}</span>
+                            )}
+                            {nowComp.name}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{'\u2014'}</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange">
+                        NEXT
+                      </span>
+                      <span className="text-sm font-medium">
+                        {nextComp ? (
+                          <>
+                            {nextComp.code && (
+                              <span className="font-mono mr-1">{nextComp.code}</span>
+                            )}
+                            {nextComp.name}
+                            {nextBlockReasons.length > 0 && (
+                              <span className="text-xs text-feis-orange ml-2">
+                                {nextBlockReasons.join(' \u00b7 ')}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{'\u2014'}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Scoring -- active competitions */}
       {scoringComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
@@ -380,11 +609,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
               >
                 <div>
                   <span className="font-medium">
-                    {comp.code && `${comp.code} — `}
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} \u2014 `}
                     {comp.name}
                   </span>
                   <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} · {comp.level}
+                    {comp.age_group} {'\u00b7'} {comp.level}
                   </span>
                 </div>
                 <Badge variant="default">Score Now</Badge>
@@ -394,7 +624,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
-      {/* Incoming — sent by side-stage */}
+      {/* Incoming -- sent by side-stage */}
       {incomingComps.length > 0 && (
         <Card className="feis-card border-feis-orange">
           <CardHeader>
@@ -411,11 +641,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
               >
                 <div>
                   <span className="font-medium">
-                    {comp.code && `${comp.code} — `}
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} \u2014 `}
                     {comp.name}
                   </span>
                   <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} · {comp.level}
+                    {comp.age_group} {'\u00b7'} {comp.level}
                   </span>
                   <p className="text-sm text-feis-orange mt-1">Sent by side-stage</p>
                 </div>
@@ -446,11 +677,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
               >
                 <div>
                   <span className="font-medium">
-                    {comp.code && `${comp.code} — `}
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} \u2014 `}
                     {comp.name}
                   </span>
                   <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} · {comp.level}
+                    {comp.age_group} {'\u00b7'} {comp.level}
                   </span>
                 </div>
                 <Button
@@ -480,11 +712,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
               >
                 <div>
                   <span className="font-medium">
-                    {comp.code && `${comp.code} — `}
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} \u2014 `}
                     {comp.name}
                   </span>
                   <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} · {comp.level}
+                    {comp.age_group} {'\u00b7'} {comp.level}
                   </span>
                 </div>
                 <Badge variant="outline">
@@ -510,11 +743,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
               >
                 <div>
                   <span className="font-medium">
-                    {comp.code && `${comp.code} — `}
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} \u2014 `}
                     {comp.name}
                   </span>
                   <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} · {comp.level}
+                    {comp.age_group} {'\u00b7'} {comp.level}
                   </span>
                 </div>
                 <CheckCircle2 className="h-5 w-5 text-feis-green" />

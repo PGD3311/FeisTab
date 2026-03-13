@@ -114,7 +114,7 @@ export default function EventOverviewPage() {
       c.status === 'complete_unpublished'
   )
 
-  // Weighted progress — reflects workflow completion, not just publication
+  // Weighted progress
   const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
     draft: 0,
     imported: 10,
@@ -138,7 +138,6 @@ export default function EventOverviewPage() {
         )
       : 0
 
-  // Group competitions by status phase for the pipeline
   const pipeline: {
     label: string
     statuses: CompetitionStatus[]
@@ -237,7 +236,7 @@ export default function EventOverviewPage() {
         </div>
       </div>
 
-      {/* Quick Links — share with side-stage person or open in another tab */}
+      {/* Quick Links */}
       <div className="flex gap-3 flex-wrap">
         <Link
           href={`/dashboard/events/${eventId}/program`}
@@ -279,7 +278,7 @@ export default function EventOverviewPage() {
         </Link>
       </div>
 
-      {/* Stage Activity — NOW / NEXT / UPCOMING */}
+      {/* Stage Activity */}
       {hasSchedulePositions && stages.length > 0 && (
         <div>
           <h2 className="text-base font-semibold mb-3">Stage Activity</h2>

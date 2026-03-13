@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
+import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -106,6 +107,11 @@ export default function RosterConfirmationPage({
   // Schedule awareness
   const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
+
+  // Heat snapshot state for scoring competitions
+  const [heatSnapshot, setHeatSnapshot] = useState<HeatSnapshot | null>(null)
+  const [heatScoredDancerIds, setHeatScoredDancerIds] = useState<Set<string>>(new Set())
+  const [loadingHeatData, setLoadingHeatData] = useState(false)
 
   // Done section collapsed state
   const [doneExpanded, setDoneExpanded] = useState(false)
@@ -386,14 +392,71 @@ export default function RosterConfirmationPage({
 
   // --- Actions ---
 
+  async function loadHeatData(competitionId: string) {
+    setLoadingHeatData(true)
+    setHeatSnapshot(null)
+    setHeatScoredDancerIds(new Set())
+
+    // Fetch active round with heat snapshot
+    const { data: roundData, error: roundErr } = await supabase
+      .from('rounds')
+      .select('id, heat_snapshot')
+      .eq('competition_id', competitionId)
+      .order('round_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (roundErr) {
+      console.error('Failed to load round for heat data:', roundErr.message)
+      setLoadingHeatData(false)
+      return
+    }
+
+    if (!roundData?.heat_snapshot) {
+      setLoadingHeatData(false)
+      return
+    }
+
+    const snapshot = roundData.heat_snapshot as HeatSnapshot
+    setHeatSnapshot(snapshot)
+
+    // Fetch scored dancer IDs for this round
+    const { data: scoreData, error: scoreErr } = await supabase
+      .from('score_entries')
+      .select('dancer_id')
+      .eq('round_id', roundData.id)
+
+    if (scoreErr) {
+      console.error('Failed to load score entries for heat data:', scoreErr.message)
+    } else {
+      const scoredIds = new Set(
+        (scoreData ?? []).map((s: { dancer_id: string }) => s.dancer_id)
+      )
+      setHeatScoredDancerIds(scoredIds)
+    }
+
+    setLoadingHeatData(false)
+  }
+
   function toggleCompetition(compId: string) {
     if (expandedCompId === compId) {
       setExpandedCompId(null)
       setRegistrations([])
+      setHeatSnapshot(null)
+      setHeatScoredDancerIds(new Set())
       return
     }
     setExpandedCompId(compId)
     void loadRegistrations(compId)
+
+    // If competition is scoring, also load heat data
+    const comp = competitions.find((c) => c.id === compId)
+    if (comp && SCORING_STATUSES.includes(comp.status)) {
+      void loadHeatData(compId)
+    } else {
+      setHeatSnapshot(null)
+      setHeatScoredDancerIds(new Set())
+    }
   }
 
   async function handleDancerStatusChange(registrationId: string, newStatus: string) {
@@ -408,6 +471,52 @@ export default function RosterConfirmationPage({
       showError('Failed to update status', { description: error.message })
       setUpdatingStatus(null)
       return
+    }
+
+    // If competition is in_progress/awaiting_scores, update heat_snapshot slot status
+    const expandedComp = expandedCompId
+      ? competitions.find((c) => c.id === expandedCompId)
+      : null
+    const reg = registrations.find((r) => r.id === registrationId)
+    if (
+      expandedComp &&
+      SCORING_STATUSES.includes(expandedComp.status) &&
+      reg &&
+      (newStatus === 'scratched' || newStatus === 'no_show') &&
+      heatSnapshot
+    ) {
+      // Read snapshot, find slot by dancer_id, update status, write back
+      const updatedHeats = heatSnapshot.heats.map((heat) => ({
+        ...heat,
+        slots: heat.slots.map((slot) =>
+          slot.dancer_id === reg.dancer_id
+            ? { ...slot, status: newStatus as 'scratched' | 'no_show' }
+            : slot
+        ),
+      }))
+      const updatedSnapshot: HeatSnapshot = { ...heatSnapshot, heats: updatedHeats }
+
+      // Persist to database
+      const { data: roundData } = await supabase
+        .from('rounds')
+        .select('id')
+        .eq('competition_id', expandedCompId)
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (roundData) {
+        const { error: snapErr } = await supabase
+          .from('rounds')
+          .update({ heat_snapshot: updatedSnapshot })
+          .eq('id', roundData.id)
+
+        if (snapErr) {
+          console.error('Failed to update heat snapshot slot:', snapErr.message)
+        } else {
+          setHeatSnapshot(updatedSnapshot)
+        }
+      }
     }
 
     setRegistrations((prev) =>
@@ -686,6 +795,108 @@ export default function RosterConfirmationPage({
 
         {isExpanded && (
           <div className="border-t px-4 pb-4 pt-3 space-y-3">
+            {/* Heat display for scoring competitions */}
+            {SCORING_STATUSES.includes(comp.status) && !loadingHeatData && heatSnapshot && (() => {
+              const currentHt = getCurrentHeat(heatSnapshot, heatScoredDancerIds)
+              const totalHeatsCount = heatSnapshot.heats.length
+              const currentHtNumber = currentHt?.heat_number ?? totalHeatsCount
+              const nextHt = currentHt && currentHtNumber < totalHeatsCount
+                ? heatSnapshot.heats[currentHtNumber]
+                : null
+              const totalActiveSlots = heatSnapshot.heats.flatMap(h => h.slots).filter(s => s.status === 'active').length
+              const scoredActiveCount = heatSnapshot.heats
+                .flatMap(h => h.slots)
+                .filter(s => s.status === 'active' && heatScoredDancerIds.has(s.dancer_id)).length
+
+              return (
+                <div className="space-y-3">
+                  {/* On Stage Now */}
+                  {currentHt && (
+                    <div className="rounded-lg border-2 border-feis-green bg-feis-green-light/30 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-feis-green animate-pulse" />
+                          <span className="text-sm font-semibold text-feis-green uppercase tracking-wider">
+                            On Stage Now
+                          </span>
+                        </div>
+                        <Badge variant="default">
+                          Heat {currentHtNumber} of {totalHeatsCount}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {currentHt.slots
+                          .filter(s => s.status === 'active')
+                          .map((slot) => {
+                            const reg = registrations.find(r => r.dancer_id === slot.dancer_id)
+                            return (
+                              <div key={slot.dancer_id} className="flex items-center gap-3 min-h-[44px]">
+                                <span className="font-mono text-2xl font-bold text-feis-green w-16 text-right shrink-0">
+                                  #{slot.competitor_number}
+                                </span>
+                                <span className="text-lg font-medium">
+                                  {reg ? `${reg.first_name} ${reg.last_name}` : slot.dancer_id}
+                                </span>
+                                {heatScoredDancerIds.has(slot.dancer_id) && (
+                                  <CheckCircle2 className="h-5 w-5 text-feis-green shrink-0" />
+                                )}
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Line Up Next */}
+                  {nextHt && (
+                    <div className="rounded-lg border border-feis-orange/30 bg-feis-orange/5 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-semibold text-feis-orange uppercase tracking-wider">
+                          Line Up Next
+                        </span>
+                        <Badge variant="outline">
+                          Heat {nextHt.heat_number} of {totalHeatsCount}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1.5">
+                        {nextHt.slots
+                          .filter(s => s.status === 'active')
+                          .map((slot) => {
+                            const reg = registrations.find(r => r.dancer_id === slot.dancer_id)
+                            return (
+                              <div key={slot.dancer_id} className="flex items-center gap-3 min-h-[40px]">
+                                <span className="font-mono text-xl font-bold w-16 text-right shrink-0">
+                                  #{slot.competitor_number}
+                                </span>
+                                <span className="text-base">
+                                  {reg ? `${reg.first_name} ${reg.last_name}` : slot.dancer_id}
+                                </span>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* All heats complete */}
+                  {!currentHt && totalHeatsCount > 0 && (
+                    <div className="rounded-lg border border-feis-green/30 bg-feis-green-light/30 p-4 text-center">
+                      <p className="text-base font-medium text-feis-green">All heats scored</p>
+                    </div>
+                  )}
+
+                  {/* Progress */}
+                  <div className="text-sm text-muted-foreground font-medium">
+                    {scoredActiveCount} of {totalActiveSlots} scored
+                  </div>
+                </div>
+              )
+            })()}
+
+            {SCORING_STATUSES.includes(comp.status) && loadingHeatData && (
+              <p className="text-muted-foreground text-sm py-2">Loading heat data...</p>
+            )}
+
             {loadingRegistrations ? (
               <p className="text-muted-foreground text-sm py-2">Loading roster...</p>
             ) : registrations.length === 0 ? (

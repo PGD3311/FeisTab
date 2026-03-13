@@ -487,8 +487,12 @@ export default function CompetitionDetailPage({
   }
 
   const latestRound = rounds[rounds.length - 1]
-  const allSignedOff = latestRound && judges.length > 0 &&
-    judges.every(j => latestRound.judge_sign_offs?.[j.id])
+  // Use assigned judges (not all event judges) to determine sign-off completeness
+  const signOffJudges = assignedJudgeIds.length > 0
+    ? judges.filter(j => assignedJudgeIds.includes(j.id))
+    : judges
+  const allSignedOff = latestRound && signOffJudges.length > 0 &&
+    signOffJudges.every(j => latestRound.judge_sign_offs?.[j.id])
 
   function resolveAnomalyMessage(anomaly: Anomaly): string {
     let msg = anomaly.message
@@ -836,6 +840,25 @@ export default function CompetitionDetailPage({
                     if (error) {
                       showError('Failed to update status', { description: error.message })
                       return
+                    }
+                    // Update heat snapshot slot if competition is being scored
+                    if (
+                      (newStatus === 'scratched' || newStatus === 'no_show') &&
+                      latestRound?.heat_snapshot
+                    ) {
+                      const snap = latestRound.heat_snapshot as { heats: Array<{ heat_number: number; slots: Array<{ dancer_id: string; competitor_number: string; status: string }> }>; group_size: number; generated_at: string }
+                      const updatedHeats = snap.heats.map(heat => ({
+                        ...heat,
+                        slots: heat.slots.map(slot =>
+                          slot.dancer_id === reg.dancer_id
+                            ? { ...slot, status: newStatus }
+                            : slot
+                        ),
+                      }))
+                      await supabase
+                        .from('rounds')
+                        .update({ heat_snapshot: { ...snap, heats: updatedHeats } })
+                        .eq('id', latestRound.id)
                     }
                     void logAudit(supabase, {
                       userId: null,
