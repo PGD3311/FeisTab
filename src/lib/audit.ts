@@ -15,6 +15,7 @@ export type AuditAction =
   | 'scratch'
   | 'disqualify'
   | 'unlock_for_correction'
+  | 'check_in'
 
 export async function logAudit(
   supabase: SupabaseClient,

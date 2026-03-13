@@ -141,7 +141,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
               event_id: eventId,
               dancer_id: dancerId,
               competition_id: comp!.id,
-              competitor_number: row.competitor_number,
+              competitor_number: row.competitor_number ?? null,
               status: 'registered',
             }
           })
@@ -171,7 +171,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-3">
-            Required columns: first_name, last_name, competitor_number, age_group, level, competition_code, competition_name
+            Required columns: first_name, last_name, age_group, level, competition_code, competition_name. Optional: competitor_number (assigned at registration desk if not provided)
           </p>
           <input
             type="file"
