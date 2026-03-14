@@ -21,6 +21,8 @@ import { logAudit } from '@/lib/audit'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
+import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
+import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
 import { Button } from '@/components/ui/button'
@@ -374,6 +376,53 @@ export default function CompetitionDetailPage({
           round_type: 'standard',
         })
         if (roundErr) throw new Error(`Failed to create round: ${roundErr.message}`)
+      }
+
+      // Side effect: generate heat snapshot when entering in_progress
+      if (targetStatus === 'in_progress') {
+        try {
+          // Ensure round exists
+          const { data: existingRound } = await supabase
+            .from('rounds')
+            .select('id, heat_snapshot')
+            .eq('competition_id', compId)
+            .limit(1)
+            .maybeSingle()
+
+          let roundId = existingRound?.id ?? null
+          if (!roundId) {
+            const { data: newRound, error: roundErr } = await supabase
+              .from('rounds')
+              .insert({ competition_id: compId, round_number: 1, round_type: 'standard' })
+              .select('id')
+              .single()
+            if (!roundErr && newRound) roundId = newRound.id
+          }
+
+          // Generate snapshot if round exists and doesn't already have one
+          if (roundId && !existingRound?.heat_snapshot) {
+            const { data: regs } = await supabase
+              .from('registrations')
+              .select('dancer_id, competitor_number, display_order')
+              .eq('competition_id', compId)
+              .not('status', 'in', `(${NON_ACTIVE_STATUSES.join(',')})`)
+
+            if (regs && regs.length > 0) {
+              const activeDancers: HeatDancer[] = regs.map(
+                (r: { dancer_id: string; competitor_number: string | null; display_order: number | null }, idx: number) => ({
+                  dancer_id: r.dancer_id,
+                  competitor_number: r.competitor_number ?? String(idx + 1),
+                  display_order: r.display_order ?? (parseInt(r.competitor_number ?? '0', 10) || idx),
+                })
+              )
+              const groupSize = (comp as Record<string, unknown>).group_size as number ?? 2
+              const snapshot = generateHeats(activeDancers, groupSize)
+              await supabase.from('rounds').update({ heat_snapshot: snapshot }).eq('id', roundId)
+            }
+          }
+        } catch (snapshotErr) {
+          console.error('Heat snapshot generation failed (non-blocking):', snapshotErr)
+        }
       }
 
       const { error: statusErr } = await supabase
