@@ -26,6 +26,7 @@ The current overview page leads with a large Event Progress card (percentage, pi
 - **Large Event Progress card** (percentage, pipeline bar, phase legend) — replaced by summary strip
 - **Quick-link cards** (Program, Side-Stage, Registration Desk) — these are already in the tab row or accessible from the nav. Removing the promotional cards.
 - **Large stat counters** (competitions, dancers, published as big numbers) — folded into summary strip
+- **`EventContextCards`** — the layout renders a 4-card grid (Competitions, Published, In Progress, Blocked) above the tab bar. This duplicates the summary strip. Remove it from the layout.
 
 ### What gets added
 
@@ -40,12 +41,12 @@ The current overview page leads with a large Event Progress card (percentage, pi
 One horizontal strip, no card wrapper. Compact inline stats separated by middots or pipes:
 
 ```
-3 competitions · 15 dancers · 2 published · 1 active · 0 blocked · 80% complete
+3 competitions · 15 dancers · 2 published · 1 active · 2 need attention · 80% complete
 ```
 
 Implementation:
 - Derive all values from existing `competitions` array (already loaded via event context)
-- `blocked` = competitions in `awaiting_scores`, `ready_to_tabulate`, `recalled_round_pending`, or `complete_unpublished` (same as current `needsAttention` filter)
+- `need attention` = competitions in `awaiting_scores`, `ready_to_tabulate`, `recalled_round_pending`, or `complete_unpublished` (same as current `needsAttention` filter). **Do not use the word "blocked"** — the codebase has a separate `BLOCKED_STATUSES` constant with a narrower definition. "Need attention" matches the section below and avoids confusion.
 - `active` = competitions in `ACTIVE_STATUSES`
 - `complete` percentage = same weighted formula already in the page
 - Style: `text-sm text-muted-foreground` with `font-semibold text-foreground` on the numbers
@@ -57,7 +58,7 @@ Implementation:
 
 - Keep the existing structure: pulsing orange dot, heading, count
 - Each row: competition link with code, name, metadata, status badge
-- **Add an action hint** per status:
+- **Add an action hint** per status, displayed as `text-xs text-muted-foreground` after the status badge:
   - `awaiting_scores` → "Waiting for sign-offs"
   - `ready_to_tabulate` → "Ready to tabulate"
   - `recalled_round_pending` → "Recall round pending"
@@ -80,7 +81,7 @@ Only render this section if stages exist and at least one competition has a `sch
 **Final section.** Keep the existing compact list.
 
 Changes from current:
-- Add stage name as a subtle label in each row (when assigned)
+- Add stage name as a subtle label in each row (when assigned). Use the `stages` array already loaded in the `useEffect` to build a `stageId → name` map. Access `stage_id` on competitions via the existing unsafe cast pattern (`(c as unknown as Record<string, unknown>).stage_id`).
 - Keep: code, name, metadata, dancer count, status badge
 - Keep: "Full table view" link to `/competitions`
 - Keep: empty state with link to Import
@@ -92,14 +93,15 @@ Changes from current:
 | Action | Path | Purpose |
 |--------|------|---------|
 | Modify | `src/app/dashboard/events/[eventId]/page.tsx` | Restructure overview layout |
+| Modify | `src/app/dashboard/events/[eventId]/layout.tsx` | Remove `EventContextCards` |
 
-This is a single-file change. No new components, no new data queries. All data is already loaded.
+Two-file change. No new components, no new data queries. All data is already loaded.
 
 ---
 
 ## What This Does NOT Include
 
-- Changing the tab row or layout
+- Changing the tab row
 - Changing the event header
 - Adding new data queries or API calls
 - Changing any sub-pages (competitions, program, judges, import, results)
@@ -110,11 +112,12 @@ This is a single-file change. No new components, no new data queries. All data i
 
 ## Acceptance Criteria
 
-1. Summary strip shows all 6 stats in one compact line
+1. Summary strip shows stats in one compact line (using "need attention" not "blocked")
 2. Needs Attention is the first section after the summary strip
 3. Stage Activity is the second section
 4. All Competitions is the final section
 5. No Event Progress card (percentage hero, pipeline bar, phase legend)
 6. No quick-link promo cards (Program, Side-Stage, Registration Desk)
-7. Page loads the same data as before — no new queries
-8. Empty states work correctly (no competitions, no stages, no attention items)
+7. `EventContextCards` removed from layout (summary strip replaces it)
+8. Page loads the same data as before — no new queries
+9. Empty states work correctly (no competitions, no stages, no attention items)
