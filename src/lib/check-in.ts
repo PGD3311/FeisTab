@@ -39,3 +39,14 @@ export function deriveCheckInStats(
 
   return { checkedIn, awaitingArrival, needsNumber }
 }
+
+// Auto-suggest starts at 100. If an event has numbers 1-50 from CSV,
+// next assigned number will still be 100 (not 51). This is intentional.
+export function computeNextNumber(existingNumbers: string[]): number {
+  let max = 99
+  for (const n of existingNumbers) {
+    const parsed = parseInt(n, 10)
+    if (!isNaN(parsed) && parsed > max) max = parsed
+  }
+  return max + 1
+}

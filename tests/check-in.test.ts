@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getCheckInState,
   deriveCheckInStats,
+  computeNextNumber,
   type CheckInRow,
   type CheckInState,
 } from '@/lib/check-in'
@@ -52,5 +53,23 @@ describe('deriveCheckInStats', () => {
     expect(stats.checkedIn).toBe(0)
     expect(stats.awaitingArrival).toBe(0)
     expect(stats.needsNumber).toBe(0)
+  })
+})
+
+describe('computeNextNumber', () => {
+  it('returns 100 when no existing numbers', () => {
+    expect(computeNextNumber([])).toBe(100)
+  })
+
+  it('returns max + 1 from existing numeric numbers', () => {
+    expect(computeNextNumber(['101', '102', '105'])).toBe(106)
+  })
+
+  it('ignores non-numeric values', () => {
+    expect(computeNextNumber(['101', 'VIP-1', '103'])).toBe(104)
+  })
+
+  it('starts from 100 even if all values are non-numeric', () => {
+    expect(computeNextNumber(['VIP-1', 'VIP-2'])).toBe(100)
   })
 })
