@@ -6,7 +6,6 @@ import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { EventProvider, type EventData, type CompetitionData } from '@/contexts/event-context'
 import { EventTabs } from '@/components/event-tabs'
-import { EventContextCards } from '@/components/event-context-cards'
 import { Badge } from '@/components/ui/badge'
 
 export default function EventLayout({
@@ -77,9 +76,6 @@ export default function EventLayout({
             {event.status}
           </Badge>
         </div>
-
-        {/* Context cards */}
-        <EventContextCards competitions={competitions} />
 
         {/* Segmented tab bar */}
         <EventTabs eventId={eventId} />
