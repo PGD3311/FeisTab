@@ -14,7 +14,8 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import Link from 'next/link'
 
 interface DancerWithRegistrations {
   dancer_id: string
@@ -255,6 +256,12 @@ export default function RegistrationDeskPage({
   return (
     <div className="space-y-4">
       <div>
+        <Link
+          href="/registration"
+          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2"
+        >
+          <ArrowLeft className="h-3 w-3" /> Back
+        </Link>
         <h1 className="text-2xl font-bold">Registration Desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
       </div>
