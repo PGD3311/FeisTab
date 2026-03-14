@@ -3,13 +3,56 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const tabs = [
-  { label: 'Overview', path: '' },
-  { label: 'Competitions', path: '/competitions' },
-  { label: 'Program', path: '/program' },
-  { label: 'Judges', path: '/judges' },
-  { label: 'Import', path: '/import' },
-  { label: 'Results', path: '/results' },
+interface Tab {
+  label: string
+  href: (basePath: string, eventId: string) => string
+  isActive: (pathname: string, basePath: string) => boolean
+  external?: boolean
+}
+
+const tabs: Tab[] = [
+  {
+    label: 'Overview',
+    href: (bp) => bp,
+    isActive: (pn, bp) => pn === bp,
+  },
+  {
+    label: 'Registration',
+    href: (_, id) => `/registration/${id}`,
+    isActive: () => false,
+    external: true,
+  },
+  {
+    label: 'Competitions',
+    href: (bp) => `${bp}/competitions`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/competitions`),
+  },
+  {
+    label: 'Program',
+    href: (bp) => `${bp}/program`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/program`),
+  },
+  {
+    label: 'Side-Stage',
+    href: (_, id) => `/checkin/${id}`,
+    isActive: () => false,
+    external: true,
+  },
+  {
+    label: 'Judges',
+    href: (bp) => `${bp}/judges`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/judges`),
+  },
+  {
+    label: 'Import',
+    href: (bp) => `${bp}/import`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/import`),
+  },
+  {
+    label: 'Results',
+    href: (bp) => `${bp}/results`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/results`),
+  },
 ]
 
 export function EventTabs({ eventId }: { eventId: string }) {
@@ -18,22 +61,16 @@ export function EventTabs({ eventId }: { eventId: string }) {
 
   return (
     <nav className="feis-segmented-bar">
-      {tabs.map(tab => {
-        const href = `${basePath}${tab.path}`
-        const isActive = tab.path === ''
-          ? pathname === basePath
-          : pathname.startsWith(href)
-
-        return (
-          <Link
-            key={tab.label}
-            href={href}
-            className={`feis-segmented-tab ${isActive ? 'feis-segmented-tab-active' : ''}`}
-          >
-            {tab.label}
-          </Link>
-        )
-      })}
+      {tabs.map(tab => (
+        <Link
+          key={tab.label}
+          href={tab.href(basePath, eventId)}
+          target={tab.external ? '_blank' : undefined}
+          className={`feis-segmented-tab ${tab.isActive(pathname, basePath) ? 'feis-segmented-tab-active' : ''}`}
+        >
+          {tab.label}{tab.external ? ' \u2197' : ''}
+        </Link>
+      ))}
     </nav>
   )
 }
