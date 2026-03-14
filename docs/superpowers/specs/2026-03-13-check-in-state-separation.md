@@ -68,7 +68,7 @@ Phase 2 (separate sprint) migrates reads. Phase 3 removes the old column.
 
 1. One `event_check_ins` row per `(event_id, dancer_id)` — enforced by unique constraint
 2. One non-null `competitor_number` per `(event_id, competitor_number)` — enforced by unique constraint
-3. `checked_in_at` cannot be set without a row existing
+3. A dancer cannot be considered checked in unless an `event_check_ins` row exists for that `(event_id, dancer_id)`
 4. New code treats `event_check_ins` as the source of truth for event-day arrival and competitor number
 5. `registrations.competitor_number` is never written directly in new code — only via the sync helper
 
@@ -173,11 +173,13 @@ Three visual states, two possible actions.
 2. Call `syncCompetitorNumberToRegistrations` (must succeed)
 3. Audit log: `check_in` with `{ competitor_number, event_id, source: 'desk_assigned' }`
 
-Number selection: auto-suggest next available number for the event (same as current behavior — `max(existing) + 1`, starting from 100).
+`check_in` is the umbrella audit action name; `source` distinguishes the path taken.
+
+Number selection: auto-suggest next available number for the event, based on `event_check_ins.competitor_number` values — `max(existing numeric values) + 1`, starting from 100. Assumes numeric competitor numbers only for auto-suggest; if non-numeric formats ever appear, this logic must be revisited.
 
 **"Check In"** (dancers with pre-assigned numbers):
 1. Update `event_check_ins` row: `checked_in_at = now()`, `checked_in_by = 'registration_desk'`
-2. Defensive sync: call `syncCompetitorNumberToRegistrations` anyway to ensure registrations are consistent (guards against partial import failures where the `event_check_ins` row was created but sync failed)
+2. Defensive sync: call `syncCompetitorNumberToRegistrations` to ensure registrations are consistent. The Check In action is allowed even if the compatibility sync is stale; successful Check In always heals registrations by re-syncing the competitor number.
 3. Audit log: `check_in` with `{ competitor_number, event_id, source: 'pre_assigned' }`
 
 ### Number editability
@@ -242,6 +244,7 @@ After running the migration, verify:
 3. No backfilled rows have `checked_in_at` set
 4. Count of `event_check_ins` rows ≤ count of distinct `(event_id, dancer_id)` with non-null numbers in registrations
 5. Any skipped conflicts are identified and logged
+6. Every backfilled `event_check_ins.competitor_number` matches all non-null registration competitor numbers for that dancer/event (when no conflict was logged)
 
 ### Seed data fix
 
@@ -278,7 +281,7 @@ The current registration desk sets `registrations.status = 'checked_in'` when as
 - The `checked_in` status was conceptually wrong (conflating event arrival with competition readiness)
 - Phase 2 will update side-stage to read arrival state from `event_check_ins` directly
 
-If this causes visible regressions during testing, the compatibility sync can temporarily also set `registrations.status = 'checked_in'` as a stopgap — but that should be treated as transitional debt, not the target behavior.
+If Phase 1 testing reveals user-facing regressions in side-stage workflows, a temporary compatibility write to `registrations.status = 'checked_in'` may be added behind a clearly marked transitional helper. This is debt, not target behavior.
 
 ---
 
