@@ -20,9 +20,14 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-bold">Events</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage your feiseanna</p>
         </div>
-        <Link href="/dashboard/events/new">
-          <Button>Create Event</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/registration" target="_blank">
+            <Button variant="outline">Registration Desk</Button>
+          </Link>
+          <Link href="/dashboard/events/new">
+            <Button>Create Event</Button>
+          </Link>
+        </div>
       </div>
 
       {(!events || events.length === 0) ? (
