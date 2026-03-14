@@ -257,10 +257,10 @@ export default function RegistrationDeskPage({
     <div className="space-y-4">
       <div>
         <Link
-          href="/registration"
+          href={`/dashboard/events/${eventId}`}
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2"
         >
-          <ArrowLeft className="h-3 w-3" /> Back
+          <ArrowLeft className="h-3 w-3" /> Back to Dashboard
         </Link>
         <h1 className="text-2xl font-bold">Registration Desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
