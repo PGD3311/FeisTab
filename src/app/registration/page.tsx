@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +45,11 @@ export default function RegistrationLandingPage() {
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Card className="feis-card w-full max-w-sm">
+        <div className="px-6 pt-4">
+          <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
+            ← Dashboard
+          </Link>
+        </div>
         <CardHeader className="text-center">
           <CardTitle className="text-xl font-semibold">Registration Desk</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
