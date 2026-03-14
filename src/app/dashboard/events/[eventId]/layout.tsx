@@ -72,9 +72,18 @@ export default function EventLayout({
               {event.start_date} {event.location && `· ${event.location}`}
             </p>
           </div>
-          <Badge variant={event.status === 'active' ? 'default' : 'secondary'}>
-            {event.status}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/registration/${eventId}`}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-feis-green text-white font-semibold text-sm hover:bg-feis-green/90 transition-colors"
+            >
+              Registration Desk &#8599;
+            </Link>
+            <Badge variant={event.status === 'active' ? 'default' : 'secondary'}>
+              {event.status}
+            </Badge>
+          </div>
         </div>
 
         {/* Segmented tab bar */}
