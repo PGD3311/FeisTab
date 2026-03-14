@@ -97,10 +97,11 @@ async function syncCompetitorNumberToRegistrations(
 ```
 
 **Behavior:**
-1. Updates `registrations.competitor_number` on all registrations for that dancer in competitions belonging to the specified event
-2. Scoped to `registrations` where `dancer_id` matches AND `competition_id` belongs to a competition with the given `event_id`
+1. Updates `registrations.competitor_number` on all registrations where `event_id` and `dancer_id` match (direct columns on `registrations` — no join through `competitions` needed)
 
 **Sync is part of the primary action.** Both the `event_check_ins` write and the sync must succeed, or the action surfaces an error to the operator. This is not fire-and-forget. During the migration period, sync failure means legacy screens would show stale data — that is a real operational failure.
+
+**Atomicity note:** Supabase client-side operations do not support transactions across multiple `.from()` calls. If the `event_check_ins` write succeeds but sync fails, the system is in a recoverable but inconsistent state (dancer has a number in `event_check_ins` but legacy screens show no number). The desk should surface the error with a retry option. The "Check In" action's defensive sync (see below) also acts as a self-healing path — if a dancer's registrations are out of sync, checking them in will fix it.
 
 **Number change handling:** If a competitor number is changed on `event_check_ins`, the sync overwrites all matching registrations with the new value. No stale values left behind.
 
@@ -176,7 +177,7 @@ Number selection: auto-suggest next available number for the event (same as curr
 
 **"Check In"** (dancers with pre-assigned numbers):
 1. Update `event_check_ins` row: `checked_in_at = now()`, `checked_in_by = 'registration_desk'`
-2. No sync needed (number already synced at import)
+2. Defensive sync: call `syncCompetitorNumberToRegistrations` anyway to ensure registrations are consistent (guards against partial import failures where the `event_check_ins` row was created but sync failed)
 3. Audit log: `check_in` with `{ competitor_number, event_id, source: 'pre_assigned' }`
 
 ### Number editability
@@ -207,7 +208,7 @@ Registration desk queries `event_check_ins` as the primary source for number + a
 
 ## Migration & Backfill
 
-### Migration file: `00012_event_check_ins.sql`
+### Migration file: `012_event_check_ins.sql`
 
 Creates:
 - `event_check_ins` table (schema above)
@@ -246,6 +247,8 @@ After running the migration, verify:
 
 Update `seed.sql` so each dancer has one competitor number across all their competitions within the event. Current seed gives the same dancer different numbers per competition — that's wrong per the corrected model.
 
+**Seed fix specifics:** Assign each dancer one number (e.g., Aoife Kelly = 101, Ciara Brennan = 102, etc.) and use that number across all their registration rows. Then add `event_check_ins` INSERT statements to the seed matching each dancer's single number, with `checked_in_at = NULL` and `checked_in_by = 'seed'`.
+
 ### What does NOT change
 
 - `registrations.competitor_number` column stays
@@ -267,6 +270,15 @@ These screens continue reading `registrations.competitor_number` via the compati
 - **Score entry form** — displays competitor number passed as prop
 
 Phase 2 (separate sprint) migrates these reads to join through `event_check_ins`.
+
+### Behavioral change note
+
+The current registration desk sets `registrations.status = 'checked_in'` when assigning a number. The new desk does **not** write this status. This means side-stage logic that references `registrations.status === 'checked_in'` (e.g., `checkin/[eventId]/page.tsx` lines 725, 746) will no longer see dancers checked in via the new flow in that status group. This is acceptable for Phase 1 because:
+- Side-stage's primary concern is competition-level presence (`present`), not event-level arrival
+- The `checked_in` status was conceptually wrong (conflating event arrival with competition readiness)
+- Phase 2 will update side-stage to read arrival state from `event_check_ins` directly
+
+If this causes visible regressions during testing, the compatibility sync can temporarily also set `registrations.status = 'checked_in'` as a stopgap — but that should be treated as transitional debt, not the target behavior.
 
 ---
 
