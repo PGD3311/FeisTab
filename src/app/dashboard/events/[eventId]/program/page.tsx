@@ -88,73 +88,37 @@ export default function ProgramPage({
       })
   }
 
-  async function handleMoveUp(stageId: string, compId: string) {
+  async function handleReorder(stageId: string, compId: string, direction: 'up' | 'down') {
     const stageComps = getCompsForStage(stageId)
     const idx = stageComps.findIndex(c => c.id === compId)
-    if (idx <= 0) return
+    if (direction === 'up' && idx <= 0) return
+    if (direction === 'down' && (idx < 0 || idx >= stageComps.length - 1)) return
 
     setReordering(true)
     try {
-      // Swap positions
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
       const newOrder = [...stageComps]
       const temp = newOrder[idx]
-      newOrder[idx] = newOrder[idx - 1]
-      newOrder[idx - 1] = temp
+      newOrder[idx] = newOrder[swapIdx]
+      newOrder[swapIdx] = temp
 
-      // Batch update positions
-      const updates = newOrder.map((c, i) => ({
-        id: c.id,
-        schedule_position: i + 1,
-      }))
-
-      for (const u of updates) {
+      // Clear all positions first to avoid UNIQUE constraint violation during swap
+      const ids = newOrder.map(c => c.id)
+      for (const id of ids) {
         const { error } = await supabase
           .from('competitions')
-          .update({ schedule_position: u.schedule_position })
-          .eq('id', u.id)
-        if (error) {
-          throw new Error(`Failed to update position for ${u.id}: ${error.message}`)
-        }
+          .update({ schedule_position: null })
+          .eq('id', id)
+        if (error) throw new Error(`Failed to clear position: ${error.message}`)
       }
 
-      await loadData()
-      showSuccess('Order updated')
-    } catch (err) {
-      showError('Failed to reorder', {
-        description: err instanceof Error ? err.message : 'Unknown error',
-      })
-    } finally {
-      setReordering(false)
-    }
-  }
-
-  async function handleMoveDown(stageId: string, compId: string) {
-    const stageComps = getCompsForStage(stageId)
-    const idx = stageComps.findIndex(c => c.id === compId)
-    if (idx < 0 || idx >= stageComps.length - 1) return
-
-    setReordering(true)
-    try {
-      // Swap positions
-      const newOrder = [...stageComps]
-      const temp = newOrder[idx]
-      newOrder[idx] = newOrder[idx + 1]
-      newOrder[idx + 1] = temp
-
-      // Batch update positions
-      const updates = newOrder.map((c, i) => ({
-        id: c.id,
-        schedule_position: i + 1,
-      }))
-
-      for (const u of updates) {
+      // Set new positions
+      for (let i = 0; i < newOrder.length; i++) {
         const { error } = await supabase
           .from('competitions')
-          .update({ schedule_position: u.schedule_position })
-          .eq('id', u.id)
-        if (error) {
-          throw new Error(`Failed to update position for ${u.id}: ${error.message}`)
-        }
+          .update({ schedule_position: i + 1 })
+          .eq('id', newOrder[i].id)
+        if (error) throw new Error(`Failed to set position: ${error.message}`)
       }
 
       await loadData()
@@ -267,7 +231,7 @@ export default function ProgramPage({
                             size="sm"
                             className="h-5 w-5 p-0"
                             disabled={idx === 0 || reordering}
-                            onClick={() => handleMoveUp(stage.id, comp.id)}
+                            onClick={() => handleReorder(stage.id, comp.id, 'up')}
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
                           </Button>
@@ -276,7 +240,7 @@ export default function ProgramPage({
                             size="sm"
                             className="h-5 w-5 p-0"
                             disabled={idx === stageComps.length - 1 || reordering}
-                            onClick={() => handleMoveDown(stage.id, comp.id)}
+                            onClick={() => handleReorder(stage.id, comp.id, 'down')}
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </Button>
