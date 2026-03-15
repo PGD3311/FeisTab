@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 
 interface JudgeScoreData {
@@ -34,6 +35,7 @@ interface CalculatedPayloadData {
 
 interface ResultRow {
   final_rank: number
+  dancer_id?: string
   dancers: { first_name: string; last_name: string } | null
   calculated_payload: CalculatedPayloadData | null
 }
@@ -59,7 +61,7 @@ function isExpandable(payload: CalculatedPayloadData | null): boolean {
   )
 }
 
-function BreakdownPanel({ row }: { row: ResultRow }) {
+function BreakdownPanel({ row, eventId }: { row: ResultRow; eventId?: string }) {
   const payload = row.calculated_payload
   if (!payload) return null
 
@@ -186,6 +188,18 @@ function BreakdownPanel({ row }: { row: ResultRow }) {
               </table>
             )}
 
+            {/* Comment sheet link */}
+            {eventId && row.dancer_id && (
+              <div className="mt-3 pt-2 border-t">
+                <Link
+                  href={`/dashboard/events/${eventId}/comments/${row.dancer_id}`}
+                  className="text-xs text-feis-green hover:underline font-medium"
+                >
+                  View feedback sheet &rarr;
+                </Link>
+              </div>
+            )}
+
             {/* Rules footer */}
             {rulesFooter && (
               <p className="text-xs text-muted-foreground mt-3 pt-2 border-t">
@@ -199,7 +213,7 @@ function BreakdownPanel({ row }: { row: ResultRow }) {
   )
 }
 
-export function ResultsTable({ results }: { results: ResultRow[] }) {
+export function ResultsTable({ results, eventId }: { results: ResultRow[]; eventId?: string }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   function handleRowClick(i: number, payload: CalculatedPayloadData | null) {
@@ -254,7 +268,7 @@ export function ResultsTable({ results }: { results: ResultRow[] }) {
                     </span>
                   </td>
                 </tr>
-                {expanded && <BreakdownPanel row={r} />}
+                {expanded && <BreakdownPanel row={r} eventId={eventId} />}
               </Fragment>
             )
           })}

@@ -5,6 +5,7 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { CopyLinkButton } from '@/components/copy-link-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -97,13 +98,19 @@ export default function ResultsPublishingPage({
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm text-muted-foreground">
-          Public results page:
-        </span>
-        <code className="text-sm bg-feis-cream-dark px-2 py-1 rounded">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <span className="text-sm text-muted-foreground">Public results:</span>
+        <code className="text-sm bg-feis-cream-dark px-2 py-1 rounded font-mono">
           /results/{eventId}
         </code>
+        <CopyLinkButton url={`${typeof window !== 'undefined' ? window.location.origin : ''}/results/${eventId}`} />
+        <a
+          href={`/results/${eventId}`}
+          target="_blank"
+          className="text-xs text-feis-green hover:underline font-medium"
+        >
+          Open public page &#8599;
+        </a>
       </div>
 
       {publishable.length > 0 && (
