@@ -157,6 +157,60 @@ export default function ProgramPage({
     return dt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
+  const [addingStageName, setAddingStageName] = useState('')
+  const [addingStage, setAddingStage] = useState(false)
+  const [editingStageId, setEditingStageId] = useState<string | null>(null)
+  const [editingStageName, setEditingStageName] = useState('')
+
+  async function handleAddStage() {
+    if (!addingStageName.trim()) return
+    setAddingStage(true)
+    const nextOrder = stages.length > 0 ? Math.max(...stages.map(s => s.display_order)) + 1 : 1
+    const { error } = await supabase.from('stages').insert({
+      event_id: eventId,
+      name: addingStageName.trim(),
+      display_order: nextOrder,
+    })
+    if (error) {
+      showError('Failed to add stage', { description: error.message })
+    } else {
+      setAddingStageName('')
+      await loadData()
+      showSuccess('Stage added')
+    }
+    setAddingStage(false)
+  }
+
+  async function handleRenameStage(stageId: string) {
+    if (!editingStageName.trim()) return
+    const { error } = await supabase
+      .from('stages')
+      .update({ name: editingStageName.trim() })
+      .eq('id', stageId)
+    if (error) {
+      showError('Failed to rename stage', { description: error.message })
+    } else {
+      setEditingStageId(null)
+      await loadData()
+      showSuccess('Stage renamed')
+    }
+  }
+
+  async function handleDeleteStage(stageId: string) {
+    const stageComps = getCompsForStage(stageId)
+    if (stageComps.length > 0) {
+      showError('Cannot delete a stage that has competitions assigned')
+      return
+    }
+    const { error } = await supabase.from('stages').delete().eq('id', stageId)
+    if (error) {
+      showError('Failed to delete stage', { description: error.message })
+    } else {
+      await loadData()
+      showSuccess('Stage deleted')
+    }
+  }
+
   if (loading) return <p className="text-muted-foreground">Loading...</p>
 
   const unassigned = getUnassignedComps()
@@ -164,7 +218,7 @@ export default function ProgramPage({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Program / Schedule</h2>
+        <h2 className="text-lg font-semibold">Schedule</h2>
         <span className="text-sm text-muted-foreground">
           {competitions.length} competition{competitions.length !== 1 ? 's' : ''} total
         </span>
@@ -173,15 +227,48 @@ export default function ProgramPage({
       {/* Stage sections */}
       {stages.map(stage => {
         const stageComps = getCompsForStage(stage.id)
+        const isEditing = editingStageId === stage.id
 
         return (
           <Card key={stage.id} className="feis-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center justify-between">
-                <span>{stage.name}</span>
-                <Badge variant="outline">
-                  {stageComps.length} competition{stageComps.length !== 1 ? 's' : ''}
-                </Badge>
+                {isEditing ? (
+                  <form onSubmit={(e) => { e.preventDefault(); handleRenameStage(stage.id) }} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingStageName}
+                      onChange={(e) => setEditingStageName(e.target.value)}
+                      className="border rounded px-2 py-1 text-sm w-40"
+                      autoFocus
+                    />
+                    <Button size="sm" type="submit">Save</Button>
+                    <Button size="sm" variant="outline" type="button" onClick={() => setEditingStageId(null)}>Cancel</Button>
+                  </form>
+                ) : (
+                  <span
+                    className="cursor-pointer hover:text-feis-green transition-colors"
+                    onClick={() => { setEditingStageId(stage.id); setEditingStageName(stage.name) }}
+                    title="Click to rename"
+                  >
+                    {stage.name}
+                  </span>
+                )}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {stageComps.length} competition{stageComps.length !== 1 ? 's' : ''}
+                  </Badge>
+                  {stageComps.length === 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteStage(stage.id)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -311,6 +398,25 @@ export default function ProgramPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Add Stage */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={addingStageName}
+          onChange={(e) => setAddingStageName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAddStage() }}
+          placeholder="New stage name..."
+          className="border rounded-md px-3 py-2 text-sm flex-1"
+        />
+        <Button
+          onClick={handleAddStage}
+          disabled={!addingStageName.trim() || addingStage}
+          size="sm"
+        >
+          {addingStage ? 'Adding...' : 'Add Stage'}
+        </Button>
+      </div>
 
       {competitions.length === 0 && (
         <p className="text-center text-muted-foreground py-8">

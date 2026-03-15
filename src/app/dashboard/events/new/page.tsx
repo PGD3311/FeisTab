@@ -45,6 +45,12 @@ export default function NewEventPage() {
       setError(insertError.message)
       setLoading(false)
     } else {
+      // Auto-create Stage 1 so the event is immediately usable
+      await supabase.from('stages').insert({
+        event_id: data.id,
+        name: 'Stage 1',
+        display_order: 1,
+      })
       router.push(`/dashboard/events/${data.id}`)
     }
   }
