@@ -74,21 +74,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     })
   }
 
-  // Classify competitions into five groups (sorted by schedule position)
-  const scoringComps = sortBySchedule(
-    competitions.filter((c) => SCORING_STATUSES.includes(c.status))
+  // Three groups: Score Now, Up Next, Done
+  const scoreNowComps = sortBySchedule(
+    competitions.filter((c) => SCORING_STATUSES.includes(c.status) || c.status === 'released_to_judge')
   )
-  const incomingComps = sortBySchedule(
-    competitions.filter((c) => c.status === 'released_to_judge')
-  )
-  const readyToStartComps = sortBySchedule(
+  const upNextComps = sortBySchedule(
     competitions.filter((c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at)
-  )
-  const waitingComps = sortBySchedule(
-    competitions.filter(
-      (c) =>
-        (c.status === 'ready_for_day_of' && !c.roster_confirmed_at) || c.status === 'imported'
-    )
   )
   const doneComps = sortBySchedule(competitions.filter((c) => DONE_STATUSES.includes(c.status)))
 
@@ -495,20 +486,12 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
 
   const hasNoComps =
-    scoringComps.length === 0 &&
-    incomingComps.length === 0 &&
-    readyToStartComps.length === 0 &&
-    waitingComps.length === 0 &&
+    scoreNowComps.length === 0 &&
+    upNextComps.length === 0 &&
     doneComps.length === 0
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/judge"
-        className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1"
-      >
-        <ChevronLeft className="h-4 w-4" /> Back
-      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -594,97 +577,70 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </div>
       )}
 
-      {/* Scoring -- active competitions */}
-      {scoringComps.length > 0 && (
+      {/* Score Now — active + incoming */}
+      {scoreNowComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg">Scoring</CardTitle>
+            <CardTitle className="text-lg">Score Now</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {scoringComps.map((comp) => (
-              <Link
-                key={comp.id}
-                href={`/judge/${eventId}/${comp.id}`}
-                className="flex items-center justify-between p-4 rounded-md border border-feis-green/30 bg-feis-green-light/30 hover:bg-feis-green-light/60 transition-colors"
-              >
-                <div>
-                  <span className="font-medium">
-                    {renderPositionBadge(comp)}
-                    {comp.code && `${comp.code} \u2014 `}
-                    {comp.name}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} {'\u00b7'} {comp.level}
-                  </span>
-                </div>
-                <Badge variant="default">Score Now</Badge>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Incoming -- sent by side-stage */}
-      {incomingComps.length > 0 && (
-        <Card className="feis-card border-feis-orange">
-          <CardHeader>
-            <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
-              <span className="inline-block w-3 h-3 rounded-full bg-feis-orange animate-pulse" />
-              Incoming
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {incomingComps.map((comp) => (
-              <div
-                key={comp.id}
-                className="flex items-center justify-between p-4 rounded-md border border-feis-orange/30 bg-feis-orange/5"
-              >
-                <div>
-                  <span className="font-medium">
-                    {renderPositionBadge(comp)}
-                    {comp.code && `${comp.code} \u2014 `}
-                    {comp.name}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} {'\u00b7'} {comp.level}
-                  </span>
-                  <p className="text-sm text-feis-orange mt-1">Sent by side-stage</p>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleStart(comp)}
-                  disabled={starting === comp.id}
+            {scoreNowComps.map((comp) => {
+              const isIncoming = comp.status === 'released_to_judge'
+              const isActive = SCORING_STATUSES.includes(comp.status)
+              return isActive ? (
+                <Link
+                  key={comp.id}
+                  href={`/judge/${eventId}/${comp.id}`}
+                  className="flex items-center justify-between p-4 rounded-md border border-feis-green/30 bg-feis-green-light/30 hover:bg-feis-green-light/60 transition-colors"
                 >
-                  {starting === comp.id ? 'Starting...' : 'Start Scoring'}
-                </Button>
-              </div>
-            ))}
+                  <span className="font-medium">
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} `}
+                    {comp.name}
+                  </span>
+                  <Badge variant="default">Score Now</Badge>
+                </Link>
+              ) : (
+                <div
+                  key={comp.id}
+                  className="flex items-center justify-between p-4 rounded-md border border-feis-orange/30 bg-feis-orange/5"
+                >
+                  <span className="font-medium">
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} `}
+                    {comp.name}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => handleStart(comp)}
+                    disabled={starting === comp.id}
+                  >
+                    {starting === comp.id ? 'Starting...' : 'Start Scoring'}
+                  </Button>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       )}
 
-      {/* Ready to Start */}
-      {readyToStartComps.length > 0 && (
+      {/* Up Next */}
+      {upNextComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg">Ready to Start</CardTitle>
+            <CardTitle className="text-lg">Up Next</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {readyToStartComps.map((comp) => (
+            {upNextComps.map((comp) => (
               <div
                 key={comp.id}
-                className="flex items-center justify-between p-4 rounded-md border border-feis-orange/30 bg-feis-orange/5"
+                className="flex items-center justify-between p-4 rounded-md border"
               >
-                <div>
-                  <span className="font-medium">
-                    {renderPositionBadge(comp)}
-                    {comp.code && `${comp.code} \u2014 `}
-                    {comp.name}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} {'\u00b7'} {comp.level}
-                  </span>
-                </div>
+                <span className="font-medium">
+                  {renderPositionBadge(comp)}
+                  {comp.code && `${comp.code} `}
+                  {comp.name}
+                </span>
                 <Button
                   size="sm"
                   onClick={() => handleStart(comp)}
@@ -698,64 +654,11 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
-      {/* Waiting */}
-      {waitingComps.length > 0 && (
-        <Card className="feis-card">
-          <CardHeader>
-            <CardTitle className="text-lg text-muted-foreground">Waiting</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {waitingComps.map((comp) => (
-              <div
-                key={comp.id}
-                className="flex items-center justify-between p-3 rounded-md border opacity-60"
-              >
-                <div>
-                  <span className="font-medium">
-                    {renderPositionBadge(comp)}
-                    {comp.code && `${comp.code} \u2014 `}
-                    {comp.name}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} {'\u00b7'} {comp.level}
-                  </span>
-                </div>
-                <Badge variant="outline">
-                  {comp.status === 'imported' ? 'Not ready' : 'Roster not confirmed yet'}
-                </Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Complete */}
+      {/* Done */}
       {doneComps.length > 0 && (
-        <Card className="feis-card">
-          <CardHeader>
-            <CardTitle className="text-lg text-muted-foreground">Complete</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {doneComps.map((comp) => (
-              <div
-                key={comp.id}
-                className="flex items-center justify-between p-3 rounded-md border opacity-60"
-              >
-                <div>
-                  <span className="font-medium">
-                    {renderPositionBadge(comp)}
-                    {comp.code && `${comp.code} \u2014 `}
-                    {comp.name}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {comp.age_group} {'\u00b7'} {comp.level}
-                  </span>
-                </div>
-                <CheckCircle2 className="h-5 w-5 text-feis-green" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground">
+          {doneComps.length} competition{doneComps.length !== 1 ? 's' : ''} complete
+        </p>
       )}
 
       {/* Empty state */}
