@@ -38,6 +38,11 @@ const tabs: Tab[] = [
     isActive: (pn, bp) => pn.startsWith(`${bp}/judges`),
   },
   {
+    label: 'Comments',
+    href: (bp) => `${bp}/comments`,
+    isActive: (pn, bp) => pn.startsWith(`${bp}/comments`),
+  },
+  {
     label: 'Import',
     href: (bp) => `${bp}/import`,
     isActive: (pn, bp) => pn.startsWith(`${bp}/import`),
