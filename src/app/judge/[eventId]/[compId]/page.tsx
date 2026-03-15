@@ -9,6 +9,7 @@ import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 import { getCurrentHeat, type Heat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
+import { validateCommentData, type CommentData } from '@/lib/comment-codes'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -114,7 +115,7 @@ export default function JudgeScoringPage({
     setLoading(false)
   }
 
-  async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
+  async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null, commentData: CommentData | null) {
     if (!session || !round) return
 
     const { error } = await supabase.from('score_entries').upsert(
@@ -127,6 +128,7 @@ export default function JudgeScoringPage({
         flagged,
         flag_reason: flagReason,
         entry_mode: 'judge_self_service',
+        comment_data: validateCommentData(commentData),
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
@@ -313,6 +315,8 @@ export default function JudgeScoringPage({
         existingScore={existing?.raw_score}
         existingFlagged={existing?.flagged ?? false}
         existingFlagReason={existing?.flag_reason}
+        existingCommentData={existing?.comment_data as CommentData | null | undefined}
+        existingLegacyComments={existing?.comments as string | null | undefined}
         scoreMin={scoreMin}
         scoreMax={scoreMax}
         onSubmit={handleScoreSubmit}
