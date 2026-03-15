@@ -16,10 +16,12 @@ export function CopyLinkButton({ url, className }: { url?: string; className?: s
       input.value = textToCopy
       document.body.appendChild(input)
       input.select()
-      document.execCommand('copy')
+      const success = document.execCommand('copy')
       document.body.removeChild(input)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (success) {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
     }
   }
 

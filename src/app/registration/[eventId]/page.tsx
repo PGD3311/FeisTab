@@ -67,6 +67,9 @@ export default function RegistrationDeskPage({
       setLoading(false)
       return
     }
+    if (checkInRes.error) {
+      console.error('Failed to load check-ins:', checkInRes.error.message)
+    }
 
     setEvent(eventRes.data)
 
@@ -195,7 +198,10 @@ export default function RegistrationDeskPage({
   async function handleCheckIn(dancer: DancerWithRegistrations) {
     setActing(dancer.dancer_id)
     const checkInRow = checkInMap.get(dancer.dancer_id)
-    if (!checkInRow) return
+    if (!checkInRow) {
+      setActing(null)
+      return
+    }
 
     try {
       const { error: updateErr } = await supabase

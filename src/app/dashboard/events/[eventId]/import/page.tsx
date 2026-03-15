@@ -178,12 +178,17 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
 
         const competitorNumber = [...numbers][0]
 
-        const { data: existing } = await supabase
+        const { data: existing, error: checkInLookupErr } = await supabase
           .from('event_check_ins')
           .select('id, competitor_number')
           .eq('event_id', eventId)
           .eq('dancer_id', dancerId)
           .maybeSingle()
+
+        if (checkInLookupErr) {
+          checkInConflicts.push(dancerId)
+          continue
+        }
 
         if (existing) {
           if (existing.competitor_number !== competitorNumber) {
