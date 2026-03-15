@@ -65,7 +65,7 @@ B101  Beginner Reel                    Heat 1 · 2 of 5 scored
 
 ### Expanded Row (tap to open)
 
-Tapping a row expands it to reveal:
+Tapping the **number area** (left side of the row) expands it to reveal details. Tapping the **score input** focuses it for typing — does not trigger expand. This prevents layout shifts while the judge is entering a score.
 - **Dancer name** (first + last) — secondary text below the number
 - **Comment chips** (same expandable UI from ScoreEntryForm)
 - **Flag checkbox + reason dropdown**
@@ -83,11 +83,11 @@ The save state must be unmistakable:
 - **Saved:** Brief green flash on the row + ✓ checkmark, row dims and auto-collapses after ~1 second
 - **Error:** Red border on input, button says "Retry"
 
-After a successful save, the next unscored row becomes "Current" automatically.
+After a successful save, the current row dims and the next unscored row becomes "Current" automatically. The next row does NOT auto-expand — it just highlights. The judge taps the score input directly to start typing. This keeps the flow fast: save → next row highlights → tap score input → type → save.
 
 ### Heat Grouping
 
-Keep the existing heat grouping logic, but simplified:
+New heat display behavior (replaces the current always-visible approach):
 - Current heat: visible, active, green header
 - Completed heats: collapsed to a single line ("Heat 1 — Complete ✓")
 - Upcoming heats: visible but dimmed
@@ -129,12 +129,13 @@ This is a **rewrite of `ScoreEntryForm` and the judge scoring page's rendering l
 
 ### What stays the same
 
-- `onSubmit` signature (dancerId, score, flagged, flagReason, commentData)
+- `onSubmit` signature (dancerId, score, flagged, flagReason, commentData) — the 5-parameter version from the comments capture work
 - All data queries (registrations, scores, rounds, heats)
-- Polling behavior
 - Packet ownership enforcement
 - Sign-off logic
 - Comment codes and validation
+
+Note: The judge scoring page does not have polling (the competition list page does). No polling behavior is affected by this change.
 
 ---
 
@@ -147,7 +148,11 @@ This is a **rewrite of `ScoreEntryForm` and the judge scoring page's rendering l
 
 Two-file change. No new components, no engine changes.
 
-**Note:** The tabulator page also uses `ScoreEntryForm`. Changes to the form component need to work for both contexts. The `isCurrentDancer` prop should be optional (tabulator doesn't use it). The tabulator may prefer the denser layout — if the new form is too sparse for tabulator use, consider a `variant` prop (`'judge'` | `'tabulator'`).
+**Tabulator compatibility:** The tabulator page also uses `ScoreEntryForm`. Use a `variant` prop (`'judge' | 'tabulator'`) to control layout:
+- **Judge variant (default for judge page):** Number-first, name hidden, expand to reveal, large touch targets, auto-advance
+- **Tabulator variant (default for tabulator page):** Name shown inline (tabulators read off paper with names), no auto-advance, no current-dancer highlighting, denser layout. Essentially the current layout with the comment expand feature added.
+
+The tabulator page passes `variant="tabulator"` to preserve its existing UX.
 
 ---
 
