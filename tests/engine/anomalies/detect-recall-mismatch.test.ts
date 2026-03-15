@@ -7,13 +7,13 @@ describe('detectRecallMismatch', () => {
     expect(detectRecallMismatch(recalls, 10, 50, 'r1', 'c1')).toEqual([])
   })
 
-  it('detects recall count mismatch', () => {
+  it('flags recall count mismatch as info (not blocker)', () => {
     const recalls = ['d1', 'd2', 'd3'].map(d => ({ dancer_id: d, round_id: 'r1' }))
     const result = detectRecallMismatch(recalls, 10, 50, 'r1', 'c1')
     expect(result).toHaveLength(1)
     expect(result[0].type).toBe('recall_mismatch')
-    expect(result[0].severity).toBe('blocker')
-    expect(result[0].scope).toBe('round')
+    expect(result[0].severity).toBe('info')
+    expect(result[0].blocking).toBe(false)
   })
 
   it('allows tie-bubble expansion (more than expected)', () => {
