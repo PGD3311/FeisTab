@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { logAudit } from '@/lib/audit'
@@ -39,6 +39,94 @@ export default function JudgeScoringPage({
   const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+
+  // Polling
+  const POLL_INTERVAL_MS = 5000
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Lightweight poll: fetch registration statuses and round heat_snapshot
+  const pollData = useCallback(async () => {
+    const [regRes, roundRes] = await Promise.all([
+      supabase
+        .from('registrations')
+        .select('id, status')
+        .eq('competition_id', compId),
+      supabase
+        .from('rounds')
+        .select('id, heat_snapshot')
+        .eq('competition_id', compId)
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .single(),
+    ])
+
+    if (regRes.error) return
+
+    // Update registration statuses if any changed (scratches, no-shows)
+    const newRegs = regRes.data ?? []
+    setRegistrations(
+      (prev: Array<{ id: string; status: string; [key: string]: unknown }>) => {
+        const changed = newRegs.some((nr: { id: string; status: string }) => {
+          const pr = prev.find((p) => p.id === nr.id)
+          return !pr || pr.status !== nr.status
+        })
+        if (!changed) return prev
+        return prev.map((p) => {
+          const nr = newRegs.find((n: { id: string }) => n.id === p.id)
+          return nr ? { ...p, status: nr.status } : p
+        })
+      }
+    )
+
+    // Update round heat_snapshot if changed
+    if (!roundRes.error && roundRes.data) {
+      setRound(
+        (prev: { id: string; heat_snapshot: unknown; [key: string]: unknown } | null) => {
+          if (!prev || prev.id !== roundRes.data.id) return prev
+          const newSnapshot = JSON.stringify(roundRes.data.heat_snapshot)
+          const oldSnapshot = JSON.stringify(prev.heat_snapshot)
+          if (newSnapshot === oldSnapshot) return prev
+          return { ...prev, heat_snapshot: roundRes.data.heat_snapshot }
+        }
+      )
+    }
+  }, [supabase, compId])
+
+  // Visibility-aware polling
+  useEffect(() => {
+    if (loading || submitted) return
+
+    function startPolling() {
+      if (pollTimerRef.current) return
+      pollTimerRef.current = setInterval(() => {
+        void pollData()
+      }, POLL_INTERVAL_MS)
+    }
+
+    function stopPolling() {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        void pollData()
+        startPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loading, submitted, pollData])
 
   useEffect(() => {
     const stored = localStorage.getItem('judge_session')

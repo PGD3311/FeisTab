@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useEvent } from '@/contexts/event-context'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -19,11 +19,51 @@ interface Stage {
   display_order: number
 }
 
+const POLL_INTERVAL_MS = 5000
+
 export default function EventOverviewPage() {
-  const { event, competitions } = useEvent()
+  const { event, competitions, loading, reload } = useEvent()
   const supabase = useSupabase()
   const [stages, setStages] = useState<Stage[]>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
+
+  // Polling — re-fetch competition statuses via the context reload
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (loading || !event) return
+
+    function startPolling() {
+      if (pollTimerRef.current) return
+      pollTimerRef.current = setInterval(() => {
+        reload()
+      }, POLL_INTERVAL_MS)
+    }
+
+    function stopPolling() {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        reload()
+        startPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loading, event, reload])
 
   // Fetch stages and judge assignment counts for schedule display
   useEffect(() => {

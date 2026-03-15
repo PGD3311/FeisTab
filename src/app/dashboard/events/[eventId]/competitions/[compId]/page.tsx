@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, useCallback, useRef, use } from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -55,6 +55,119 @@ export default function CompetitionDetailPage({
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [loadWarning, setLoadWarning] = useState(false)
   const [stages, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
+
+  // Polling
+  const POLL_INTERVAL_MS = 5000
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Lightweight poll: only fetch frequently-changing fields
+  const pollData = useCallback(async () => {
+    const [compRes, scoreRes, roundRes, regRes] = await Promise.all([
+      supabase.from('competitions').select('status').eq('id', compId).single(),
+      supabase
+        .from('score_entries')
+        .select('id, dancer_id, judge_id, round_id')
+        .eq('competition_id', compId),
+      supabase
+        .from('rounds')
+        .select('id, judge_sign_offs, status')
+        .eq('competition_id', compId)
+        .order('round_number'),
+      supabase
+        .from('registrations')
+        .select('id, status')
+        .eq('competition_id', compId),
+    ])
+
+    if (compRes.error || scoreRes.error || roundRes.error || regRes.error) {
+      // Silently skip this poll cycle on error
+      return
+    }
+
+    // Update competition status if changed
+    const newStatus = compRes.data?.status as CompetitionStatus | undefined
+    if (newStatus) {
+      setComp((prev: Record<string, unknown> | null) =>
+        prev && prev.status !== newStatus ? { ...prev, status: newStatus } : prev
+      )
+    }
+
+    // Update scores if count changed (triggers re-render for score progress)
+    const newScores = scoreRes.data ?? []
+    setScores((prev: Array<{ id: string }>) => {
+      if (prev.length !== newScores.length) return newScores
+      // Check if any IDs differ (new scores arrived)
+      const prevIds = new Set(prev.map((s) => s.id))
+      const changed = newScores.some((s: { id: string }) => !prevIds.has(s.id))
+      return changed ? newScores : prev
+    })
+
+    // Update rounds (sign-offs change)
+    const newRounds = roundRes.data ?? []
+    setRounds((prev: Array<{ id: string; judge_sign_offs: Record<string, string> | null }>) => {
+      if (prev.length !== newRounds.length) return newRounds
+      // Check if sign-offs changed on any round
+      const changed = newRounds.some(
+        (nr: { id: string; judge_sign_offs: Record<string, string> | null }) => {
+          const pr = prev.find((p) => p.id === nr.id)
+          if (!pr) return true
+          return JSON.stringify(pr.judge_sign_offs) !== JSON.stringify(nr.judge_sign_offs)
+        }
+      )
+      return changed ? newRounds : prev
+    })
+
+    // Update registration statuses (scratches, no-shows)
+    const newRegs = regRes.data ?? []
+    setRegistrations((prev: Array<{ id: string; status: string }>) => {
+      const changed = newRegs.some((nr: { id: string; status: string }) => {
+        const pr = prev.find((p) => p.id === nr.id)
+        return !pr || pr.status !== nr.status
+      })
+      return changed
+        ? prev.map((p) => {
+            const nr = newRegs.find((n: { id: string }) => n.id === p.id)
+            return nr ? { ...p, status: nr.status } : p
+          })
+        : prev
+    })
+  }, [supabase, compId])
+
+  // Visibility-aware polling
+  useEffect(() => {
+    if (loading) return
+
+    function startPolling() {
+      if (pollTimerRef.current) return
+      pollTimerRef.current = setInterval(() => {
+        void pollData()
+      }, POLL_INTERVAL_MS)
+    }
+
+    function stopPolling() {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        void pollData()
+        startPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loading, pollData])
 
   async function loadData() {
     const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes, stagesRes] = await Promise.all([
