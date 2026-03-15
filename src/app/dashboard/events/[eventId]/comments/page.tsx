@@ -24,6 +24,7 @@ export default function CommentsIndexPage({
   const supabase = useSupabase()
   const [dancers, setDancers] = useState<DancerRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [search, setSearch] = useState('')
 
   async function loadData() {
@@ -37,6 +38,7 @@ export default function CommentsIndexPage({
 
     if (regErr) {
       console.error('Failed to load registrations:', regErr.message)
+      setLoadError(true)
       setLoading(false)
       return
     }
@@ -49,6 +51,7 @@ export default function CommentsIndexPage({
 
     if (checkInErr) {
       console.error('Failed to load check-ins:', checkInErr.message)
+      // Supplementary — falls back to registration competitor numbers
     }
 
     const checkInMap = new Map<string, string>()
@@ -88,6 +91,7 @@ export default function CommentsIndexPage({
 
     if (compErr) {
       console.error('Failed to load competitions:', compErr.message)
+      setLoadError(true)
       setLoading(false)
       return
     }
@@ -105,6 +109,7 @@ export default function CommentsIndexPage({
 
       if (scoreErr) {
         console.error('Failed to load score entries:', scoreErr.message)
+        // Supplementary — comment counts will show 0 but page still works
       }
 
       type ScoreRow = {
@@ -182,6 +187,14 @@ export default function CommentsIndexPage({
     : dancers
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
+
+  if (loadError) {
+    return (
+      <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+        Could not load comment sheets. Check your connection and try again.
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-3xl">

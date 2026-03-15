@@ -16,6 +16,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
   const [conflicts, setConflicts] = useState<string[]>([])
+  const [syncFailures, setSyncFailures] = useState<number>(0)
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -170,6 +171,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       }
 
       const checkInConflicts: string[] = []
+      let syncFailureCount = 0
       for (const [dancerId, numbers] of dancerNumbers) {
         if (numbers.size > 1) {
           checkInConflicts.push(dancerId)
@@ -216,10 +218,12 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         )
         if (syncResult.error) {
           console.error('Sync failed for dancer:', dancerId, syncResult.error.message)
+          syncFailureCount++
         }
       }
 
       setConflicts(checkInConflicts)
+      setSyncFailures(syncFailureCount)
 
       setDone(true)
     } catch (err: unknown) {
@@ -279,6 +283,12 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
             <p className="text-sm text-orange-600 mt-2">
               {conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
               Review and assign numbers at the registration desk.
+            </p>
+          )}
+          {syncFailures > 0 && (
+            <p className="text-sm text-orange-600 mt-2">
+              {syncFailures} dancer(s) had competitor number sync failures.
+              Their check-in numbers were saved but may not appear on registrations until the next sync.
             </p>
           )}
           <Button

@@ -278,6 +278,7 @@ export default function RosterConfirmationPage({
 
     if (error) {
       console.error('Failed to load check-ins:', error.message)
+      showError('Failed to load check-in data', { description: error.message })
       return
     }
 

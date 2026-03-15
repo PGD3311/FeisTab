@@ -72,6 +72,7 @@ export default function DancerCommentSheetPage({
   const [competitorNumber, setCompetitorNumber] = useState<string | null>(null)
   const [sections, setSections] = useState<CompetitionSection[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   async function loadData() {
     // Load dancer info, event info, and check-in in parallel
@@ -88,12 +89,14 @@ export default function DancerCommentSheetPage({
 
     if (dancerRes.error) {
       console.error('Failed to load dancer:', dancerRes.error.message)
+      setLoadError(true)
       setLoading(false)
       return
     }
 
     if (eventRes.error) {
       console.error('Failed to load event:', eventRes.error.message)
+      // Supplementary — page still works without event name
     }
 
     setDancer(dancerRes.data as DancerInfo)
@@ -127,6 +130,7 @@ export default function DancerCommentSheetPage({
 
     if (compErr) {
       console.error('Failed to load competitions:', compErr.message)
+      setLoadError(true)
       setLoading(false)
       return
     }
@@ -149,6 +153,7 @@ export default function DancerCommentSheetPage({
 
     if (scoreErr) {
       console.error('Failed to load score entries:', scoreErr.message)
+      setLoadError(true)
       setLoading(false)
       return
     }
@@ -171,6 +176,7 @@ export default function DancerCommentSheetPage({
 
       if (judgeErr) {
         console.error('Failed to load judges:', judgeErr.message)
+        // Supplementary — page falls back to "Unknown Judge"
       }
       for (const j of (judges as Judge[] | null) ?? []) {
         judgeMap.set(j.id, j)
@@ -185,6 +191,7 @@ export default function DancerCommentSheetPage({
 
       if (roundErr) {
         console.error('Failed to load rounds:', roundErr.message)
+        // Supplementary — page falls back to default round info
       }
       for (const r of (rounds as Round[] | null) ?? []) {
         roundMap.set(r.id, r)
@@ -269,6 +276,14 @@ export default function DancerCommentSheetPage({
   }, [])
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
+
+  if (loadError) {
+    return (
+      <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+        Could not load comment sheet. Check your connection and try again.
+      </div>
+    )
+  }
 
   if (!dancer) {
     return <p className="text-muted-foreground">Dancer not found.</p>

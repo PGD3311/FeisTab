@@ -39,6 +39,7 @@ export default function ResultsPublishingPage({
   const [expandedCompId, setExpandedCompId] = useState<string | null>(null)
   const [expandedResults, setExpandedResults] = useState<ResultRow[]>([])
   const [loadingResults, setLoadingResults] = useState(false)
+  const [expandError, setExpandError] = useState(false)
 
   async function loadData(): Promise<void> {
     const { data, error } = await supabase
@@ -57,14 +58,15 @@ export default function ResultsPublishingPage({
     setLoading(false)
   }
 
-  async function loadResultsForComp(compId: string) {
-    if (expandedCompId === compId) {
+  async function loadResultsForComp(compId: string, retry?: boolean) {
+    if (expandedCompId === compId && !retry) {
       setExpandedCompId(null)
       return
     }
 
     setLoadingResults(true)
     setExpandedCompId(compId)
+    setExpandError(false)
 
     const { data, error } = await supabase
       .from('results')
@@ -74,6 +76,7 @@ export default function ResultsPublishingPage({
 
     if (error) {
       console.error('Failed to load results:', error.message)
+      setExpandError(true)
       setLoadingResults(false)
       return
     }
@@ -175,6 +178,14 @@ export default function ResultsPublishingPage({
           <div className="mt-2 mb-4 ml-6">
             {loadingResults ? (
               <p className="text-sm text-muted-foreground py-2">Loading results...</p>
+            ) : expandError ? (
+              <button
+                type="button"
+                onClick={() => loadResultsForComp(c.id, true)}
+                className="text-sm text-orange-600 hover:text-orange-800 py-2 cursor-pointer"
+              >
+                Failed to load results. Click to retry.
+              </button>
             ) : (
               <ResultsTable results={expandedResults} />
             )}
