@@ -66,6 +66,7 @@ export default function TabulatorEntryPage({
   const [error, setError] = useState<string | null>(null)
   const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [signedOff, setSignedOff] = useState(false)
+  const [focusDancerId, setFocusDancerId] = useState<string | null>(null)
 
   async function loadBase() {
     const [compRes, judgesRes, regRes, roundRes] = await Promise.all([
@@ -167,6 +168,14 @@ export default function TabulatorEntryPage({
       loadJudgeScores(selectedJudgeId)
     }
   }, [selectedJudgeId, round])
+
+  useEffect(() => {
+    if (registrations.length > 0 && scores.length >= 0) {
+      const scoredIds = new Set(scores.map(s => s.dancer_id))
+      const firstUnscored = registrations.find(r => !scoredIds.has(r.dancer_id))
+      setFocusDancerId(firstUnscored?.dancer_id ?? null)
+    }
+  }, [registrations, scores])
 
   async function handleScoreSubmit(
     dancerId: string,
@@ -336,6 +345,12 @@ export default function TabulatorEntryPage({
         scoreMax={scoreMax}
         onSubmit={handleScoreSubmit}
         locked={signedOff}
+        autoFocus={reg.dancer_id === focusDancerId}
+        onSaved={() => {
+          const scoredIds = new Set([...scores.map(s => s.dancer_id), reg.dancer_id])
+          const nextUnscored = registrations.find(r => !scoredIds.has(r.dancer_id))
+          setFocusDancerId(nextUnscored?.dancer_id ?? null)
+        }}
       />
     )
   }
