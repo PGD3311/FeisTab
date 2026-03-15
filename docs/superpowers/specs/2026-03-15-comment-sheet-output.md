@@ -61,7 +61,15 @@ One query per dancer, joining across:
 - `score_entries` — scores with `comment_data` and `comments`, joined with `judges` for judge name
 - `event_check_ins` — competitor number (source of truth)
 
-This is a server component page (read-only, no interactivity). Use `createClient()` from `server.ts` with `export const dynamic = 'force-dynamic'`.
+**Index page:** Client component (needs search interactivity). Uses `useSupabase()`.
+
+**Per-dancer comment sheet:** Client component (needs the Print button which calls `window.print()`). Uses `useSupabase()`. The page is mostly read-only but the print action requires client-side JavaScript.
+
+**`dancerId` URL parameter** is the `dancers.id` UUID, not a competitor number. The index page links using this UUID.
+
+**Round handling:** Show comments from all rounds (including recall rounds). Group by competition, then by judge — if a judge scored multiple rounds, their comments from each round appear separately.
+
+**Index page query shape:** A single aggregate query, not N+1. Join `registrations → score_entries` grouped by `dancer_id`, counting distinct competitions where `comment_data IS NOT NULL OR comments IS NOT NULL`.
 
 ### Code Label Resolution
 
@@ -82,7 +90,7 @@ Two new pages. No new components, no engine changes. Uses existing `COMMENT_CODE
 
 ## Navigation
 
-Add "Comments" to the event tab bar (`src/components/event-tabs.tsx`) between Results and Import:
+Add "Comments" to the event tab bar (`src/components/event-tabs.tsx`) between Judges and Import:
 
 `Overview | Competitions | Program | Side-Stage ↗ | Judges | Comments | Import | Results`
 
