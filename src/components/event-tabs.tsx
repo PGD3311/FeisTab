@@ -17,12 +17,7 @@ const tabs: Tab[] = [
     isActive: (pn, bp) => pn === bp,
   },
   {
-    label: 'Competitions',
-    href: (bp) => `${bp}/competitions`,
-    isActive: (pn, bp) => pn.startsWith(`${bp}/competitions`),
-  },
-  {
-    label: 'Program',
+    label: 'Schedule',
     href: (bp) => `${bp}/program`,
     isActive: (pn, bp) => pn.startsWith(`${bp}/program`),
   },

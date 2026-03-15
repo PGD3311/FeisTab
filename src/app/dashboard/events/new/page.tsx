@@ -36,6 +36,7 @@ export default function NewEventPage() {
         name,
         start_date: startDate,
         location: location || null,
+        status: 'active',
         created_by: user?.id,
       })
       .select()
