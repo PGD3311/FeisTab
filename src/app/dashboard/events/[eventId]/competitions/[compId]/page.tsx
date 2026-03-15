@@ -133,7 +133,29 @@ export default function CompetitionDetailPage({
     })
   }, [supabase, compId])
 
-  // Visibility-aware polling
+  // Realtime subscriptions for instant updates (polling kept as fallback)
+  useEffect(() => {
+    if (loading) return
+
+    const channel = supabase
+      .channel(`comp-detail-${compId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, () => {
+        void pollData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'score_entries', filter: `competition_id=eq.${compId}` }, () => {
+        void pollData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `competition_id=eq.${compId}` }, () => {
+        void pollData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loading, supabase, compId, pollData])
+
+  // Visibility-aware polling (fallback if Realtime drops)
   useEffect(() => {
     if (loading) return
 

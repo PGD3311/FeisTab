@@ -27,7 +27,23 @@ export default function EventOverviewPage() {
   const [stages, setStages] = useState<Stage[]>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
 
-  // Polling — re-fetch competition statuses via the context reload
+  // Realtime subscription for instant competition status updates
+  useEffect(() => {
+    if (loading || !event) return
+
+    const channel = supabase
+      .channel('dashboard-competitions')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions' }, () => {
+        reload()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loading, event, supabase, reload])
+
+  // Polling fallback
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {

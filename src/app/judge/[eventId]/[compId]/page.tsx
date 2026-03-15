@@ -92,7 +92,26 @@ export default function JudgeScoringPage({
     }
   }, [supabase, compId])
 
-  // Visibility-aware polling
+  // Realtime subscriptions for instant updates from organizer actions
+  useEffect(() => {
+    if (loading || submitted) return
+
+    const channel = supabase
+      .channel(`judge-scoring-${compId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'registrations', filter: `competition_id=eq.${compId}` }, () => {
+        void pollData()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `competition_id=eq.${compId}` }, () => {
+        void pollData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loading, submitted, supabase, compId, pollData])
+
+  // Visibility-aware polling (fallback)
   useEffect(() => {
     if (loading || submitted) return
 
