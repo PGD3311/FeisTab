@@ -49,7 +49,9 @@ For each dancer in a competition roster:
 | **Not Arrived — no number** | No `event_check_ins` row for this dancer | `Not arrived` text + "No number" subtext |
 | **Not Arrived — awaiting** | `event_check_ins` row exists, `checked_in_at` is null | `Not arrived` text + "Number assigned, not checked in" subtext. Competitor number shown dimmed. |
 
-The "Call to stage" hint only shows when the competition is in an active status (`in_progress`, `awaiting_scores`, `released_to_judge`). On setup/draft competitions, arrival info is shown but the action hint is suppressed to reduce noise.
+The "Call to stage" hint only shows when the competition is in a scoring-relevant status: `released_to_judge`, `in_progress`, or `awaiting_scores`. This is intentionally broader than the codebase's `ACTIVE_STATUSES` (which excludes `released_to_judge`) — the reasoning is that once a judge has the packet, missing dancers should be flagged. On setup/draft competitions, arrival info is shown but the action hint is suppressed to reduce noise.
+
+**Known limitation:** The existing 5-second poll refreshes `event_check_ins` and competition statuses, but does NOT re-fetch the expanded competition's registration roster. If a dancer's `registrations.status` changes on another screen (e.g., marked present), the side-stage operator won't see it until they collapse and re-expand that competition. This is acceptable for now — the existing page has this same limitation.
 
 ### What Does NOT Change
 
@@ -68,7 +70,9 @@ The "Call to stage" hint only shows when the competition is in an active status 
 |--------|------|---------|
 | Modify | `src/app/checkin/[eventId]/page.tsx` | Add `event_check_ins` query, arrival indicator per dancer, read competitor number from check-ins |
 
-Single-file change. Uses existing `CheckInRow` type from `src/lib/check-in.ts`.
+Single-file change. The query result `{ dancer_id, competitor_number, checked_in_at }` is mapped into `Map<string, CheckInRow>` using `dancer_id` as the key. `CheckInRow` (from `src/lib/check-in.ts`) has `competitor_number` and `checked_in_at` — the `dancer_id` is only needed for map construction, not stored in the value. No changes to `CheckInRow` needed.
+
+**Note on competitor number nullability:** `event_check_ins.competitor_number` is `NOT NULL` (always a string), but the fallback `registrations.competitor_number` is `string | null`. When falling back, the display should handle `null` (show a dash, matching existing behavior at line 914).
 
 ---
 
