@@ -307,14 +307,6 @@ export default function RegistrationDeskPage({
                   {dancer.school_name && (
                     <div className="text-sm text-muted-foreground">{dancer.school_name}</div>
                   )}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {dancer.registrations.map((reg) => (
-                      <Badge key={reg.id} variant="secondary" className="text-xs">
-                        {reg.competition_code && `${reg.competition_code} — `}
-                        {reg.competition_name}
-                      </Badge>
-                    ))}
-                  </div>
                 </div>
                 <div className="shrink-0">
                   {state === 'checked_in' && checkInRow && (

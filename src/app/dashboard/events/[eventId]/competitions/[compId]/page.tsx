@@ -589,32 +589,8 @@ export default function CompetitionDetailPage({
         <ChevronLeft className="h-4 w-4" /> Competitions
       </Link>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
-          <p className="text-sm text-muted-foreground">{comp.age_group} · {comp.level}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CompetitionStatusBadge status={comp.status} />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              const newValue = !comp.numbers_released
-              const { error } = await supabase
-                .from('competitions')
-                .update({ numbers_released: newValue })
-                .eq('id', compId)
-              if (error) {
-                showError(newValue ? 'Failed to release numbers' : 'Failed to hide numbers')
-                return
-              }
-              await loadData()
-              showSuccess(newValue ? 'Numbers released' : 'Numbers hidden')
-            }}
-          >
-            {comp.numbers_released ? '✓ Numbers Released' : 'Release Numbers'}
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
+        <CompetitionStatusBadge status={comp.status} />
       </div>
 
       {loadWarning && (
@@ -623,128 +599,14 @@ export default function CompetitionDetailPage({
         </div>
       )}
 
-      {/* Schedule */}
-      <Card className="feis-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Schedule</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Stage</label>
-              <select
-                value={comp.stage_id ?? ''}
-                onChange={async (e) => {
-                  const val = e.target.value || null
-                  const { error } = await supabase
-                    .from('competitions')
-                    .update({ stage_id: val })
-                    .eq('id', compId)
-                  if (error) {
-                    showError('Failed to update stage', { description: error.message })
-                    return
-                  }
-                  await loadData()
-                  showSuccess('Stage updated')
-                }}
-                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
-              >
-                <option value="">Unassigned</option>
-                {stages.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Schedule Position</label>
-              <input
-                type="number"
-                min={1}
-                value={comp.schedule_position ?? ''}
-                onChange={async (e) => {
-                  const val = e.target.value ? parseInt(e.target.value, 10) : null
-                  const { error } = await supabase
-                    .from('competitions')
-                    .update({ schedule_position: val })
-                    .eq('id', compId)
-                  if (error) {
-                    showError('Failed to update position', { description: error.message })
-                    return
-                  }
-                  await loadData()
-                  showSuccess('Position updated')
-                }}
-                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
-                placeholder="Run order within stage"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Dance Type</label>
-              <select
-                value={comp.dance_type ?? ''}
-                onChange={async (e) => {
-                  const val = e.target.value || null
-                  const { error } = await supabase
-                    .from('competitions')
-                    .update({ dance_type: val })
-                    .eq('id', compId)
-                  if (error) {
-                    showError('Failed to update dance type', { description: error.message })
-                    return
-                  }
-                  await loadData()
-                  showSuccess('Dance type updated')
-                }}
-                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
-              >
-                <option value="">Not set</option>
-                <option value="reel">Reel</option>
-                <option value="jig">Jig</option>
-                <option value="hornpipe">Hornpipe</option>
-                <option value="slip_jig">Slip Jig</option>
-                <option value="treble_jig">Treble Jig</option>
-                <option value="set_dance">Set Dance</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Group Size</label>
-              <select
-                value={comp.group_size ?? 2}
-                onChange={async (e) => {
-                  const val = parseInt(e.target.value, 10)
-                  const { error } = await supabase
-                    .from('competitions')
-                    .update({ group_size: val })
-                    .eq('id', compId)
-                  if (error) {
-                    showError('Failed to update group size', { description: error.message })
-                    return
-                  }
-                  await loadData()
-                  showSuccess('Group size updated')
-                }}
-                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
-              >
-                <option value={1}>1 (solo)</option>
-                <option value={2}>2 (pairs)</option>
-                <option value={3}>3 (trios)</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Next Step */}
+      {/* Next Step — single action card for the organizer */}
       {(() => {
         const currentStatus = comp.status as CompetitionStatus
         const nextStates = getNextStates(currentStatus)
-        // Only show operator-driven transitions (not tabulate/recalls/publish — those have their own buttons)
         const operatorTransitions = nextStates.filter(s => {
           if (s === 'awaiting_scores' && currentStatus !== 'in_progress') return false
           return ['ready_for_day_of', 'in_progress', 'awaiting_scores', 'released_to_judge'].includes(s)
         })
-
-        if (operatorTransitions.length === 0) return null
 
         const context: TransitionContext = {
           registrationCount: registrations.length,
@@ -753,16 +615,25 @@ export default function CompetitionDetailPage({
           rosterConfirmedAt: comp.roster_confirmed_at ?? null,
         }
 
+        // Determine if tabulation/publish actions should show here
+        const showTabulate = currentStatus === 'ready_to_tabulate' && !previewResults
+        const showRecalls = currentStatus === 'ready_to_tabulate' && ruleset && ruleset.recall_top_percent > 0
+        const showPublish = results.length > 0 && currentStatus === 'complete_unpublished'
+        const hasActions = operatorTransitions.length > 0 || showTabulate || showPublish
+
+        if (!hasActions && currentStatus !== 'published' && currentStatus !== 'locked') return null
+
         return (
           <Card className="feis-card border-feis-green/30 bg-feis-green-light/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Next Step</CardTitle>
+              <CardTitle className="text-lg">
+                {currentStatus === 'published' || currentStatus === 'locked' ? 'Complete' : 'Next Step'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {operatorTransitions.map(target => {
                 const blockReason = getTransitionBlockReason(currentStatus, target, context)
                 const label = getTransitionLabel(currentStatus, target)
-
                 return (
                   <div key={target}>
                     <Button
@@ -779,6 +650,39 @@ export default function CompetitionDetailPage({
                   </div>
                 )
               })}
+              {showTabulate && (
+                <Button
+                  onClick={handlePreviewTabulation}
+                  disabled={!allSignedOff || anomalies.some(a => a.blocking)}
+                  className="w-full justify-start text-left"
+                  size="lg"
+                >
+                  {anomalies.some(a => a.blocking)
+                    ? 'Resolve blockers before tabulation'
+                    : !allSignedOff
+                      ? 'Waiting for judge sign-offs...'
+                      : 'Run Tabulation'}
+                </Button>
+              )}
+              {showRecalls && (
+                <Button onClick={handleGenerateRecalls} variant="outline" className="w-full justify-start text-left" size="lg">
+                  Generate Recalls (Top {ruleset!.recall_top_percent}%)
+                </Button>
+              )}
+              {showPublish && (
+                <Button onClick={handlePublish} className="w-full justify-start text-left" size="lg">
+                  Publish Results
+                </Button>
+              )}
+              {(currentStatus === 'published' || currentStatus === 'locked') && (
+                <p className="text-sm text-feis-green">Results published.</p>
+              )}
+              <Link
+                href={`/dashboard/events/${eventId}/competitions/${compId}/audit`}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                View audit trail
+              </Link>
             </CardContent>
           </Card>
         )
@@ -843,25 +747,6 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Judges */}
-      <Card className="feis-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Judges</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {(assignedJudgeIds.length > 0
-              ? judges.filter(j => assignedJudgeIds.includes(j.id))
-              : judges
-            ).map(j => (
-              <Badge key={j.id} variant="outline" className="text-sm">
-                {j.first_name} {j.last_name}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Roster */}
       <Card className="feis-card">
@@ -941,42 +826,6 @@ export default function CompetitionDetailPage({
         </CardContent>
       </Card>
 
-      {/* Rounds & Scores */}
-      <Card className="feis-card">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            Rounds ({rounds.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {rounds.map(round => {
-            const roundScores = scores.filter(s => s.round_id === round.id)
-            return (
-              <div key={round.id} className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-medium">Round {round.round_number}</span>
-                  <Badge variant="outline">{round.round_type}</Badge>
-                  <Badge variant="outline">{round.status}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {roundScores.length} score entries
-                  </span>
-                </div>
-                <div className="flex gap-1 flex-wrap mt-1">
-                  {judges.map(j => {
-                    const signedOff = round.judge_sign_offs?.[j.id]
-                    return (
-                      <span key={j.id} className={`text-xs px-2 py-0.5 rounded ${signedOff ? 'bg-feis-green-light text-feis-green' : 'bg-gray-100 text-gray-500'}`}>
-                        {j.first_name}: {signedOff ? 'Signed off' : 'Pending'}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
-
       {/* Anomaly Checks */}
       {anomalies.length > 0 && (
         <Card className="feis-card">
@@ -1023,61 +872,6 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Recent Activity */}
-      <Card className="feis-card">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center justify-between">
-            <span>Recent Activity</span>
-            {auditEntries.length > 0 && (
-              <Link
-                href={`/dashboard/events/${eventId}/competitions/${compId}/audit`}
-                className="text-sm font-normal text-feis-green hover:underline"
-              >
-                View full audit trail →
-              </Link>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {auditEntries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No audit entries yet. Entries appear as scores are entered, sign-offs recorded, and actions taken.
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium text-xs">When</th>
-                  <th className="pb-2 pr-3 font-medium text-xs">Action</th>
-                  <th className="pb-2 font-medium text-xs">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditEntries.slice(0, 5).map(entry => {
-                  const formatted = formatAuditEntry(entry, nameMaps)
-                  return (
-                    <tr key={entry.id} className={`border-b last:border-0 ${formatted.isCorrection ? 'bg-orange-50' : ''}`}>
-                      <td
-                        className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap"
-                        title={new Date(entry.created_at).toLocaleString()}
-                      >
-                        {relativeTime(entry.created_at)}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${formatted.badgeColor}`}>
-                          {formatted.badgeText}
-                        </span>
-                      </td>
-                      <td className="py-2 text-xs">{formatted.summary}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Corrections */}
       {(comp.status === 'ready_to_tabulate' || comp.status === 'complete_unpublished') && (
@@ -1171,40 +965,6 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Actions */}
-      <Card className="feis-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
-          <Button
-            onClick={handlePreviewTabulation}
-            variant="default"
-            disabled={!allSignedOff || anomalies.some(a => a.blocking) || !!previewResults}
-          >
-            {anomalies.some(a => a.blocking)
-              ? 'Resolve blockers before tabulation'
-              : !allSignedOff
-                ? 'Waiting for judge sign-offs...'
-                : previewResults
-                  ? 'Preview shown below'
-                  : 'Run Tabulation'}
-          </Button>
-          {ruleset && ruleset.recall_top_percent > 0 && (
-            <Button onClick={handleGenerateRecalls} variant="outline">
-              Generate Recalls (Top {ruleset.recall_top_percent}%)
-            </Button>
-          )}
-          {results.length > 0 && comp.status !== 'published' && (
-            <Button onClick={handlePublish} variant="outline">
-              Publish Results
-            </Button>
-          )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Tabulation Preview */}
       {previewResults && (
