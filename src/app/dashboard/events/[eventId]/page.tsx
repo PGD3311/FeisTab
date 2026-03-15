@@ -19,13 +19,6 @@ interface Stage {
   display_order: number
 }
 
-const ACTION_HINTS: Partial<Record<CompetitionStatus, string>> = {
-  awaiting_scores: 'Waiting for sign-offs',
-  ready_to_tabulate: 'Ready to tabulate',
-  recalled_round_pending: 'Recall round pending',
-  complete_unpublished: 'Ready to publish',
-}
-
 const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
   draft: 0,
   imported: 10,
@@ -197,17 +190,9 @@ export default function EventOverviewPage() {
                     )}
                     {comp.name}
                   </span>
-                  <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                    {comp.age_group} &middot; {comp.level}
-                  </span>
                 </div>
                 <div className="flex items-center gap-2 ml-3 shrink-0">
                   <CompetitionStatusBadge status={comp.status} />
-                  {ACTION_HINTS[comp.status] && (
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
-                      {ACTION_HINTS[comp.status]}
-                    </span>
-                  )}
                 </div>
               </Link>
             ))}
@@ -353,10 +338,11 @@ export default function EventOverviewPage() {
                       )}
                       {comp.name}
                     </span>
-                    <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                      {comp.age_group} &middot; {comp.level}
-                      {stageName && ` · ${stageName}`}
-                    </span>
+                    {stageName && (
+                      <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                        {stageName}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
                     <span className="text-xs text-muted-foreground hidden sm:inline tabular-nums">

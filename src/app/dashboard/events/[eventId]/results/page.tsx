@@ -115,7 +115,7 @@ export default function ResultsPublishingPage({
             {publishable.map(c => (
               <div key={c.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-feis-green-light/30 transition-colors">
                 <div>
-                  <span className="font-medium">{c.code && `${c.code} — `}{c.name}</span>
+                  <span className="font-medium">{c.code && `${c.code} `}{c.name}</span>
                   <span className="ml-2 text-sm text-muted-foreground">
                     {c.results?.[0]?.count ?? 0} results
                   </span>
@@ -136,7 +136,7 @@ export default function ResultsPublishingPage({
             {published.map(c => (
               <div key={c.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-feis-green-light/30 transition-colors">
                 <div>
-                  <span className="font-medium">{c.code && `${c.code} — `}{c.name}</span>
+                  <span className="font-medium">{c.code && `${c.code} `}{c.name}</span>
                   <CompetitionStatusBadge status={c.status} />
                 </div>
                 <Button size="sm" variant="outline" onClick={() => handleUnpublish(c.id, c.status)}>

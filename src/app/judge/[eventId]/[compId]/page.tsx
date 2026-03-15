@@ -412,9 +412,8 @@ export default function JudgeScoringPage({
 
       <Card className="feis-card feis-accent-left mb-6">
         <CardHeader className="pb-3">
-          <CardTitle className="text-2xl">{comp.code && `${comp.code} — `}{comp.name}</CardTitle>
+          <CardTitle className="text-2xl">{comp.code && `${comp.code} `}{comp.name}</CardTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Round {round?.round_number}</span>
             <Badge variant="outline">{scoredCount}/{totalDancers} scored</Badge>
             {heatSnapshot && totalHeats > 0 && (
               <Badge variant="outline">

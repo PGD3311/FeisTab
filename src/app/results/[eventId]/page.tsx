@@ -92,12 +92,9 @@ export default async function PublicResultsPage({
               )
               return (
                 <div key={comp.id}>
-                  <h2 className="font-bold text-lg mb-1 text-feis-charcoal">
-                    {comp.code && `${comp.code} — `}{comp.name}
+                  <h2 className="font-bold text-lg mb-2 text-feis-charcoal">
+                    {comp.code && `${comp.code} `}{comp.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {comp.age_group} · {comp.level}
-                  </p>
                   <ResultsTable results={sortedResults} />
                 </div>
               )

@@ -589,7 +589,7 @@ export default function CompetitionDetailPage({
         <ChevronLeft className="h-4 w-4" /> Competitions
       </Link>
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{comp.code && `${comp.code} — `}{comp.name}</h1>
+        <h1 className="text-3xl font-bold">{comp.code && `${comp.code} `}{comp.name}</h1>
         <CompetitionStatusBadge status={comp.status} />
       </div>
 

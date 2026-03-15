@@ -459,7 +459,7 @@ export default function TabulatorEntryPage({
 
       <div>
         <h1 className="text-3xl font-bold">
-          {compCode && `${compCode} — `}Tabulator Entry
+          {compCode && `${compCode} `}Tabulator Entry
         </h1>
         <p className="text-sm text-muted-foreground">
           Enter scores from paper score sheets on behalf of a judge

@@ -812,15 +812,9 @@ export default function RosterConfirmationPage({
             )}
             <div>
               <span className="text-lg font-medium">
-                {comp.code && <span className="font-mono">{comp.code}</span>}
-                {comp.code && ' \u2014 '}
+                {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
                 {comp.name}
               </span>
-              {(comp.age_group || comp.level) && (
-                <span className="ml-2 text-sm text-muted-foreground">
-                  {[comp.age_group, comp.level].filter(Boolean).join(' \u00b7 ')}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1246,8 +1240,7 @@ export default function RosterConfirmationPage({
                           {comp.schedule_position}
                         </span>
                       )}
-                      {comp.code && <span className="font-mono">{comp.code}</span>}
-                      {comp.code && ' \u2014 '}
+                      {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
                       {comp.name}
                     </span>
                     <p className="text-sm text-feis-green mt-1">
