@@ -396,14 +396,8 @@ export default function EventOverviewPage() {
                     )}
                     {comp.name}
                   </span>
-                  <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                    {comp.age_group} &middot; {comp.level}
-                  </span>
                 </div>
                 <div className="flex items-center gap-2 ml-3 shrink-0">
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    {comp.registrations?.[0]?.count ?? 0} dancers
-                  </span>
                   <CompetitionStatusBadge status={comp.status} />
                 </div>
               </Link>
@@ -450,9 +444,6 @@ export default function EventOverviewPage() {
                       <span className="font-mono text-feis-green/50 mr-1.5">{comp.code}</span>
                     )}
                     {comp.name}
-                  </span>
-                  <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                    {comp.age_group} &middot; {comp.level}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 ml-3 shrink-0">
