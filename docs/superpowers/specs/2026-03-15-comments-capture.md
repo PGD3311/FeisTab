@@ -79,6 +79,8 @@ These are **neutral topic labels** — the checkbox means "I have feedback about
 
 **Comments are saved as part of the existing Save action.** No separate save button for comments.
 
+**Locked state:** When the form receives `locked={true}` (round signed off), the comments UI (chips + textarea) must also be disabled — same as score input and save button. Comments save with the score, so locked means locked for everything.
+
 **`onSubmit` signature change:**
 ```ts
 // Current:
@@ -116,7 +118,7 @@ onSubmit: (dancerId: string, score: number, flagged: boolean, flagReason: string
 | Create | `src/lib/comment-codes.ts` | Code definitions, types, validation helper |
 | Modify | `src/components/score-entry-form.tsx` | Add expandable comments UI |
 | Modify | `src/app/judge/[eventId]/[compId]/page.tsx` | Pass `commentData` through score upsert, select `comment_data` on load |
-| Modify | `src/app/dashboard/.../tabulator/page.tsx` | Same — pass `commentData` through upsert, select on load |
+| Modify | `src/app/dashboard/.../tabulator/page.tsx` | Pass `commentData` through upsert. **Note:** this page uses an explicit column list in its select (`'id, dancer_id, raw_score, flagged, flag_reason, entry_mode'`) — must add `comment_data, comments`. Also update the `ScoreEntry` interface (lines 40-47) to include `comment_data: Record<string, unknown> \| null` and `comments: string \| null`. |
 
 ---
 
@@ -146,6 +148,7 @@ onSubmit: (dancerId: string, score: number, flagged: boolean, flagReason: string
 - Comment-level audit trail
 - Comments in tabulation results or result explainability view
 - Comments in the anomaly detection engine
+- Updating audit `afterData` to include `comment_data` (not needed for this layer)
 
 ---
 
