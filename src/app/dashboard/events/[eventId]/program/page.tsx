@@ -296,10 +296,11 @@ export default function ProgramPage({
                             )}
                             {comp.name}
                           </span>
-                          <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                            {comp.age_group} · {comp.level}
-                            {comp.dance_type && ` · ${formatDanceType(comp.dance_type)}`}
-                          </span>
+                          {comp.dance_type && (
+                            <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                              {formatDanceType(comp.dance_type)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-3 shrink-0">
@@ -368,9 +369,6 @@ export default function ProgramPage({
                         </span>
                       )}
                       {comp.name}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                      {comp.age_group} · {comp.level}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">

@@ -10,6 +10,7 @@ import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
+import { validateCommentData, type CommentData } from '@/lib/comment-codes'
 import { showError, showSuccess, showCritical } from '@/lib/feedback'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,8 @@ interface ScoreEntry {
   flagged: boolean
   flag_reason: string | null
   entry_mode: EntryMode
+  comment_data: Record<string, unknown> | null
+  comments: string | null
 }
 
 export default function TabulatorEntryPage({
@@ -131,7 +134,7 @@ export default function TabulatorEntryPage({
 
     const { data: existingScores, error: scoresErr } = await supabase
       .from('score_entries')
-      .select('id, dancer_id, raw_score, flagged, flag_reason, entry_mode')
+      .select('id, dancer_id, raw_score, flagged, flag_reason, entry_mode, comment_data, comments')
       .eq('round_id', round.id)
       .eq('judge_id', judgeId)
 
@@ -181,7 +184,8 @@ export default function TabulatorEntryPage({
     dancerId: string,
     score: number,
     flagged: boolean,
-    flagReason: string | null
+    flagReason: string | null,
+    commentData: CommentData | null
   ) {
     if (!selectedJudgeId || !round) return
 
@@ -195,6 +199,7 @@ export default function TabulatorEntryPage({
         flagged,
         flag_reason: flagReason,
         entry_mode: 'tabulator_transcription' as EntryMode,
+        comment_data: validateCommentData(commentData),
         entered_by_user_id: null,
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
@@ -341,6 +346,8 @@ export default function TabulatorEntryPage({
         existingScore={existing ? Number(existing.raw_score) : undefined}
         existingFlagged={existing?.flagged ?? false}
         existingFlagReason={existing?.flag_reason}
+        existingCommentData={existing?.comment_data as CommentData | null | undefined}
+        existingLegacyComments={existing?.comments as string | null | undefined}
         scoreMin={scoreMin}
         scoreMax={scoreMax}
         onSubmit={handleScoreSubmit}
@@ -467,7 +474,7 @@ export default function TabulatorEntryPage({
 
       <div>
         <h1 className="text-3xl font-bold">
-          {compCode && `${compCode} — `}Tabulator Entry
+          {compCode && `${compCode} `}Tabulator Entry
         </h1>
         <p className="text-sm text-muted-foreground">
           Enter scores from paper score sheets on behalf of a judge

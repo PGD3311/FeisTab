@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
 import { parseRegistrationCSV, type ImportRow, type ImportResult } from '@/lib/csv/import'
 import { CSVPreviewTable } from '@/components/csv-preview-table'
+import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -14,6 +15,8 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
   const [importing, setImporting] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  const [conflicts, setConflicts] = useState<string[]>([])
+  const [syncFailures, setSyncFailures] = useState<number>(0)
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -141,7 +144,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
               event_id: eventId,
               dancer_id: dancerId,
               competition_id: comp!.id,
-              competitor_number: row.competitor_number ?? null,
+              competitor_number: null, // Written by syncCompetitorNumberToRegistrations via event_check_ins
               status: 'registered',
             }
           })
@@ -154,6 +157,73 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
           )
         }
       }
+
+      // --- Step 4: Create event_check_ins for dancers with competitor numbers ---
+      const dancerNumbers = new Map<string, Set<string>>()
+      for (const row of preview.valid) {
+        if (!row.competitor_number) continue
+        const dancerKey = `${row.first_name}|${row.last_name}|${row.school_name ?? ''}`.toLowerCase()
+        const dancerId = dancerLookup.get(dancerKey)
+        if (!dancerId) continue
+
+        if (!dancerNumbers.has(dancerId)) dancerNumbers.set(dancerId, new Set())
+        dancerNumbers.get(dancerId)!.add(row.competitor_number)
+      }
+
+      const checkInConflicts: string[] = []
+      let syncFailureCount = 0
+      for (const [dancerId, numbers] of dancerNumbers) {
+        if (numbers.size > 1) {
+          checkInConflicts.push(dancerId)
+          continue
+        }
+
+        const competitorNumber = [...numbers][0]
+
+        const { data: existing, error: checkInLookupErr } = await supabase
+          .from('event_check_ins')
+          .select('id, competitor_number')
+          .eq('event_id', eventId)
+          .eq('dancer_id', dancerId)
+          .maybeSingle()
+
+        if (checkInLookupErr) {
+          checkInConflicts.push(dancerId)
+          continue
+        }
+
+        if (existing) {
+          if (existing.competitor_number !== competitorNumber) {
+            checkInConflicts.push(dancerId)
+          }
+          continue
+        }
+
+        const { error: checkInErr } = await supabase
+          .from('event_check_ins')
+          .insert({
+            event_id: eventId,
+            dancer_id: dancerId,
+            competitor_number: competitorNumber,
+            checked_in_by: 'import',
+          })
+
+        if (checkInErr) {
+          checkInConflicts.push(dancerId)
+          continue
+        }
+
+        const syncResult = await syncCompetitorNumberToRegistrations(
+          supabase, eventId, dancerId, competitorNumber
+        )
+        if (syncResult.error) {
+          console.error('Sync failed for dancer:', dancerId, syncResult.error.message)
+          syncFailureCount++
+        }
+      }
+
+      setConflicts(checkInConflicts)
+      setSyncFailures(syncFailureCount)
 
       setDone(true)
     } catch (err: unknown) {
@@ -209,6 +279,18 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       {done && (
         <div className="border border-feis-green/30 rounded-md p-4 bg-feis-green-light">
           <p className="text-feis-green font-medium">Import complete.</p>
+          {conflicts.length > 0 && (
+            <p className="text-sm text-orange-600 mt-2">
+              {conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
+              Review and assign numbers at the registration desk.
+            </p>
+          )}
+          {syncFailures > 0 && (
+            <p className="text-sm text-orange-600 mt-2">
+              {syncFailures} dancer(s) had competitor number sync failures.
+              Their check-in numbers were saved but may not appear on registrations until the next sync.
+            </p>
+          )}
           <Button
             variant="outline"
             className="mt-2"

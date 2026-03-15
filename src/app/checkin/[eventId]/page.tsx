@@ -56,6 +56,11 @@ interface Registration {
 
 const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
 const SENT_STATUSES: CompetitionStatus[] = ['released_to_judge']
+const CALL_TO_STAGE_STATUSES: CompetitionStatus[] = [
+  'released_to_judge',
+  'in_progress',
+  'awaiting_scores',
+]
 const UPCOMING_STATUSES: CompetitionStatus[] = ['imported', 'draft']
 const COMPLETE_STATUSES: CompetitionStatus[] = [
   'ready_to_tabulate',
@@ -115,6 +120,11 @@ export default function RosterConfirmationPage({
 
   // Done section collapsed state
   const [doneExpanded, setDoneExpanded] = useState(false)
+
+  // Event-wide check-in map: dancer_id -> { competitor_number, checked_in_at }
+  const [checkInMap, setCheckInMap] = useState<
+    Map<string, { competitor_number: string; checked_in_at: string | null }>
+  >(new Map())
 
   // Polling
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -259,6 +269,29 @@ export default function RosterConfirmationPage({
     setLoadingRegistrations(false)
   }
 
+  // Load event-wide check-in data
+  const loadCheckIns = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('event_check_ins')
+      .select('dancer_id, competitor_number, checked_in_at')
+      .eq('event_id', eventId)
+
+    if (error) {
+      console.error('Failed to load check-ins:', error.message)
+      showError('Failed to load check-in data', { description: error.message })
+      return
+    }
+
+    const map = new Map<string, { competitor_number: string; checked_in_at: string | null }>()
+    for (const row of data ?? []) {
+      map.set(row.dancer_id, {
+        competitor_number: row.competitor_number,
+        checked_in_at: row.checked_in_at,
+      })
+    }
+    setCheckInMap(map)
+  }, [supabase, eventId])
+
   // --- Polling ---
 
   const pollStatuses = useCallback(async () => {
@@ -302,7 +335,8 @@ export default function RosterConfirmationPage({
   // Initial load
   useEffect(() => {
     void loadInitialData()
-  }, [loadInitialData])
+    void loadCheckIns()
+  }, [loadInitialData, loadCheckIns])
 
   // Judge filter effect
   useEffect(() => {
@@ -317,6 +351,7 @@ export default function RosterConfirmationPage({
       if (pollTimerRef.current) return
       pollTimerRef.current = setInterval(() => {
         void pollStatuses()
+        void loadCheckIns()
       }, POLL_INTERVAL_MS)
     }
 
@@ -332,6 +367,7 @@ export default function RosterConfirmationPage({
         stopPolling()
       } else {
         void pollStatuses()
+        void loadCheckIns()
         startPolling()
       }
     }
@@ -343,7 +379,7 @@ export default function RosterConfirmationPage({
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [loading, competitions.length, pollStatuses])
+  }, [loading, competitions.length, pollStatuses, loadCheckIns])
 
   // Supabase Realtime subscription for near-instant competition status updates.
   useEffect(() => {
@@ -777,15 +813,9 @@ export default function RosterConfirmationPage({
             )}
             <div>
               <span className="text-lg font-medium">
-                {comp.code && <span className="font-mono">{comp.code}</span>}
-                {comp.code && ' \u2014 '}
+                {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
                 {comp.name}
               </span>
-              {(comp.age_group || comp.level) && (
-                <span className="ml-2 text-sm text-muted-foreground">
-                  {[comp.age_group, comp.level].filter(Boolean).join(' \u00b7 ')}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -904,18 +934,71 @@ export default function RosterConfirmationPage({
             ) : (
               <>
                 <div className="space-y-2">
-                  {registrations.map((reg) => (
+                  {registrations.map((reg) => {
+                    const checkIn = checkInMap.get(reg.dancer_id)
+                    const displayNumber = checkIn?.competitor_number ?? reg.competitor_number
+                    const isPresent =
+                      reg.status === 'present' ||
+                      reg.status === 'checked_in' ||
+                      reg.status === 'danced' ||
+                      reg.status === 'recalled' ||
+                      reg.status === 'finalized'
+                    const hasArrived = checkIn?.checked_in_at != null
+                    const hasNumber = checkIn != null
+                    const showCallToStage =
+                      hasArrived &&
+                      !isPresent &&
+                      CALL_TO_STAGE_STATUSES.includes(comp.status)
+
+                    return (
                     <div
                       key={reg.id}
                       className="flex items-center justify-between min-h-[48px] py-1"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-lg font-medium w-14 text-right shrink-0">
-                          #{reg.competitor_number ?? '\u2014'}
+                        <span
+                          className={`font-mono text-lg font-medium w-14 text-right shrink-0${!hasArrived && hasNumber && !isPresent ? ' opacity-40' : ''}`}
+                        >
+                          #{displayNumber ?? '\u2014'}
                         </span>
-                        <span className="text-lg">
-                          {reg.first_name} {reg.last_name}
-                        </span>
+                        <div>
+                          <span className="text-lg">
+                            {reg.first_name} {reg.last_name}
+                          </span>
+                          {/* Arrival state indicator */}
+                          {!isPresent && hasArrived && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
+                                Arrived
+                              </span>
+                              {showCallToStage && (
+                                <span className="text-xs text-teal-600 ml-1">
+                                  Call to stage
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {!isPresent && !hasArrived && !hasNumber && (
+                            <div className="mt-0.5">
+                              <span className="text-xs text-muted-foreground">
+                                Not arrived
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-1">
+                                {'\u00b7'} No number
+                              </span>
+                            </div>
+                          )}
+                          {!isPresent && !hasArrived && hasNumber && (
+                            <div className="mt-0.5">
+                              <span className="text-xs text-muted-foreground">
+                                Not arrived
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-1">
+                                {'\u00b7'} Number assigned, not checked in
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="shrink-0">
                         {isRosterLocked ? (
@@ -949,7 +1032,8 @@ export default function RosterConfirmationPage({
                         )}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 <div className="text-base text-muted-foreground font-medium pt-1">
@@ -1150,8 +1234,7 @@ export default function RosterConfirmationPage({
                           {comp.schedule_position}
                         </span>
                       )}
-                      {comp.code && <span className="font-mono">{comp.code}</span>}
-                      {comp.code && ' \u2014 '}
+                      {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
                       {comp.name}
                     </span>
                     <p className="text-sm text-feis-green mt-1">

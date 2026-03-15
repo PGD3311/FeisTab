@@ -1,6 +1,64 @@
+# Event Dashboard Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Restructure the event overview dashboard from a landing page into an operations console — summary strip, needs attention first, stage activity second, all competitions last.
+
+**Architecture:** Two-file change. Remove `EventContextCards` from the layout (redundant with new summary strip). Rewrite the overview page's JSX to reorder sections and replace the progress hero + promo cards with a compact summary strip. All data queries stay the same.
+
+**Tech Stack:** Next.js 15 (App Router), TypeScript, Tailwind CSS
+
+**Spec:** `docs/superpowers/specs/2026-03-14-event-dashboard-redesign.md`
+
+---
+
+### Task 1: Remove EventContextCards from layout
+
+**Files:**
+- Modify: `src/app/dashboard/events/[eventId]/layout.tsx`
+
+- [ ] **Step 1: Remove the EventContextCards import and usage**
+
+In `src/app/dashboard/events/[eventId]/layout.tsx`:
+
+Remove the import (line 9):
+```ts
+import { EventContextCards } from '@/components/event-context-cards'
+```
+
+Remove the usage (line 82):
+```tsx
+        <EventContextCards competitions={competitions} />
+```
+
+- [ ] **Step 2: Verify build passes**
+
+Run: `npm run build`
+
+Expected: Clean build. The `EventContextCards` component file stays (other pages might use it) — we're just removing it from this layout.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add "src/app/dashboard/events/[eventId]/layout.tsx"
+git commit -m "refactor: remove EventContextCards from event layout — replaced by summary strip"
+```
+
+---
+
+### Task 2: Rewrite event overview page
+
+**Files:**
+- Modify: `src/app/dashboard/events/[eventId]/page.tsx` (full rewrite of JSX + remove unused JS)
+
+- [ ] **Step 1: Rewrite the overview page**
+
+Replace the entire content of `src/app/dashboard/events/[eventId]/page.tsx` with:
+
+```tsx
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useEvent } from '@/contexts/event-context'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -19,7 +77,12 @@ interface Stage {
   display_order: number
 }
 
-const POLL_INTERVAL_MS = 5000
+const ACTION_HINTS: Partial<Record<CompetitionStatus, string>> = {
+  awaiting_scores: 'Waiting for sign-offs',
+  ready_to_tabulate: 'Ready to tabulate',
+  recalled_round_pending: 'Recall round pending',
+  complete_unpublished: 'Ready to publish',
+}
 
 const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
   draft: 0,
@@ -36,66 +99,11 @@ const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
 }
 
 export default function EventOverviewPage() {
-  const { event, competitions, loading, reload } = useEvent()
+  const { event, competitions } = useEvent()
   const supabase = useSupabase()
   const [stages, setStages] = useState<Stage[]>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
 
-  // Realtime subscription for instant competition status updates
-  useEffect(() => {
-    if (loading || !event) return
-
-    const channel = supabase
-      .channel('dashboard-competitions')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions' }, () => {
-        reload()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [loading, event, supabase, reload])
-
-  // Polling fallback
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    if (loading || !event) return
-
-    function startPolling() {
-      if (pollTimerRef.current) return
-      pollTimerRef.current = setInterval(() => {
-        reload()
-      }, POLL_INTERVAL_MS)
-    }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    function handleVisibilityChange() {
-      if (document.hidden) {
-        stopPolling()
-      } else {
-        reload()
-        startPolling()
-      }
-    }
-
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [loading, event, reload])
-
-  // Fetch stages and judge assignment counts for schedule display
   useEffect(() => {
     if (!event) return
 
@@ -144,9 +152,7 @@ export default function EventOverviewPage() {
     status: c.status,
     schedule_position: (c as unknown as Record<string, unknown>).schedule_position as number | null,
     stage_id: (c as unknown as Record<string, unknown>).stage_id as string | null,
-    roster_confirmed_at: (c as unknown as Record<string, unknown>).roster_confirmed_at as
-      | string
-      | null,
+    roster_confirmed_at: (c as unknown as Record<string, unknown>).roster_confirmed_at as string | null,
     judge_count: judgeCounts.get(c.id) ?? 0,
   }))
 
@@ -192,26 +198,12 @@ export default function EventOverviewPage() {
     <div className="space-y-5">
       {/* Summary Strip */}
       <div className="text-sm text-muted-foreground border-b pb-3 flex flex-wrap gap-x-4 gap-y-1">
-        <span>
-          <strong className="text-foreground tabular-nums">{competitions.length}</strong>{' '}
-          competitions
-        </span>
-        <span>
-          <strong className="text-foreground tabular-nums">{totalDancers}</strong> dancers
-        </span>
-        <span>
-          <strong className="text-foreground tabular-nums">{publishedCount}</strong> published
-        </span>
-        <span>
-          <strong className="text-foreground tabular-nums">{activeCount}</strong> active
-        </span>
-        <span>
-          <strong className="text-foreground tabular-nums">{needsAttention.length}</strong> need
-          attention
-        </span>
-        <span>
-          <strong className="text-foreground tabular-nums">{progressPct}%</strong> complete
-        </span>
+        <span><strong className="text-foreground tabular-nums">{competitions.length}</strong> competitions</span>
+        <span><strong className="text-foreground tabular-nums">{totalDancers}</strong> dancers</span>
+        <span><strong className="text-foreground tabular-nums">{publishedCount}</strong> published</span>
+        <span><strong className="text-foreground tabular-nums">{activeCount}</strong> active</span>
+        <span><strong className="text-foreground tabular-nums">{needsAttention.length}</strong> need attention</span>
+        <span><strong className="text-foreground tabular-nums">{progressPct}%</strong> complete</span>
       </div>
 
       {/* Needs Attention */}
@@ -223,15 +215,12 @@ export default function EventOverviewPage() {
           <h2 className="text-base font-semibold">Needs Attention</h2>
           {needsAttention.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              {needsAttention.length} competition{needsAttention.length !== 1 ? 's' : ''} waiting
-              on you
+              {needsAttention.length} competition{needsAttention.length !== 1 ? 's' : ''} waiting on you
             </span>
           )}
         </div>
         {needsAttention.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No competitions need attention right now.
-          </p>
+          <p className="text-sm text-muted-foreground">No competitions need attention right now.</p>
         ) : (
           <div className="space-y-2">
             {needsAttention.map((comp) => (
@@ -247,9 +236,17 @@ export default function EventOverviewPage() {
                     )}
                     {comp.name}
                   </span>
+                  <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                    {comp.age_group} &middot; {comp.level}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 ml-3 shrink-0">
                   <CompetitionStatusBadge status={comp.status} />
+                  {ACTION_HINTS[comp.status] && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {ACTION_HINTS[comp.status]}
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}
@@ -377,9 +374,7 @@ export default function EventOverviewPage() {
         ) : (
           <div className="space-y-1.5">
             {competitions.map((comp) => {
-              const stageId = (comp as unknown as Record<string, unknown>).stage_id as
-                | string
-                | null
+              const stageId = (comp as unknown as Record<string, unknown>).stage_id as string | null
               const stageName = stageId ? stageNameMap.get(stageId) : null
 
               return (
@@ -395,11 +390,10 @@ export default function EventOverviewPage() {
                       )}
                       {comp.name}
                     </span>
-                    {stageName && (
-                      <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-                        {stageName}
-                      </span>
-                    )}
+                    <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+                      {comp.age_group} &middot; {comp.level}
+                      {stageName && ` · ${stageName}`}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
                     <span className="text-xs text-muted-foreground hidden sm:inline tabular-nums">
@@ -416,3 +410,33 @@ export default function EventOverviewPage() {
     </div>
   )
 }
+```
+
+- [ ] **Step 2: Verify build passes**
+
+Run: `npm run build`
+
+Expected: Clean build.
+
+- [ ] **Step 3: Run full test suite**
+
+Run: `npm test`
+
+Expected: All tests pass. No tests depend on the overview page.
+
+- [ ] **Step 4: Manual test**
+
+1. Navigate to any event dashboard
+2. Verify: compact summary strip at top (one line of stats)
+3. Verify: Needs Attention section is first (or "No competitions need attention" message)
+4. Verify: Stage Activity section is second (if stages exist)
+5. Verify: All Competitions section is last with stage names shown
+6. Verify: No Event Progress card, no pipeline bar, no quick-link promo cards
+7. Verify: Other tabs (Competitions, Program, Judges, Import, Results) still work — no context cards above tab bar
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add "src/app/dashboard/events/[eventId]/page.tsx"
+git commit -m "feat: redesign event overview as operations console — summary strip, attention-first layout"
+```

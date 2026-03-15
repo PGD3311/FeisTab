@@ -7,11 +7,12 @@ import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
-import { getCurrentHeat, type Heat, type HeatSnapshot } from '@/lib/engine/heats'
+import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
+import { validateCommentData, type CommentData } from '@/lib/comment-codes'
 import { useSupabase } from '@/hooks/use-supabase'
 import { ScoreEntryForm } from '@/components/score-entry-form'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -30,6 +31,7 @@ export default function JudgeScoringPage({
   const supabase = useSupabase()
   const router = useRouter()
   const [session, setSession] = useState<JudgeSession | null>(null)
+  // TODO: type when Supabase types generated
   const [comp, setComp] = useState<any>(null)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [round, setRound] = useState<any>(null)
@@ -39,6 +41,8 @@ export default function JudgeScoringPage({
   const [packetBlocked, setPacketBlocked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
+  const [collapsedHeats, setCollapsedHeats] = useState<Set<number>>(new Set())
 
   // Polling
   const POLL_INTERVAL_MS = 5000
@@ -221,7 +225,7 @@ export default function JudgeScoringPage({
     setLoading(false)
   }
 
-  async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null) {
+  async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null, commentData: CommentData | null) {
     if (!session || !round) return
 
     const { error } = await supabase.from('score_entries').upsert(
@@ -234,6 +238,7 @@ export default function JudgeScoringPage({
         flagged,
         flag_reason: flagReason,
         entry_mode: 'judge_self_service',
+        comment_data: validateCommentData(commentData),
       },
       { onConflict: 'round_id,dancer_id,judge_id' }
     )
@@ -311,11 +316,9 @@ export default function JudgeScoringPage({
         if (compErr) throw new Error(`Failed to check competition status: ${compErr.message}`)
 
         // Step through transitions to reach ready_to_tabulate
-        // Handles both in_progress → awaiting_scores → ready_to_tabulate
-        // and awaiting_scores → ready_to_tabulate
         let currentStatus = currentComp?.status as CompetitionStatus
         if (currentStatus === 'ready_to_tabulate') {
-          // Already there — idempotent, nothing to do
+          // Already there — idempotent
         } else {
           if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
             const { error: midErr } = await supabase
@@ -404,13 +407,34 @@ export default function JudgeScoringPage({
 
   // Heat grouping
   const heatSnapshot = (round?.heat_snapshot as HeatSnapshot) ?? null
-  const scoredDancerIds = new Set(scores.map(s => s.dancer_id))
+  const scoredDancerIds = new Set(scores.map((s: { dancer_id: string }) => s.dancer_id))
   const currentHeat = heatSnapshot ? getCurrentHeat(heatSnapshot, scoredDancerIds) : null
   const totalHeats = heatSnapshot?.heats.length ?? 0
   const currentHeatNumber = currentHeat?.heat_number ?? (totalHeats > 0 ? totalHeats : 0)
 
+  // Current dancer = first unscored active dancer (in heat order if grouped)
+  function computeCurrentDancerId(): string | null {
+    if (heatSnapshot) {
+      for (const heat of heatSnapshot.heats) {
+        for (const slot of heat.slots) {
+          if (slot.status === 'active' && !scoredDancerIds.has(slot.dancer_id)) {
+            return slot.dancer_id
+          }
+        }
+      }
+      return null
+    }
+    const unscoredReg = activeDancers.find(r => !scoredDancerIds.has(r.dancer_id))
+    return unscoredReg?.dancer_id ?? null
+  }
+
+  const currentDancerId = computeCurrentDancerId()
+
+  // Show sign-off bar when all scored and not yet submitted
+  const showSignOff = scoredCount === totalDancers && totalDancers > 0 && !submitted
+
   function renderScoreEntry(reg: (typeof registrations)[number]) {
-    const existing = scores.find(s => s.dancer_id === reg.dancer_id)
+    const existing = scores.find((s: { dancer_id: string }) => s.dancer_id === reg.dancer_id)
     return (
       <ScoreEntryForm
         key={reg.id}
@@ -420,10 +444,19 @@ export default function JudgeScoringPage({
         existingScore={existing?.raw_score}
         existingFlagged={existing?.flagged ?? false}
         existingFlagReason={existing?.flag_reason}
+        existingCommentData={existing?.comment_data as CommentData | null | undefined}
+        existingLegacyComments={existing?.comments as string | null | undefined}
         scoreMin={scoreMin}
         scoreMax={scoreMax}
         onSubmit={handleScoreSubmit}
         locked={submitted}
+        variant="judge"
+        isCurrentDancer={reg.dancer_id === currentDancerId}
+        isExpanded={expandedDancerId === reg.dancer_id}
+        onToggleExpand={(id) =>
+          setExpandedDancerId(prev => (prev === id ? null : id))
+        }
+        onSaved={() => setExpandedDancerId(null)}
       />
     )
   }
@@ -435,12 +468,40 @@ export default function JudgeScoringPage({
       <div className="space-y-4 mb-6">
         {heatSnapshot.heats.map((heat) => {
           const heatDancerIds = new Set(heat.slots.map(s => s.dancer_id))
-          const heatRegs = registrations.filter(r => heatDancerIds.has(r.dancer_id))
+          const heatRegs = registrations.filter((r: { dancer_id: string }) => heatDancerIds.has(r.dancer_id))
           const isCurrentHeat = heat.heat_number === currentHeat?.heat_number
           const heatActiveSlots = heat.slots.filter(s => s.status === 'active')
           const heatScoredCount = heatActiveSlots.filter(s => scoredDancerIds.has(s.dancer_id)).length
           const isHeatComplete = heatScoredCount === heatActiveSlots.length && heatActiveSlots.length > 0
+          const isCollapsed = collapsedHeats.has(heat.heat_number)
           const isUpcoming = !isCurrentHeat && !isHeatComplete
+
+          // Completed heats collapse to single line (user can re-expand)
+          if (isHeatComplete && !isCurrentHeat) {
+            return (
+              <button
+                key={heat.heat_number}
+                type="button"
+                onClick={() => {
+                  setCollapsedHeats(prev => {
+                    const next = new Set(prev)
+                    if (next.has(heat.heat_number)) {
+                      next.delete(heat.heat_number)
+                    } else {
+                      next.add(heat.heat_number)
+                    }
+                    return next
+                  })
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-border/50 bg-muted/30 opacity-60 hover:opacity-80 transition-opacity text-left"
+              >
+                <span className="text-sm text-muted-foreground">
+                  Heat {heat.heat_number} — Complete
+                </span>
+                <span className="text-feis-green text-sm">{isCollapsed ? '\u25BE' : '\u2713'}</span>
+              </button>
+            )
+          }
 
           return (
             <div
@@ -448,48 +509,43 @@ export default function JudgeScoringPage({
               className={`rounded-lg border-2 ${
                 isCurrentHeat
                   ? 'border-feis-green bg-feis-green-light/30'
-                  : isHeatComplete
-                    ? 'border-border/50 bg-muted/30 opacity-60'
+                  : isUpcoming
+                    ? 'border-border/30 opacity-70'
                     : 'border-border/30'
               }`}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border/30">
                 <div className="flex items-center gap-2">
                   {isCurrentHeat && (
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-feis-green animate-pulse" />
+                    <span className="inline-block w-2 h-2 rounded-full bg-feis-green animate-pulse" />
                   )}
-                  <span className={`text-base font-semibold ${isCurrentHeat ? 'text-feis-green' : 'text-muted-foreground'}`}>
-                    Heat {heat.heat_number} of {totalHeats}
+                  <span className={`text-sm font-semibold ${isCurrentHeat ? 'text-feis-green' : 'text-muted-foreground'}`}>
+                    Heat {heat.heat_number}
                   </span>
                 </div>
-                <Badge variant={isHeatComplete ? 'secondary' : isCurrentHeat ? 'default' : 'outline'}>
-                  {isHeatComplete ? 'Complete' : `${heatScoredCount}/${heatActiveSlots.length}`}
-                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {heatScoredCount}/{heatActiveSlots.length}
+                </span>
               </div>
-              {(!isHeatComplete || isCurrentHeat) && (
-                <div className="p-2 space-y-2">
-                  {heatRegs.map(reg => {
-                    const slot = heat.slots.find(s => s.dancer_id === reg.dancer_id)
-                    const isInactive = slot && slot.status !== 'active'
-                    if (isInactive) {
-                      return (
-                        <div key={reg.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/50 opacity-60">
-                          <span className="font-mono text-base w-12 text-right text-muted-foreground">
-                            #{reg.competitor_number ?? '—'}
-                          </span>
-                          <span className="text-muted-foreground line-through">
-                            {reg.dancers?.first_name} {reg.dancers?.last_name}
-                          </span>
-                          <Badge variant="outline" className="text-orange-600 border-orange-300 ml-auto">
-                            {slot.status === 'scratched' ? 'Scratched' : slot.status === 'no_show' ? 'No Show' : slot.status}
-                          </Badge>
-                        </div>
-                      )
-                    }
-                    return renderScoreEntry(reg)
-                  })}
-                </div>
-              )}
+              <div className="p-2 space-y-1">
+                {heatRegs.map((reg: (typeof registrations)[number]) => {
+                  const slot = heat.slots.find(s => s.dancer_id === reg.dancer_id)
+                  const isInactive = slot && slot.status !== 'active'
+                  if (isInactive) {
+                    return (
+                      <div key={reg.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/50 opacity-60">
+                        <span className="font-mono text-base w-12 text-right text-muted-foreground line-through">
+                          {reg.competitor_number ?? '\u2014'}
+                        </span>
+                        <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs">
+                          {slot.status === 'scratched' ? 'Scratched' : slot.status === 'no_show' ? 'No Show' : slot.status}
+                        </Badge>
+                      </div>
+                    )
+                  }
+                  return renderScoreEntry(reg)
+                })}
+              </div>
             </div>
           )
         })}
@@ -499,37 +555,32 @@ export default function JudgeScoringPage({
 
   function renderFlatList() {
     return (
-      <div className="space-y-2 mb-6">
-        {registrations.map(reg => renderScoreEntry(reg))}
+      <div className="space-y-1 mb-6">
+        {registrations.map((reg: (typeof registrations)[number]) => renderScoreEntry(reg))}
       </div>
     )
   }
 
   return (
-    <div>
-      <div className="mb-4">
+    <div className={showSignOff ? 'pb-24' : ''}>
+      <div className="mb-3">
         <Link href={`/judge/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
-          &larr; Back to competitions
+          &larr; comps
         </Link>
       </div>
 
-      <Card className="feis-card feis-accent-left mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-2xl">{comp.code && `${comp.code} — `}{comp.name}</CardTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Round {round?.round_number}</span>
-            <Badge variant="outline">{scoredCount}/{totalDancers} scored</Badge>
-            {heatSnapshot && totalHeats > 0 && (
-              <Badge variant="outline">
-                Heat {currentHeat ? currentHeatNumber : totalHeats} of {totalHeats}
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Scoring as <span className="font-medium text-feis-green">{session?.name}</span>
-          </p>
-        </CardHeader>
-      </Card>
+      {/* Compact header bar */}
+      <div className="flex items-center justify-between border-b-2 border-feis-green pb-3 mb-4">
+        <div>
+          {comp.code && (
+            <span className="font-mono text-sm text-feis-green/50">{comp.code}</span>
+          )}
+          <span className="text-base font-semibold ml-1">{comp.name}</span>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {heatSnapshot && totalHeats > 0 ? `Heat ${currentHeatNumber} \u00B7 ` : ''}{scoredCount} of {totalDancers} scored
+        </span>
+      </div>
 
       {submitted ? (
         <Card className="feis-card">
@@ -561,20 +612,21 @@ export default function JudgeScoringPage({
           {!packetBlocked && (
             <>
               {heatSnapshot ? renderHeatGrouped() : renderFlatList()}
-
-              <Button
-                onClick={handleSignOff}
-                disabled={scoredCount < totalDancers}
-                className="w-full text-lg font-semibold"
-                size="lg"
-              >
-                {scoredCount < totalDancers
-                  ? `Score all dancers to sign off (${scoredCount}/${totalDancers})`
-                  : 'Sign Off Round'}
-              </Button>
             </>
           )}
         </>
+      )}
+
+      {/* Fixed sign-off bar */}
+      {showSignOff && !packetBlocked && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-feis-green shadow-lg z-50">
+          <Button
+            onClick={handleSignOff}
+            className="w-full py-6 text-lg font-semibold bg-feis-green hover:bg-feis-green/90"
+          >
+            Sign Off — All {totalDancers} Dancers Scored
+          </Button>
+        </div>
       )}
     </div>
   )

@@ -2,6 +2,13 @@
 
 import { useEffect, useState, useMemo, use } from 'react'
 import { logAudit } from '@/lib/audit'
+import {
+  getCheckInState,
+  deriveCheckInStats,
+  computeNextNumber,
+  type CheckInRow,
+} from '@/lib/check-in'
+import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,32 +17,15 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
-interface RegistrationDancer {
-  id: string
-  first_name: string
-  last_name: string
-  school_name: string | null
-}
-
-interface RegistrationCompetition {
-  id: string
-  code: string | null
-  name: string
-}
-
 interface DancerWithRegistrations {
   dancer_id: string
   first_name: string
   last_name: string
   school_name: string | null
-  competitor_number: string | null
   registrations: {
     id: string
-    competition_id: string
     competition_code: string | null
     competition_name: string
-    competitor_number: string | null
-    status: string
   }[]
 }
 
@@ -48,18 +38,23 @@ export default function RegistrationDeskPage({
   const supabase = useSupabase()
   const [event, setEvent] = useState<{ id: string; name: string } | null>(null)
   const [dancers, setDancers] = useState<DancerWithRegistrations[]>([])
+  const [checkInMap, setCheckInMap] = useState<Map<string, CheckInRow>>(new Map())
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [assigning, setAssigning] = useState<string | null>(null)
+  const [acting, setActing] = useState<string | null>(null)
 
   async function loadData() {
-    const [eventRes, regRes] = await Promise.all([
+    const [eventRes, regRes, checkInRes] = await Promise.all([
       supabase.from('events').select('id, name').eq('id', eventId).single(),
       supabase
         .from('registrations')
-        .select('id, dancer_id, competition_id, competitor_number, status, dancers(id, first_name, last_name, school_name), competitions(id, code, name)')
+        .select('id, dancer_id, competition_id, dancers(id, first_name, last_name, school_name), competitions(id, code, name)')
         .eq('event_id', eventId)
         .order('dancer_id'),
+      supabase
+        .from('event_check_ins')
+        .select('dancer_id, competitor_number, checked_in_at')
+        .eq('event_id', eventId),
     ])
 
     if (eventRes.error) {
@@ -72,14 +67,25 @@ export default function RegistrationDeskPage({
       setLoading(false)
       return
     }
+    if (checkInRes.error) {
+      console.error('Failed to load check-ins:', checkInRes.error.message)
+    }
 
     setEvent(eventRes.data)
 
-    // Group registrations by dancer
+    const ciMap = new Map<string, CheckInRow>()
+    for (const row of checkInRes.data ?? []) {
+      ciMap.set(row.dancer_id, {
+        competitor_number: row.competitor_number,
+        checked_in_at: row.checked_in_at,
+      })
+    }
+    setCheckInMap(ciMap)
+
     const dancerMap = new Map<string, DancerWithRegistrations>()
     for (const reg of regRes.data ?? []) {
-      const dancer = reg.dancers as unknown as RegistrationDancer | null
-      const comp = reg.competitions as unknown as RegistrationCompetition | null
+      const dancer = reg.dancers as unknown as { id: string; first_name: string; last_name: string; school_name: string | null } | null
+      const comp = reg.competitions as unknown as { id: string; code: string | null; name: string } | null
       if (!dancer || !comp) continue
 
       if (!dancerMap.has(dancer.id)) {
@@ -88,22 +94,14 @@ export default function RegistrationDeskPage({
           first_name: dancer.first_name,
           last_name: dancer.last_name,
           school_name: dancer.school_name,
-          competitor_number: reg.competitor_number,
           registrations: [],
         })
       }
 
-      const entry = dancerMap.get(dancer.id)!
-      if (reg.competitor_number && !entry.competitor_number) {
-        entry.competitor_number = reg.competitor_number
-      }
-      entry.registrations.push({
+      dancerMap.get(dancer.id)!.registrations.push({
         id: reg.id,
-        competition_id: comp.id,
         competition_code: comp.code,
         competition_name: comp.name,
-        competitor_number: reg.competitor_number,
-        status: reg.status,
       })
     }
 
@@ -120,15 +118,12 @@ export default function RegistrationDeskPage({
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const nextNumber = useMemo(() => {
-    let max = 99
-    for (const d of dancers) {
-      if (d.competitor_number) {
-        const num = parseInt(d.competitor_number, 10)
-        if (!isNaN(num) && num > max) max = num
-      }
-    }
-    return max + 1
-  }, [dancers])
+    const existing = [...checkInMap.values()].map((r) => r.competitor_number)
+    return computeNextNumber(existing)
+  }, [checkInMap])
+
+  const allDancerIds = useMemo(() => dancers.map((d) => d.dancer_id), [dancers])
+  const stats = useMemo(() => deriveCheckInStats(allDancerIds, checkInMap), [allDancerIds, checkInMap])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return dancers
@@ -141,27 +136,31 @@ export default function RegistrationDeskPage({
     )
   }, [dancers, search])
 
-  const checkedInCount = dancers.filter((d) => d.competitor_number).length
-  const totalCount = dancers.length
-
-  async function handleAssign(dancer: DancerWithRegistrations) {
-    setAssigning(dancer.dancer_id)
+  async function handleAssignAndCheckIn(dancer: DancerWithRegistrations) {
+    setActing(dancer.dancer_id)
+    const numberStr = String(nextNumber)
 
     try {
-      const numberToAssign = String(nextNumber)
-
-      const regIds = dancer.registrations.map((r) => r.id)
-      const { error } = await supabase
-        .from('registrations')
-        .update({
-          competitor_number: numberToAssign,
-          status: 'checked_in',
+      const { error: insertErr } = await supabase
+        .from('event_check_ins')
+        .insert({
+          event_id: eventId,
+          dancer_id: dancer.dancer_id,
+          competitor_number: numberStr,
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: 'registration_desk',
         })
-        .in('id', regIds)
 
-      if (error) {
-        showCritical('Failed to assign number', { description: error.message })
-        setAssigning(null)
+      if (insertErr) {
+        showCritical('Failed to assign number', { description: insertErr.message })
+        return
+      }
+
+      const syncResult = await syncCompetitorNumberToRegistrations(
+        supabase, eventId, dancer.dancer_id, numberStr
+      )
+      if (syncResult.error) {
+        showCritical('Number assigned but sync failed — retry', { description: syncResult.error.message })
         return
       }
 
@@ -171,34 +170,90 @@ export default function RegistrationDeskPage({
         entityId: dancer.dancer_id,
         action: 'check_in',
         afterData: {
-          competitor_number: numberToAssign,
+          competitor_number: numberStr,
           event_id: eventId,
-          registrations_updated: regIds.length,
+          source: 'desk_assigned',
         },
       })
 
-      setDancers((prev) =>
-        prev.map((d) => {
-          if (d.dancer_id !== dancer.dancer_id) return d
-          return {
-            ...d,
-            competitor_number: numberToAssign,
-            registrations: d.registrations.map((r) => ({
-              ...r,
-              competitor_number: numberToAssign,
-              status: 'checked_in',
-            })),
-          }
+      setCheckInMap((prev) => {
+        const next = new Map(prev)
+        next.set(dancer.dancer_id, {
+          competitor_number: numberStr,
+          checked_in_at: new Date().toISOString(),
         })
-      )
+        return next
+      })
 
-      showSuccess(`#${numberToAssign} assigned to ${dancer.first_name} ${dancer.last_name}`)
+      showSuccess(`#${numberStr} assigned to ${dancer.first_name} ${dancer.last_name}`)
     } catch (err) {
       showCritical('Unexpected error', {
         description: err instanceof Error ? err.message : 'Unknown error',
       })
     } finally {
-      setAssigning(null)
+      setActing(null)
+    }
+  }
+
+  async function handleCheckIn(dancer: DancerWithRegistrations) {
+    setActing(dancer.dancer_id)
+    const checkInRow = checkInMap.get(dancer.dancer_id)
+    if (!checkInRow) {
+      setActing(null)
+      return
+    }
+
+    try {
+      const { error: updateErr } = await supabase
+        .from('event_check_ins')
+        .update({
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: 'registration_desk',
+        })
+        .eq('event_id', eventId)
+        .eq('dancer_id', dancer.dancer_id)
+
+      if (updateErr) {
+        showCritical('Failed to check in', { description: updateErr.message })
+        return
+      }
+
+      const syncResult = await syncCompetitorNumberToRegistrations(
+        supabase, eventId, dancer.dancer_id, checkInRow.competitor_number
+      )
+      if (syncResult.error) {
+        showCritical('Checked in but sync failed — retry', { description: syncResult.error.message })
+        return
+      }
+
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'dancer',
+        entityId: dancer.dancer_id,
+        action: 'check_in',
+        afterData: {
+          competitor_number: checkInRow.competitor_number,
+          event_id: eventId,
+          source: 'pre_assigned',
+        },
+      })
+
+      setCheckInMap((prev) => {
+        const next = new Map(prev)
+        next.set(dancer.dancer_id, {
+          ...checkInRow,
+          checked_in_at: new Date().toISOString(),
+        })
+        return next
+      })
+
+      showSuccess(`${dancer.first_name} ${dancer.last_name} checked in`)
+    } catch (err) {
+      showCritical('Unexpected error', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setActing(null)
     }
   }
 
@@ -235,12 +290,13 @@ export default function RegistrationDeskPage({
       )}
 
       {filtered.map((dancer) => {
-        const isCheckedIn = !!dancer.competitor_number
+        const checkInRow = checkInMap.get(dancer.dancer_id) ?? null
+        const state = getCheckInState(checkInRow)
 
         return (
           <Card
             key={dancer.dancer_id}
-            className={`feis-card ${isCheckedIn ? 'border-feis-green/30' : ''}`}
+            className={`feis-card ${state === 'checked_in' ? 'border-feis-green/30' : ''}`}
           >
             <CardContent className="py-4">
               <div className="flex items-center justify-between gap-4">
@@ -253,23 +309,43 @@ export default function RegistrationDeskPage({
                   )}
                 </div>
                 <div className="shrink-0">
-                  {isCheckedIn ? (
+                  {state === 'checked_in' && checkInRow && (
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold text-lg bg-feis-green-light text-feis-green px-3 py-1 rounded-md">
-                        #{dancer.competitor_number}
+                        #{checkInRow.competitor_number}
                       </span>
                       <CheckCircle2 className="h-5 w-5 text-feis-green" />
                     </div>
-                  ) : (
-                    <Button
-                      onClick={() => handleAssign(dancer)}
-                      disabled={assigning === dancer.dancer_id}
-                      size="lg"
-                    >
-                      {assigning === dancer.dancer_id
-                        ? 'Assigning...'
-                        : `Assign #${nextNumber}`}
-                    </Button>
+                  )}
+                  {state === 'awaiting_arrival' && checkInRow && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-semibold text-lg border border-muted-foreground/30 text-muted-foreground px-3 py-1 rounded-md">
+                        #{checkInRow.competitor_number}
+                      </span>
+                      <Button
+                        onClick={() => handleCheckIn(dancer)}
+                        disabled={acting === dancer.dancer_id}
+                        size="lg"
+                      >
+                        {acting === dancer.dancer_id ? 'Checking in...' : 'Check In'}
+                      </Button>
+                    </div>
+                  )}
+                  {state === 'needs_number' && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
+                        Needs Number
+                      </Badge>
+                      <Button
+                        onClick={() => handleAssignAndCheckIn(dancer)}
+                        disabled={acting === dancer.dancer_id}
+                        size="lg"
+                      >
+                        {acting === dancer.dancer_id
+                          ? 'Assigning...'
+                          : `Assign #${nextNumber} & Check In`}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -279,11 +355,13 @@ export default function RegistrationDeskPage({
       })}
 
       <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-4">
+        <div className="flex gap-4">
+          <span><strong className="text-foreground">{stats.checkedIn}</strong> Checked In</span>
+          <span><strong className="text-foreground">{stats.awaitingArrival}</strong> Awaiting Arrival</span>
+          <span><strong className="text-foreground">{stats.needsNumber}</strong> Needs Number</span>
+        </div>
         <span>
-          <strong className="text-foreground">{checkedInCount}</strong> / {totalCount} checked in
-        </span>
-        <span>
-          Last assigned: <strong className="font-mono text-foreground">#{nextNumber > 100 ? nextNumber - 1 : '—'}</strong>
+          Next: <strong className="font-mono text-foreground">#{nextNumber}</strong>
         </span>
       </div>
     </div>
