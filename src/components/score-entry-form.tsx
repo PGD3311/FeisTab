@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,6 +33,7 @@ interface ScoreEntryFormProps {
   isExpanded?: boolean
   onToggleExpand?: (dancerId: string) => void
   onSaved?: () => void
+  autoFocus?: boolean
 }
 
 export function ScoreEntryForm({
@@ -53,6 +54,7 @@ export function ScoreEntryForm({
   isExpanded,
   onToggleExpand,
   onSaved,
+  autoFocus,
 }: ScoreEntryFormProps) {
   const [score, setScore] = useState(existingScore?.toString() ?? '')
   const [saving, setSaving] = useState(false)
@@ -67,6 +69,21 @@ export function ScoreEntryForm({
   const [commentNote, setCommentNote] = useState(
     existingCommentData?.note ?? ''
   )
+
+  const scoreInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (autoFocus && scoreInputRef.current) {
+      scoreInputRef.current.focus()
+    }
+  }, [autoFocus])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      handleSave()
+    }
+  }
 
   const hasContent = hasCommentContent(
     existingCommentData ?? (selectedCodes.length > 0 || commentNote.trim()
@@ -102,6 +119,9 @@ export function ScoreEntryForm({
           setSaved(false)
           onSaved()
         }, 800)
+      } else if (variant === 'tabulator' && onSaved) {
+        onSaved()
+        setTimeout(() => setSaved(false), 2000)
       } else {
         setTimeout(() => setSaved(false), 2000)
       }
@@ -257,6 +277,8 @@ export function ScoreEntryForm({
   return (
     <div
       className={`flex flex-col p-3 rounded-md border transition-colors ${
+        autoFocus ? 'border-l-2 border-l-feis-green' : ''
+      } ${
         flagged ? 'border-feis-orange/60 bg-feis-orange/5' : 'hover:bg-feis-green-light/50'
       }`}
     >
@@ -269,6 +291,7 @@ export function ScoreEntryForm({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Input
+            ref={scoreInputRef}
             type="number"
             min={scoreMin}
             max={scoreMax}
@@ -278,6 +301,7 @@ export function ScoreEntryForm({
               setScore(e.target.value)
               setSaved(false)
             }}
+            onKeyDown={handleKeyDown}
             className={`w-full sm:w-24 text-center text-lg h-11 ${hasError ? 'border-destructive' : ''}`}
             disabled={locked}
           />
@@ -364,7 +388,6 @@ export function ScoreEntryForm({
             rows={2}
             className="w-full text-xs border rounded-md px-2 py-1.5 resize-none placeholder:text-muted-foreground disabled:opacity-50"
           />
-          <p className="text-[10px] text-muted-foreground mt-1">Saves with score</p>
         </div>
       )}
 

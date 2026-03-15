@@ -21,7 +21,7 @@ const statusLabels: Record<CompetitionStatus, string> = {
   released_to_judge: 'With Judge',
   in_progress: 'In Progress',
   awaiting_scores: 'Awaiting Scores',
-  ready_to_tabulate: 'Ready to Tab',
+  ready_to_tabulate: 'Ready to Tabulate',
   recalled_round_pending: 'Recall Pending',
   complete_unpublished: 'Complete',
   published: 'Published',
