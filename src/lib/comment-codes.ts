@@ -17,7 +17,7 @@ export const COMMENT_CODES = [
   { code: 'carriage', label: 'Carriage' },
 ] as const
 
-const VALID_CODES = new Set(COMMENT_CODES.map(c => c.code))
+const VALID_CODES: Set<string> = new Set(COMMENT_CODES.map(c => c.code))
 
 /**
  * Validates and normalizes comment data before save.
