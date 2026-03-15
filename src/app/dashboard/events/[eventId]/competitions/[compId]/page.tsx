@@ -688,8 +688,8 @@ export default function CompetitionDetailPage({
         )
       })()}
 
-      {/* Roster Status */}
-      {(['draft', 'imported', 'ready_for_day_of', 'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published'].includes(comp.status)) && (
+      {/* Roster Status — only show when roster actions are still meaningful */}
+      {(['draft', 'imported', 'ready_for_day_of'].includes(comp.status)) && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Roster Status</CardTitle>
@@ -749,6 +749,9 @@ export default function CompetitionDetailPage({
       )}
 
       {/* Roster */}
+      {(() => {
+        const rosterLocked = ['ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(comp.status)
+        return (
       <Card className="feis-card">
         <CardHeader>
           <CardTitle className="text-lg">
@@ -763,6 +766,15 @@ export default function CompetitionDetailPage({
                   <span className="feis-number font-mono text-sm mr-3">{reg.competitor_number}</span>
                   {reg.dancers?.first_name} {reg.dancers?.last_name}
                 </span>
+                {rosterLocked ? (
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
+                      ? 'bg-red-50 text-red-800'
+                      : 'text-muted-foreground'
+                  }`}>
+                    {reg.status === 'present' ? '' : reg.status.replace(/_/g, ' ')}
+                  </span>
+                ) : (
                 <select
                   value={reg.status}
                   onChange={async (e) => {
@@ -820,11 +832,14 @@ export default function CompetitionDetailPage({
                   <option value="medical">Medical</option>
                   <option value="disqualified">Disqualified</option>
                 </select>
+                )}
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+        )
+      })()}
 
       {/* Anomaly Checks */}
       {anomalies.length > 0 && (
