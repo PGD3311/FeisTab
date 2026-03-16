@@ -66,6 +66,12 @@ export default function HomePage() {
         href: `/checkin/${event.id}`,
         color: 'bg-white border-2 border-feis-orange text-feis-orange hover:bg-feis-orange/5',
       },
+      {
+        label: "I'm a Judge",
+        description: 'Score dancers, leave feedback',
+        href: '/judge',
+        color: 'bg-white border-2 border-feis-charcoal/30 text-feis-charcoal hover:bg-muted',
+      },
     ]
 
     return (
@@ -93,15 +99,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="text-center space-y-2">
-            <Link href="/judge" className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
-              Judge login →
-            </Link>
-            <span className="text-muted-foreground mx-2">·</span>
-            <Link href={`/results/${event.id}`} className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
-              Public results →
-            </Link>
-          </div>
 
           <button
             type="button"
@@ -143,17 +140,9 @@ export default function HomePage() {
             {checking ? 'Checking...' : 'Enter'}
           </Button>
         </form>
-        <div className="space-y-2">
-          <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
-            Organizer dashboard →
-          </Link>
-          <Link href="/judge" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
-            Judge login →
-          </Link>
-          <Link href="/results" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
-            Public results →
-          </Link>
-        </div>
+        <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2 text-center">
+          Organizer dashboard →
+        </Link>
       </div>
     </div>
   )
