@@ -62,6 +62,27 @@ Aoife,Kelly,U12,Beginner,B-U12-R1,Beginner U12 Reel`
     expect(result.warnings.filter(w => w.message.includes('duplicate'))).toHaveLength(0)
   })
 
+  it('parses optional fields: date_of_birth, teacher_name, dance_type', () => {
+    const csv = `first_name,last_name,age_group,level,competition_code,competition_name,date_of_birth,school_name,teacher_name,dance_type
+Siobhan,Murphy,U12,Beginner,B-U12-R1,Beginner U12 Reel,2014-03-15,Murphy Academy,Colm Murphy,reel`
+
+    const result = parseRegistrationCSV(csv)
+    expect(result.valid).toHaveLength(1)
+    expect(result.valid[0].date_of_birth).toBe('2014-03-15')
+    expect(result.valid[0].teacher_name).toBe('Colm Murphy')
+    expect(result.valid[0].dance_type).toBe('reel')
+    expect(result.valid[0].school_name).toBe('Murphy Academy')
+  })
+
+  it('ignores unknown columns without error', () => {
+    const csv = `first_name,last_name,age_group,level,competition_code,competition_name,some_random_column
+Siobhan,Murphy,U12,Beginner,B-U12-R1,Beginner U12 Reel,whatever`
+
+    const result = parseRegistrationCSV(csv)
+    expect(result.valid).toHaveLength(1)
+    expect(result.errors).toHaveLength(0)
+  })
+
   it('warns when same name appears with different schools', () => {
     const csv = `first_name,last_name,competitor_number,age_group,level,competition_code,competition_name,school_name
 Siobhan,Murphy,101,U12,Beginner,B-U12-R1,Beginner U12 Reel,Murphy Academy

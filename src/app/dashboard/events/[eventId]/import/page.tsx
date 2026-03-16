@@ -66,6 +66,8 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         first_name: row.first_name,
         last_name: row.last_name,
         school_name: row.school_name || null,
+        teacher_name: row.teacher_name || null,
+        date_of_birth: row.date_of_birth || null,
       }))
 
       const { error: dancerErr } = await supabase
@@ -91,6 +93,8 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
               first_name: row.first_name,
               last_name: row.last_name,
               school_name: row.school_name || null,
+              teacher_name: row.teacher_name || null,
+              date_of_birth: row.date_of_birth || null,
             })
             .select()
             .single()
@@ -118,6 +122,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
               name: sample.competition_name,
               age_group: sample.age_group,
               level: sample.level,
+              dance_type: sample.dance_type || null,
               status: 'imported',
               ruleset_id: defaultRuleset?.id,
             })
@@ -241,7 +246,9 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-3">
-            Required columns: first_name, last_name, age_group, level, competition_code, competition_name. Optional: competitor_number (assigned at registration desk if not provided)
+            Required: first_name, last_name, age_group, level, competition_code, competition_name.
+            Optional: competitor_number, date_of_birth, school_name, teacher_name, dance_type.
+            One row per dancer per competition.
           </p>
           <input
             type="file"

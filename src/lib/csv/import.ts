@@ -4,11 +4,14 @@ export interface ImportRow {
   first_name: string
   last_name: string
   competitor_number?: string
+  date_of_birth?: string
+  school_name?: string
+  teacher_name?: string
   age_group: string
   level: string
   competition_code: string
   competition_name: string
-  school_name?: string
+  dance_type?: string
 }
 
 export interface ImportError {
@@ -62,11 +65,14 @@ export function parseRegistrationCSV(csvText: string): ImportResult {
       first_name: raw.first_name.trim(),
       last_name: raw.last_name.trim(),
       competitor_number: raw.competitor_number?.trim() || undefined,
+      date_of_birth: raw.date_of_birth?.trim() || undefined,
+      school_name: raw.school_name?.trim() || undefined,
+      teacher_name: raw.teacher_name?.trim() || undefined,
       age_group: raw.age_group.trim(),
       level: raw.level.trim(),
       competition_code: raw.competition_code.trim(),
       competition_name: raw.competition_name.trim(),
-      school_name: raw.school_name?.trim() || undefined,
+      dance_type: raw.dance_type?.trim() || undefined,
     })
   }
 
