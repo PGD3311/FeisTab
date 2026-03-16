@@ -94,20 +94,27 @@ export default function RegistrationDeskPage({
       return
     }
 
-    // Step 2: Load dancer details for those IDs
-    const { data: dancerRows, error: dancerErr } = await supabase
-      .from('dancers')
-      .select('id, first_name, last_name, school_name, date_of_birth')
-      .in('id', uniqueIds)
-      .limit(10000)
+    // Step 2: Load dancer details in chunks (Supabase .in() has URL length limits)
+    const CHUNK_SIZE = 100
+    const allDancerRows: Array<{ id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null }> = []
 
-    if (dancerErr) {
-      console.error('Failed to load dancers:', dancerErr.message)
-      setLoading(false)
-      return
+    for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueIds.slice(i, i + CHUNK_SIZE)
+      const { data: dancerRows, error: dancerErr } = await supabase
+        .from('dancers')
+        .select('id, first_name, last_name, school_name, date_of_birth')
+        .in('id', chunk)
+
+      if (dancerErr) {
+        console.error('Failed to load dancers chunk:', dancerErr.message)
+        continue
+      }
+      for (const row of dancerRows ?? []) {
+        allDancerRows.push(row as typeof allDancerRows[number])
+      }
     }
 
-    const sorted = (dancerRows ?? [])
+    const sorted = allDancerRows
       .map((d: { id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null }) => ({
         dancer_id: d.id,
         first_name: d.first_name,
