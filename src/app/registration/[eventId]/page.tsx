@@ -45,14 +45,8 @@ export default function RegistrationDeskPage({
   const [acting, setActing] = useState<string | null>(null)
 
   async function loadData() {
-    const [eventRes, regRes, checkInRes] = await Promise.all([
+    const [eventRes, checkInRes] = await Promise.all([
       supabase.from('events').select('id, name').eq('id', eventId).single(),
-      supabase
-        .from('registrations')
-        .select('id, dancer_id, dancers(id, first_name, last_name, school_name, date_of_birth)')
-        .eq('event_id', eventId)
-        .order('dancer_id')
-        .limit(10000),
       supabase
         .from('event_check_ins')
         .select('dancer_id, competitor_number, checked_in_at')
@@ -61,11 +55,6 @@ export default function RegistrationDeskPage({
 
     if (eventRes.error) {
       console.error('Failed to load event:', eventRes.error.message)
-      setLoading(false)
-      return
-    }
-    if (regRes.error) {
-      console.error('Failed to load registrations:', regRes.error.message)
       setLoading(false)
       return
     }
@@ -84,34 +73,54 @@ export default function RegistrationDeskPage({
     }
     setCheckInMap(ciMap)
 
-    const dancerMap = new Map<string, DancerWithRegistrations>()
-    for (const reg of regRes.data ?? []) {
-      const dancer = reg.dancers as unknown as { id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null } | null
-      if (!dancer) continue
+    // Step 1: Get unique dancer IDs for this event (light query — just IDs)
+    const { data: regRows, error: regErr } = await supabase
+      .from('registrations')
+      .select('dancer_id')
+      .eq('event_id', eventId)
+      .limit(10000)
 
-      if (!dancerMap.has(dancer.id)) {
-        dancerMap.set(dancer.id, {
-          dancer_id: dancer.id,
-          first_name: dancer.first_name,
-          last_name: dancer.last_name,
-          school_name: dancer.school_name,
-          date_of_birth: dancer.date_of_birth,
-          registrations: [],
-        })
-      }
-
-      dancerMap.get(dancer.id)!.registrations.push({
-        id: reg.id,
-        competition_code: null,
-        competition_name: '',
-      })
+    if (regErr) {
+      console.error('Failed to load registrations:', regErr.message)
+      setLoading(false)
+      return
     }
 
-    const sorted = [...dancerMap.values()].sort((a, b) => {
-      const lastCmp = a.last_name.localeCompare(b.last_name)
-      if (lastCmp !== 0) return lastCmp
-      return a.first_name.localeCompare(b.first_name)
-    })
+    const uniqueIds = [...new Set((regRows ?? []).map((r: { dancer_id: string }) => r.dancer_id))]
+
+    if (uniqueIds.length === 0) {
+      setDancers([])
+      setLoading(false)
+      return
+    }
+
+    // Step 2: Load dancer details for those IDs
+    const { data: dancerRows, error: dancerErr } = await supabase
+      .from('dancers')
+      .select('id, first_name, last_name, school_name, date_of_birth')
+      .in('id', uniqueIds)
+      .limit(10000)
+
+    if (dancerErr) {
+      console.error('Failed to load dancers:', dancerErr.message)
+      setLoading(false)
+      return
+    }
+
+    const sorted = (dancerRows ?? [])
+      .map((d: { id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null }) => ({
+        dancer_id: d.id,
+        first_name: d.first_name,
+        last_name: d.last_name,
+        school_name: d.school_name,
+        date_of_birth: d.date_of_birth,
+        registrations: [],
+      }))
+      .sort((a: DancerWithRegistrations, b: DancerWithRegistrations) => {
+        const lastCmp = a.last_name.localeCompare(b.last_name)
+        if (lastCmp !== 0) return lastCmp
+        return a.first_name.localeCompare(b.first_name)
+      })
 
     setDancers(sorted)
     setLoading(false)
