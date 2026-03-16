@@ -858,7 +858,6 @@ export default function RosterConfirmationPage({
             )}
             <div>
               <span className="text-lg font-medium">
-                {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
                 {comp.name}
               </span>
             </div>
@@ -1284,8 +1283,7 @@ export default function RosterConfirmationPage({
                           {comp.schedule_position}
                         </span>
                       )}
-                      {comp.code && <span className="font-mono mr-1.5">{comp.code}</span>}
-                      {comp.name}
+                            {comp.name}
                     </span>
                     <p className="text-sm text-feis-green mt-1">
                       Waiting for judge to start scoring...
