@@ -143,14 +143,14 @@ export default function HomePage() {
             {checking ? 'Checking...' : 'Enter'}
           </Button>
         </form>
-        <div className="text-xs text-muted-foreground space-y-1">
-          <Link href="/dashboard" className="block hover:text-feis-green transition-colors">
+        <div className="space-y-2">
+          <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
             Organizer dashboard →
           </Link>
-          <Link href="/judge" className="block hover:text-feis-green transition-colors">
+          <Link href="/judge" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
             Judge login →
           </Link>
-          <Link href="/results" className="block hover:text-feis-green transition-colors">
+          <Link href="/results" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2">
             Public results →
           </Link>
         </div>
