@@ -355,6 +355,37 @@ export default function ProgramPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {stages.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                <span className="text-sm text-muted-foreground">Assign all to:</span>
+                {stages.map(s => (
+                  <Button
+                    key={s.id}
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const ids = unassigned.map(c => c.id)
+                      // Assign all with sequential positions
+                      const existingCount = getCompsForStage(s.id).length
+                      for (let i = 0; i < ids.length; i++) {
+                        const { error } = await supabase
+                          .from('competitions')
+                          .update({ stage_id: s.id, schedule_position: existingCount + i + 1 })
+                          .eq('id', ids[i])
+                        if (error) {
+                          showError('Failed to assign', { description: error.message })
+                          break
+                        }
+                      }
+                      await loadData()
+                      showSuccess(`${ids.length} competitions assigned to ${s.name}`)
+                    }}
+                  >
+                    {s.name}
+                  </Button>
+                ))}
+              </div>
+            )}
             <div className="space-y-1.5">
               {unassigned.map(comp => (
                 <div
