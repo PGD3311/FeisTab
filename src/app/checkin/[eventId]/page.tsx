@@ -1000,8 +1000,8 @@ export default function RosterConfirmationPage({
                             {reg.first_name} {reg.last_name}
                           </span>
                           {!hasArrived && (
-                            <span className="text-xs text-muted-foreground mt-0.5 block">
-                              Not checked in
+                            <span className="text-xs text-destructive/70 mt-0.5 block">
+                              Not checked in at registration
                             </span>
                           )}
                         </div>
@@ -1020,9 +1020,7 @@ export default function RosterConfirmationPage({
                               reg.status === 'no_show' ||
                               reg.status === 'scratched'
                                 ? reg.status
-                                : hasArrived
-                                  ? 'present'
-                                  : 'registered'
+                                : 'registered'
                             }
                             onChange={(e) =>
                               void handleDancerStatusChange(reg.id, e.target.value)
@@ -1030,7 +1028,7 @@ export default function RosterConfirmationPage({
                             disabled={updatingStatus === reg.id}
                             className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}
                           >
-                            <option value="registered">{'\u2014'}</option>
+                            <option value="registered">Registered</option>
                             {DANCER_STATUSES.map((s) => (
                               <option key={s} value={s}>
                                 {DANCER_STATUS_LABELS[s]}
