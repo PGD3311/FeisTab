@@ -577,6 +577,17 @@ export default function RosterConfirmationPage({
   }
 
   async function handleConfirmRoster(compId: string) {
+    // Block if any dancer is still unaccounted for (status = 'registered')
+    if (expandedCompId === compId && registrations.length > 0) {
+      const unaccounted = registrations.filter((r) => r.status === 'registered')
+      if (unaccounted.length > 0) {
+        showError(
+          `${unaccounted.length} dancer${unaccounted.length !== 1 ? 's' : ''} not accounted for — mark each as Present, No Show, or Scratched before confirming`
+        )
+        return
+      }
+    }
+
     setConfirmingRoster(compId)
 
     const comp = competitions.find((c) => c.id === compId)
