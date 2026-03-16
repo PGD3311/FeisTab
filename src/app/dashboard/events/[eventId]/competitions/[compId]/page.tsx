@@ -133,24 +133,26 @@ export default function CompetitionDetailPage({
     })
   }, [supabase, compId])
 
-  // Realtime subscriptions for instant updates (polling kept as fallback)
+  // Realtime subscriptions for instant updates (debounced to avoid request storms)
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (loading) return
 
+    function debouncedPoll() {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current)
+      realtimeDebounceRef.current = setTimeout(() => { void pollData() }, 300)
+    }
+
     const channel = supabase
       .channel(`comp-detail-${compId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, () => {
-        void pollData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'score_entries', filter: `competition_id=eq.${compId}` }, () => {
-        void pollData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `competition_id=eq.${compId}` }, () => {
-        void pollData()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, debouncedPoll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'score_entries', filter: `competition_id=eq.${compId}` }, debouncedPoll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `competition_id=eq.${compId}` }, debouncedPoll)
       .subscribe()
 
     return () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current)
       supabase.removeChannel(channel)
     }
   }, [loading, supabase, compId, pollData])
