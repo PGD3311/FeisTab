@@ -74,7 +74,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     })
   }
 
-  // Three groups: Score Now, Up Next, Done
+  // Three groups: Score Now, Queued, Done
   const scoreNowComps = sortBySchedule(
     competitions.filter((c) => SCORING_STATUSES.includes(c.status) || c.status === 'released_to_judge')
   )
@@ -624,11 +624,11 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
-      {/* Up Next */}
+      {/* Queued */}
       {upNextComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader>
-            <CardTitle className="text-lg">Up Next</CardTitle>
+            <CardTitle className="text-lg">Queued</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {upNextComps.map((comp) => (

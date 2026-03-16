@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { logAudit } from '@/lib/audit'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
-import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { validateCommentData, type CommentData } from '@/lib/comment-codes'
@@ -477,6 +477,20 @@ export default function JudgeScoringPage({
 
     return (
       <div className="space-y-4 mb-6">
+        {/* Absent dancers not in heats */}
+        {(() => {
+          const allHeatDancerIds = new Set(heatSnapshot.heats.flatMap(h => h.slots.map(s => s.dancer_id)))
+          const absentRegs = registrations.filter(
+            (r: { dancer_id: string; status: string }) =>
+              !allHeatDancerIds.has(r.dancer_id) && NON_ACTIVE_STATUSES.includes((r.status ?? 'registered') as RegistrationStatus)
+          )
+          if (absentRegs.length === 0) return null
+          return (
+            <div className="space-y-1">
+              {absentRegs.map((reg: (typeof registrations)[number]) => renderAbsentDancer(reg))}
+            </div>
+          )
+        })()}
         {heatSnapshot.heats.map((heat) => {
           const heatDancerIds = new Set(heat.slots.map(s => s.dancer_id))
           const heatRegs = registrations.filter((r: { dancer_id: string }) => heatDancerIds.has(r.dancer_id))
@@ -564,10 +578,29 @@ export default function JudgeScoringPage({
     )
   }
 
+  function renderAbsentDancer(reg: (typeof registrations)[number]) {
+    return (
+      <div key={reg.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/50 opacity-60">
+        <span className="font-mono text-lg font-bold w-14 text-right text-muted-foreground line-through">
+          {reg.competitor_number ?? '\u2014'}
+        </span>
+        <span className="text-muted-foreground line-through">
+          {reg.dancers?.first_name} {reg.dancers?.last_name}
+        </span>
+        <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs ml-auto">
+          {reg.status === 'scratched' ? 'Scratched' : reg.status === 'no_show' ? 'No Show' : 'Absent'}
+        </Badge>
+      </div>
+    )
+  }
+
   function renderFlatList() {
     return (
       <div className="space-y-1 mb-6">
-        {registrations.map((reg: (typeof registrations)[number]) => renderScoreEntry(reg))}
+        {registrations.map((reg: (typeof registrations)[number]) => {
+          const isAbsent = NON_ACTIVE_STATUSES.includes((reg.status ?? 'registered') as RegistrationStatus)
+          return isAbsent ? renderAbsentDancer(reg) : renderScoreEntry(reg)
+        })}
       </div>
     )
   }

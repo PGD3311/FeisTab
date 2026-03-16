@@ -665,6 +665,17 @@ export default function RosterConfirmationPage({
       return
     }
 
+    // Warn if there are already competitions sent/scoring
+    const alreadySent = competitions.filter(
+      (c) => c.id !== compId && (c.status === 'released_to_judge' || c.status === 'in_progress')
+    )
+    if (alreadySent.length > 0) {
+      const names = alreadySent.map((c) => c.code ? `#${c.code}` : c.name).join(', ')
+      if (!confirm(`${alreadySent.length} competition${alreadySent.length !== 1 ? 's' : ''} already sent or scoring (${names}). Send another?`)) {
+        return
+      }
+    }
+
     // Atomic conditional update: only transitions if still in expected state
     const { error } = await supabase
       .from('competitions')
