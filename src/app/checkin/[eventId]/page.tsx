@@ -111,6 +111,7 @@ export default function RosterConfirmationPage({
 
   // Schedule awareness
   const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedStageId, setSelectedStageId] = useState<string>('')
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
 
   // Heat snapshot state for scoring competitions
@@ -735,10 +736,9 @@ export default function RosterConfirmationPage({
 
   // --- Filtering & Grouping ---
 
-  const filteredCompetitions =
-    assignedCompIds !== null
-      ? competitions.filter((c) => assignedCompIds.has(c.id))
-      : competitions
+  const filteredCompetitions = competitions
+    .filter((c) => assignedCompIds === null || assignedCompIds.has(c.id))
+    .filter((c) => !selectedStageId || c.stage_id === selectedStageId)
 
   // Sort helper: schedule_position first (nulls last), then code
   function sortBySchedule(comps: Competition[]): Competition[] {
@@ -1130,6 +1130,33 @@ export default function RosterConfirmationPage({
         <h1 className="text-2xl font-bold">Side-Stage</h1>
         {event && <p className="text-lg text-muted-foreground">{event.name}</p>}
       </div>
+
+      {/* Stage selector */}
+      {stages.length > 1 && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedStageId('')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !selectedStageId ? 'bg-feis-green text-white' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            All Stages
+          </button>
+          {stages.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSelectedStageId(s.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedStageId === s.id ? 'bg-feis-green text-white' : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {judges.length > 0 && (
         <div>

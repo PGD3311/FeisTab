@@ -266,6 +266,25 @@ export default function EventOverviewPage() {
         )
       })()}
 
+      {/* Competitions without judges */}
+      {(() => {
+        const noJudge = competitions.filter((c) =>
+          (judgeCounts.get(c.id) ?? 0) === 0 &&
+          !['draft', 'published', 'locked'].includes(c.status)
+        )
+        if (noJudge.length === 0) return null
+        return (
+          <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+            <span className="text-sm text-destructive">
+              <strong>{noJudge.length}</strong> competition{noJudge.length !== 1 ? 's' : ''} have no judge assigned
+            </span>
+            <Link href={`/dashboard/events/${eventId}/judges`} className="text-sm text-destructive hover:underline font-medium">
+              Assign judges →
+            </Link>
+          </div>
+        )
+      })()}
+
       {/* Needs Attention */}
       <div>
         <div className="flex items-center gap-2 mb-3">
