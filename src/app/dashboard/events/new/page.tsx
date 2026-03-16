@@ -30,6 +30,9 @@ export default function NewEventPage() {
       data: { user },
     } = await supabase.auth.getUser()
 
+    // Generate a 6-character access code
+    const accessCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+
     const { data, error: insertError } = await supabase
       .from('events')
       .insert({
@@ -37,6 +40,7 @@ export default function NewEventPage() {
         start_date: startDate,
         location: location || null,
         status: 'active',
+        registration_code: accessCode,
         created_by: user?.id,
       })
       .select()
@@ -46,6 +50,9 @@ export default function NewEventPage() {
       setError(insertError.message)
       setLoading(false)
     } else {
+      // Auto-authorize the creator
+      localStorage.setItem(`feistab_access_${data.id}`, accessCode)
+
       // Auto-create Stage 1 so the event is immediately usable
       await supabase.from('stages').insert({
         event_id: data.id,
