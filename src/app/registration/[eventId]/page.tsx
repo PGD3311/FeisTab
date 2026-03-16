@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, use } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback, use } from 'react'
 import { logAudit } from '@/lib/audit'
 import {
   getCheckInState,
@@ -117,6 +117,54 @@ export default function RegistrationDeskPage({
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live sync: re-fetch check-ins when another device assigns a number
+  const refreshCheckIns = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('event_check_ins')
+      .select('dancer_id, competitor_number, checked_in_at')
+      .eq('event_id', eventId)
+    if (error) return
+    const map = new Map<string, CheckInRow>()
+    for (const row of data ?? []) {
+      map.set(row.dancer_id, {
+        competitor_number: row.competitor_number,
+        checked_in_at: row.checked_in_at,
+      })
+    }
+    setCheckInMap(map)
+  }, [supabase, eventId])
+
+  // Realtime: instant update when any device assigns a number
+  useEffect(() => {
+    if (loading) return
+    const channel = supabase
+      .channel('reg-desk-checkins')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_check_ins' }, () => {
+        void refreshCheckIns()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [loading, supabase, refreshCheckIns])
+
+  // Polling fallback: 5s interval, visibility-aware
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (loading) return
+    function startPolling() {
+      if (pollTimerRef.current) return
+      pollTimerRef.current = setInterval(() => { void refreshCheckIns() }, 5000)
+    }
+    function stopPolling() {
+      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+    }
+    function handleVis() {
+      if (document.hidden) { stopPolling() } else { void refreshCheckIns(); startPolling() }
+    }
+    startPolling()
+    document.addEventListener('visibilitychange', handleVis)
+    return () => { stopPolling(); document.removeEventListener('visibilitychange', handleVis) }
+  }, [loading, refreshCheckIns])
+
   const nextNumber = useMemo(() => {
     const existing = [...checkInMap.values()].map((r) => r.competitor_number)
     return computeNextNumber(existing)
@@ -138,26 +186,55 @@ export default function RegistrationDeskPage({
 
   async function handleAssignAndCheckIn(dancer: DancerWithRegistrations) {
     setActing(dancer.dancer_id)
-    const numberStr = String(nextNumber)
 
     try {
-      const { error: insertErr } = await supabase
-        .from('event_check_ins')
-        .insert({
-          event_id: eventId,
-          dancer_id: dancer.dancer_id,
-          competitor_number: numberStr,
-          checked_in_at: new Date().toISOString(),
-          checked_in_by: 'registration_desk',
-        })
+      // Collision-safe: retry with next number if unique constraint fails
+      const MAX_RETRIES = 3
+      let assignedNumber: string | null = null
 
-      if (insertErr) {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        // Re-fetch latest check-ins to get the freshest nextNumber
+        if (attempt > 0) {
+          await refreshCheckIns()
+        }
+
+        // Compute number from current state
+        const existing = [...checkInMap.values()].map((r) => r.competitor_number)
+        const tryNumber = String(computeNextNumber(existing) + attempt)
+
+        const { error: insertErr } = await supabase
+          .from('event_check_ins')
+          .insert({
+            event_id: eventId,
+            dancer_id: dancer.dancer_id,
+            competitor_number: tryNumber,
+            checked_in_at: new Date().toISOString(),
+            checked_in_by: 'registration_desk',
+          })
+
+        if (!insertErr) {
+          assignedNumber = tryNumber
+          break
+        }
+
+        // If it's a unique constraint violation, retry with next number
+        if (insertErr.code === '23505') {
+          continue
+        }
+
+        // Any other error — stop retrying
         showCritical('Failed to assign number', { description: insertErr.message })
         return
       }
 
+      if (!assignedNumber) {
+        showCritical('Number conflict — refresh and try again')
+        await refreshCheckIns()
+        return
+      }
+
       const syncResult = await syncCompetitorNumberToRegistrations(
-        supabase, eventId, dancer.dancer_id, numberStr
+        supabase, eventId, dancer.dancer_id, assignedNumber
       )
       if (syncResult.error) {
         showCritical('Number assigned but sync failed — retry', { description: syncResult.error.message })
@@ -170,7 +247,7 @@ export default function RegistrationDeskPage({
         entityId: dancer.dancer_id,
         action: 'check_in',
         afterData: {
-          competitor_number: numberStr,
+          competitor_number: assignedNumber,
           event_id: eventId,
           source: 'desk_assigned',
         },
@@ -179,13 +256,13 @@ export default function RegistrationDeskPage({
       setCheckInMap((prev) => {
         const next = new Map(prev)
         next.set(dancer.dancer_id, {
-          competitor_number: numberStr,
+          competitor_number: assignedNumber!,
           checked_in_at: new Date().toISOString(),
         })
         return next
       })
 
-      showSuccess(`#${numberStr} assigned to ${dancer.first_name} ${dancer.last_name}`)
+      showSuccess(`#${assignedNumber} assigned to ${dancer.first_name} ${dancer.last_name}`)
     } catch (err) {
       showCritical('Unexpected error', {
         description: err instanceof Error ? err.message : 'Unknown error',

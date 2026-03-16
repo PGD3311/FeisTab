@@ -96,6 +96,10 @@ export default function JudgeScoringPage({
     }
   }, [supabase, compId])
 
+  // Track if competition has been recalled/changed by organizer
+  const [compRecalled, setCompRecalled] = useState(false)
+  const SCORING_VALID = ['in_progress', 'awaiting_scores']
+
   // Realtime subscriptions for instant updates from organizer actions
   useEffect(() => {
     if (loading || submitted) return
@@ -107,6 +111,12 @@ export default function JudgeScoringPage({
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `competition_id=eq.${compId}` }, () => {
         void pollData()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, (payload) => {
+        const updated = payload.new as { status: string }
+        if (!SCORING_VALID.includes(updated.status)) {
+          setCompRecalled(true)
+        }
       })
       .subscribe()
 
@@ -582,7 +592,17 @@ export default function JudgeScoringPage({
         </span>
       </div>
 
-      {submitted ? (
+      {compRecalled ? (
+        <Card className="border-destructive">
+          <CardContent className="py-12 text-center">
+            <p className="text-lg font-medium text-destructive">Competition recalled by organizer</p>
+            <p className="text-sm text-muted-foreground mt-2">Scoring has been paused. Contact the organizer.</p>
+            <Link href={`/judge/${eventId}`}>
+              <Button variant="outline" className="mt-4">Back to Competitions</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : submitted ? (
         <Card className="feis-card">
           <CardContent className="py-12 text-center">
             <p className="text-lg font-medium text-feis-green">Round signed off. Scores locked.</p>

@@ -422,13 +422,16 @@ export default function RosterConfirmationPage({
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'event_check_ins',
         },
         () => {
-          // Dancer checked in at registration desk — refresh check-in data
+          // Dancer checked in at registration desk — refresh check-in data + expanded roster
           void loadCheckIns()
+          if (expandedCompId) {
+            void loadRegistrations(expandedCompId)
+          }
         }
       )
       .subscribe()
