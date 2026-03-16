@@ -22,6 +22,7 @@ interface CompetitionRow {
 
 interface ResultRow {
   final_rank: number
+  dancer_id?: string
   dancers: { first_name: string; last_name: string } | null
   calculated_payload: Record<string, unknown> | null
 }
@@ -70,7 +71,7 @@ export default function ResultsPublishingPage({
 
     const { data, error } = await supabase
       .from('results')
-      .select('final_rank, calculated_payload, dancers(first_name, last_name)')
+      .select('final_rank, calculated_payload, dancer_id, dancers(first_name, last_name)')
       .eq('competition_id', compId)
       .order('final_rank')
 
@@ -83,6 +84,7 @@ export default function ResultsPublishingPage({
 
     const normalized = (data ?? []).map((r) => ({
       final_rank: r.final_rank,
+      dancer_id: (r as unknown as { dancer_id: string }).dancer_id,
       calculated_payload: r.calculated_payload as Record<string, unknown> | null,
       dancers: Array.isArray(r.dancers) ? r.dancers[0] ?? null : r.dancers as { first_name: string; last_name: string } | null,
     }))
@@ -187,7 +189,7 @@ export default function ResultsPublishingPage({
                 Failed to load results. Click to retry.
               </button>
             ) : (
-              <ResultsTable results={expandedResults} />
+              <ResultsTable results={expandedResults} eventId={eventId} />
             )}
           </div>
         )}

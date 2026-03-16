@@ -188,6 +188,17 @@ function BreakdownPanel({ row, eventId }: { row: ResultRow; eventId?: string }) 
               </table>
             )}
 
+            {/* Feedback sheet link (organizer view only) */}
+            {eventId && row.dancer_id && (
+              <div className="mt-3 pt-2 border-t">
+                <Link
+                  href={`/dashboard/events/${eventId}/comments/${row.dancer_id}`}
+                  className="text-xs text-feis-green hover:underline font-medium"
+                >
+                  View comment sheet &rarr;
+                </Link>
+              </div>
+            )}
 
             {/* Rules footer */}
             {rulesFooter && (
