@@ -130,9 +130,6 @@ export default async function PublicResultsPage({
                         )}
                         {comp.name}
                       </h2>
-                      <p className="text-xs text-muted-foreground/50 mt-0.5">
-                        {comp.age_group} · {comp.level}
-                      </p>
                     </div>
                     <span className="text-xs text-muted-foreground/50 font-mono">
                       {sortedResults.length} placed
