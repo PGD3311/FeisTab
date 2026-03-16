@@ -50,9 +50,9 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
               <tbody className="feis-tbody">
                 {valid.map((row, i) => (
                   <tr key={i} className="border-t">
-                    <td className="px-3 py-2">{row.competitor_number}</td>
+                    <td className="px-3 py-2 font-mono">{row.competitor_number}</td>
                     <td className="px-3 py-2">{row.first_name} {row.last_name}</td>
-                    <td className="px-3 py-2">{row.competitor_number}</td>
+                    <td className="px-3 py-2 font-mono">{row.competitor_number}</td>
                     <td className="px-3 py-2">{row.age_group}</td>
                     <td className="px-3 py-2">{row.level}</td>
                     <td className="px-3 py-2">{row.competition_code}</td>

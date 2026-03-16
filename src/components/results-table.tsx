@@ -242,7 +242,7 @@ export function ResultsTable({ results, eventId }: { results: ResultRow[]; event
                   onClick={() => handleRowClick(i, r.calculated_payload)}
                 >
                   <td
-                    className={`px-4 py-2 font-bold ${
+                    className={`px-4 py-2 font-bold font-mono ${
                       r.final_rank === 1
                         ? 'feis-place-1'
                         : r.final_rank === 2
@@ -258,7 +258,7 @@ export function ResultsTable({ results, eventId }: { results: ResultRow[]; event
                     {r.dancers?.first_name} {r.dancers?.last_name}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <span className="inline-flex items-center gap-1 justify-end">
+                    <span className="inline-flex items-center gap-1 justify-end font-mono">
                       {r.calculated_payload?.total_points ?? '—'}
                       {expandable && (
                         <ChevronDown

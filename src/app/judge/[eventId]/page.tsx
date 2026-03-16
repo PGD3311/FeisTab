@@ -657,7 +657,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       {/* Done */}
       {doneComps.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          {doneComps.length} competition{doneComps.length !== 1 ? 's' : ''} complete
+          <span className="font-mono">{doneComps.length}</span> competition{doneComps.length !== 1 ? 's' : ''} complete
         </p>
       )}
 
