@@ -541,6 +541,19 @@ export default function ProgramPage({
         </Button>
       </div>
 
+      {/* Save confirmation */}
+      {competitions.length > 0 && (
+        <Button
+          className="w-full"
+          onClick={async () => {
+            await loadData()
+            showSuccess('Schedule saved')
+          }}
+        >
+          Save Schedule
+        </Button>
+      )}
+
       {competitions.length === 0 && (
         <p className="text-center text-muted-foreground py-8">
           No competitions yet. Import competitions first.
