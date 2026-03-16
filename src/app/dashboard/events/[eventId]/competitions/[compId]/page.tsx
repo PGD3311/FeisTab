@@ -229,7 +229,7 @@ export default function CompetitionDetailPage({
     setRounds(roundRes.data ?? [])
     setScores(scoreRes.data ?? [])
     setResults(resultRes.data ?? [])
-    setRuleset(compRes.data?.rule_sets?.config as RuleSetConfig | null ?? null)
+    setRuleset((compRes.data?.rule_sets?.config as RuleSetConfig | null) ?? DEFAULT_RULES)
     setJudges(judgesRes.data ?? [])
     setAssignedJudgeIds((assignRes.data ?? []).map((a: { judge_id: string }) => a.judge_id))
     setStages(stagesRes.data ?? [])
