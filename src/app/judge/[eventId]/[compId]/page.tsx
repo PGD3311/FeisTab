@@ -378,7 +378,7 @@ export default function JudgeScoringPage({
   if (loadError) {
     return (
       <div className="p-6 space-y-4">
-        <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+        <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20 text-destructive">
           <p className="font-medium">Could not load competition data.</p>
           <p className="text-sm mt-1">Check your connection and try again.</p>
         </div>
@@ -523,7 +523,7 @@ export default function JudgeScoringPage({
                     Heat {heat.heat_number}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground font-mono">
                   {heatScoredCount}/{heatActiveSlots.length}
                 </span>
               </div>
@@ -537,7 +537,7 @@ export default function JudgeScoringPage({
                         <span className="font-mono text-base w-12 text-right text-muted-foreground line-through">
                           {reg.competitor_number ?? '\u2014'}
                         </span>
-                        <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs">
+                        <Badge variant="outline" className="text-feis-orange border-feis-orange/30 text-xs">
                           {slot.status === 'scratched' ? 'Scratched' : slot.status === 'no_show' ? 'No Show' : slot.status}
                         </Badge>
                       </div>
@@ -577,7 +577,7 @@ export default function JudgeScoringPage({
           )}
           <span className="text-base font-semibold ml-1">{comp.name}</span>
         </div>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground font-mono">
           {heatSnapshot && totalHeats > 0 ? `Heat ${currentHeatNumber} \u00B7 ` : ''}{scoredCount} of {totalDancers} scored
         </span>
       </div>
@@ -597,12 +597,12 @@ export default function JudgeScoringPage({
       ) : (
         <>
           {packetBlocked && (
-            <Card className="border-orange-200 bg-orange-50">
+            <Card className="border-feis-orange/20 bg-feis-orange-light">
               <CardContent className="py-6 text-center">
-                <p className="text-sm font-medium text-orange-800">
+                <p className="text-sm font-medium text-feis-orange">
                   Your scores are being entered by the tabulator.
                 </p>
-                <p className="text-xs text-orange-600 mt-1">
+                <p className="text-xs text-feis-orange/80 mt-1">
                   Contact the tabulator if you need to make changes.
                 </p>
               </CardContent>
@@ -619,7 +619,7 @@ export default function JudgeScoringPage({
 
       {/* Fixed sign-off bar */}
       {showSignOff && !packetBlocked && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-feis-green shadow-lg z-50">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t-2 border-feis-green z-50">
           <Button
             onClick={handleSignOff}
             className="w-full py-6 text-lg font-semibold bg-feis-green hover:bg-feis-green/90"

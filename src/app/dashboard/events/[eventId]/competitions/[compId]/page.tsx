@@ -749,7 +749,7 @@ export default function CompetitionDetailPage({
       </div>
 
       {loadWarning && (
-        <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
           Some competition data could not be loaded. Roster, scores, or judge details may be incomplete. Refresh to try again.
         </div>
       )}
@@ -924,7 +924,7 @@ export default function CompetitionDetailPage({
                 {rosterLocked ? (
                   <span className={`text-xs px-2 py-1 rounded ${
                     reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
-                      ? 'bg-red-50 text-red-800'
+                      ? 'bg-destructive/10 text-destructive'
                       : 'text-muted-foreground'
                   }`}>
                     {reg.status === 'present' ? '' : reg.status.replace(/_/g, ' ')}
@@ -974,10 +974,10 @@ export default function CompetitionDetailPage({
                   }}
                   className={`text-xs border rounded px-2 py-1 ${
                     reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
-                      ? 'border-red-300 bg-red-50 text-red-800'
+                      ? 'border-destructive/30 bg-destructive/10 text-destructive'
                       : reg.status === 'medical' || reg.status === 'did_not_complete'
-                        ? 'border-orange-300 bg-orange-50 text-orange-800'
-                        : 'border-gray-200'
+                        ? 'border-feis-orange/30 bg-feis-orange-light text-feis-orange'
+                        : 'border'
                   }`}
                 >
                   <option value="present">Present</option>
@@ -1009,7 +1009,7 @@ export default function CompetitionDetailPage({
               <div className="space-y-2">
                 <p className="text-sm font-medium text-destructive">Blockers — must resolve before tabulation</p>
                 {anomalies.filter(a => a.blocking).map((a, i) => (
-                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-red-50 border border-red-200 text-red-800">
+                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-destructive/10 border border-destructive/20 text-destructive">
                     {resolveAnomalyMessage(a)}
                   </div>
                 ))}
@@ -1019,7 +1019,7 @@ export default function CompetitionDetailPage({
               <div className="space-y-2">
                 <p className="text-sm font-medium text-feis-orange">Warnings — review recommended</p>
                 {anomalies.filter(a => a.severity === 'warning').map((a, i) => (
-                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-orange-50 border border-orange-200 text-orange-800">
+                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-feis-orange-light border border-feis-orange/20 text-feis-orange">
                     {resolveAnomalyMessage(a)}
                   </div>
                 ))}

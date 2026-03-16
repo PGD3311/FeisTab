@@ -356,7 +356,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   if (loadError) {
     return (
       <div className="max-w-2xl">
-        <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
           Could not load judges. Try refreshing.
         </div>
       </div>
@@ -561,7 +561,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                                   <select
                                     value={filterLevel}
                                     onChange={(e) => setFilterLevel(e.target.value)}
-                                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                   >
                                     <option value="">Select level...</option>
                                     {uniqueLevels.map((level) => (
@@ -590,7 +590,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                                   <select
                                     value={filterAgeGroup}
                                     onChange={(e) => setFilterAgeGroup(e.target.value)}
-                                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                   >
                                     <option value="">Select age group...</option>
                                     {uniqueAgeGroups.map((ag) => (

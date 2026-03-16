@@ -96,7 +96,7 @@ export default function NewEventPage() {
                 onChange={(e) => setLocation(e.target.value)}
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Creating...' : 'Create Event'}
             </Button>

@@ -71,7 +71,7 @@ export default async function PublicResultsPage({
   ).size
 
   return (
-    <div className="min-h-screen bg-[#FAFBFC]">
+    <div className="min-h-screen bg-feis-cream">
       {/* Header */}
       <header className="bg-feis-green">
         <div className="max-w-2xl mx-auto px-4 py-8">
@@ -101,7 +101,7 @@ export default async function PublicResultsPage({
             name="q"
             placeholder="Search dancer or competition..."
             defaultValue={q}
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-white shadow-sm text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-feis-green/30 focus:border-feis-green/50"
+            className="w-full px-4 py-3 rounded-lg border bg-card text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-feis-green/30 focus:border-feis-green/50"
           />
         </form>
       </div>
@@ -110,7 +110,7 @@ export default async function PublicResultsPage({
       <main className="max-w-2xl mx-auto px-4 py-6">
         {(!filtered || filtered.length === 0) ? (
           <div className="text-center py-16">
-            <p className="text-gray-400 text-sm">
+            <p className="text-muted-foreground/50 text-sm">
               {q ? 'No results match your search.' : 'No published results yet.'}
             </p>
           </div>
@@ -130,11 +130,11 @@ export default async function PublicResultsPage({
                         )}
                         {comp.name}
                       </h2>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-muted-foreground/50 mt-0.5">
                         {comp.age_group} · {comp.level}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400 font-mono">
+                    <span className="text-xs text-muted-foreground/50 font-mono">
                       {sortedResults.length} placed
                     </span>
                   </div>
@@ -149,7 +149,7 @@ export default async function PublicResultsPage({
         )}
 
         <footer className="mt-16 pb-8 text-center">
-          <div className="inline-flex items-center gap-1.5 text-[10px] text-gray-300 uppercase tracking-[0.2em] font-mono">
+          <div className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em] font-mono">
             <span className="w-1 h-1 rounded-full bg-feis-green/30" />
             FeisTab
           </div>

@@ -193,7 +193,7 @@ export default function AuditTrailPage({
                   return (
                     <tr
                       key={entry.id}
-                      className={`border-b last:border-0 ${formatted.isCorrection ? 'bg-orange-50' : ''}`}
+                      className={`border-b last:border-0 ${formatted.isCorrection ? 'bg-feis-orange-light' : ''}`}
                     >
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap align-top">
                         {new Date(entry.created_at).toLocaleDateString('en-US', {
@@ -225,7 +225,7 @@ export default function AuditTrailPage({
                           </button>
                         )}
                         {isExpanded && (
-                          <pre className="mt-2 p-2 rounded bg-gray-50 border text-xs font-mono whitespace-pre-wrap break-all select-all">
+                          <pre className="mt-2 p-2 rounded bg-feis-cream border text-xs font-mono whitespace-pre-wrap break-all select-all">
                             {entry.before_data && (
                               <>
                                 <span className="text-muted-foreground">before: </span>

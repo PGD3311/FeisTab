@@ -246,7 +246,7 @@ export function ScoreEntryForm({
                     className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                       isSelected
                         ? 'bg-feis-green-light text-feis-green border-feis-green/40 font-medium'
-                        : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-gray-300'
+                        : 'bg-feis-cream-dark text-muted-foreground border hover:border-feis-charcoal/30'
                     } ${locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     {isSelected && '\u2713 '}{cc.label}
@@ -369,7 +369,7 @@ export function ScoreEntryForm({
                   className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                     isSelected
                       ? 'bg-feis-green-light text-feis-green border-feis-green/40 font-medium'
-                      : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-gray-300'
+                      : 'bg-feis-cream-dark text-muted-foreground border hover:border-feis-charcoal/30'
                   } ${locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   {isSelected && '\u2713 '}{cc.label}

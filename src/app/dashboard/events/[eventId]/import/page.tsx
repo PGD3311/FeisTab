@@ -280,13 +280,13 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         <div className="border border-feis-green/30 rounded-md p-4 bg-feis-green-light">
           <p className="text-feis-green font-medium">Import complete.</p>
           {conflicts.length > 0 && (
-            <p className="text-sm text-orange-600 mt-2">
+            <p className="text-sm text-feis-orange mt-2">
               {conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
               Review and assign numbers at the registration desk.
             </p>
           )}
           {syncFailures > 0 && (
-            <p className="text-sm text-orange-600 mt-2">
+            <p className="text-sm text-feis-orange mt-2">
               {syncFailures} dancer(s) had competitor number sync failures.
               Their check-in numbers were saved but may not appear on registrations until the next sync.
             </p>

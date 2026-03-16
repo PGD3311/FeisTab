@@ -482,11 +482,11 @@ export default function TabulatorEntryPage({
       </div>
 
       {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
           {error}
           <button
             onClick={() => setError(null)}
-            className="ml-2 underline text-red-600"
+            className="ml-2 underline text-destructive"
           >
             Dismiss
           </button>
@@ -540,10 +540,10 @@ export default function TabulatorEntryPage({
       </Card>
 
       {packetBlocked && selectedJudgeId && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive/20 bg-destructive/10">
           <CardContent className="py-6 text-center">
-            <p className="text-sm font-medium text-red-800">{packetBlocked}</p>
-            <p className="text-xs text-red-600 mt-1">
+            <p className="text-sm font-medium text-destructive">{packetBlocked}</p>
+            <p className="text-xs text-destructive/80 mt-1">
               This judge has already started entering scores via their own device.
               One entry path per judge per round.
             </p>

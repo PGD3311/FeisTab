@@ -190,7 +190,7 @@ export default function CommentsIndexPage({
 
   if (loadError) {
     return (
-      <div className="p-3 rounded-md bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+      <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
         Could not load comment sheets. Check your connection and try again.
       </div>
     )

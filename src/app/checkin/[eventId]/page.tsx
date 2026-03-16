@@ -783,10 +783,10 @@ export default function RosterConfirmationPage({
       case 'finalized':
         return 'bg-feis-green-light text-feis-green'
       case 'no_show':
-        return 'bg-red-50 text-red-700'
+        return 'bg-destructive/10 text-destructive'
       case 'scratched':
       case 'disqualified':
-        return 'bg-orange-50 text-orange-700'
+        return 'bg-feis-orange-light text-feis-orange'
       default:
         return 'bg-muted text-muted-foreground'
     }
@@ -1136,7 +1136,7 @@ export default function RosterConfirmationPage({
             id="judge-filter"
             value={selectedJudgeId}
             onChange={(e) => setSelectedJudgeId(e.target.value)}
-            className="min-h-[44px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-lg shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="min-h-[44px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">All judges</option>
             {judges.map((j) => (
