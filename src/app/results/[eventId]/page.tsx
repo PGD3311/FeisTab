@@ -117,9 +117,9 @@ export default async function PublicResultsPage({
         ) : (
           <div className="space-y-8">
             {filtered.map(comp => {
-              const sortedResults = [...(comp.results ?? [])].sort(
-                (a, b) => a.final_rank - b.final_rank
-              )
+              const sortedResults = [...(comp.results ?? [])]
+                .sort((a, b) => a.final_rank - b.final_rank)
+                .filter((r) => r.final_rank <= 3)
               return (
                 <section key={comp.id}>
                   <div className="flex items-baseline justify-between mb-3">
@@ -132,7 +132,7 @@ export default async function PublicResultsPage({
                       </h2>
                     </div>
                     <span className="text-xs text-muted-foreground/50 font-mono">
-                      {sortedResults.length} placed
+                      Top {sortedResults.length}
                     </span>
                   </div>
                   <ResultsTable
