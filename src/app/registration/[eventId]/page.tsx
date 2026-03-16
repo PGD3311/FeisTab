@@ -49,7 +49,7 @@ export default function RegistrationDeskPage({
       supabase.from('events').select('id, name').eq('id', eventId).single(),
       supabase
         .from('registrations')
-        .select('id, dancer_id, competition_id, dancers(id, first_name, last_name, school_name, date_of_birth), competitions(id, code, name)')
+        .select('id, dancer_id, dancers(id, first_name, last_name, school_name, date_of_birth)')
         .eq('event_id', eventId)
         .order('dancer_id')
         .limit(10000),
@@ -87,8 +87,7 @@ export default function RegistrationDeskPage({
     const dancerMap = new Map<string, DancerWithRegistrations>()
     for (const reg of regRes.data ?? []) {
       const dancer = reg.dancers as unknown as { id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null } | null
-      const comp = reg.competitions as unknown as { id: string; code: string | null; name: string } | null
-      if (!dancer || !comp) continue
+      if (!dancer) continue
 
       if (!dancerMap.has(dancer.id)) {
         dancerMap.set(dancer.id, {
@@ -103,8 +102,8 @@ export default function RegistrationDeskPage({
 
       dancerMap.get(dancer.id)!.registrations.push({
         id: reg.id,
-        competition_code: comp.code,
-        competition_name: comp.name,
+        competition_code: null,
+        competition_name: '',
       })
     }
 
