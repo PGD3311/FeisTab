@@ -59,12 +59,20 @@ export default function EventLayout({
     <EventProvider value={{ event, competitions, loading, reload: loadData }}>
       <div className="space-y-5">
         {/* Back nav */}
-        <Link
-          href="/dashboard"
-          className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1"
-        >
-          <ChevronLeft className="h-4 w-4" /> Events
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href="/dashboard"
+            className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" /> Events
+          </Link>
+          <Link
+            href="/"
+            className="text-xs text-muted-foreground hover:text-feis-green transition-colors"
+          >
+            Switch station
+          </Link>
+        </div>
 
         {/* Event header */}
         <div className="flex items-center justify-between">
