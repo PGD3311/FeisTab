@@ -140,7 +140,7 @@ export default async function PublicResultsPage({
                   </div>
                   <ResultsTable
                     results={sortedResults}
-                    eventId={eventId}
+                    publicMode
                   />
                 </section>
               )

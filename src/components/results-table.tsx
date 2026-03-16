@@ -213,10 +213,11 @@ function BreakdownPanel({ row, eventId }: { row: ResultRow; eventId?: string }) 
   )
 }
 
-export function ResultsTable({ results, eventId }: { results: ResultRow[]; eventId?: string }) {
+export function ResultsTable({ results, eventId, publicMode }: { results: ResultRow[]; eventId?: string; publicMode?: boolean }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   function handleRowClick(i: number, payload: CalculatedPayloadData | null) {
+    if (publicMode) return // No expansion on public results
     if (!isExpandable(payload)) return
     setExpandedIndex(expandedIndex === i ? null : i)
   }
@@ -233,7 +234,7 @@ export function ResultsTable({ results, eventId }: { results: ResultRow[]; event
         </thead>
         <tbody className="feis-tbody">
           {results.map((r, i) => {
-            const expandable = isExpandable(r.calculated_payload)
+            const expandable = !publicMode && isExpandable(r.calculated_payload)
             const expanded = expandedIndex === i
             return (
               <Fragment key={i}>
