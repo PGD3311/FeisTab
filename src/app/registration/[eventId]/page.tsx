@@ -22,6 +22,7 @@ interface DancerWithRegistrations {
   first_name: string
   last_name: string
   school_name: string | null
+  date_of_birth: string | null
   registrations: {
     id: string
     competition_code: string | null
@@ -48,7 +49,7 @@ export default function RegistrationDeskPage({
       supabase.from('events').select('id, name').eq('id', eventId).single(),
       supabase
         .from('registrations')
-        .select('id, dancer_id, competition_id, dancers(id, first_name, last_name, school_name), competitions(id, code, name)')
+        .select('id, dancer_id, competition_id, dancers(id, first_name, last_name, school_name, date_of_birth), competitions(id, code, name)')
         .eq('event_id', eventId)
         .order('dancer_id'),
       supabase
@@ -84,7 +85,7 @@ export default function RegistrationDeskPage({
 
     const dancerMap = new Map<string, DancerWithRegistrations>()
     for (const reg of regRes.data ?? []) {
-      const dancer = reg.dancers as unknown as { id: string; first_name: string; last_name: string; school_name: string | null } | null
+      const dancer = reg.dancers as unknown as { id: string; first_name: string; last_name: string; school_name: string | null; date_of_birth: string | null } | null
       const comp = reg.competitions as unknown as { id: string; code: string | null; name: string } | null
       if (!dancer || !comp) continue
 
@@ -94,6 +95,7 @@ export default function RegistrationDeskPage({
           first_name: dancer.first_name,
           last_name: dancer.last_name,
           school_name: dancer.school_name,
+          date_of_birth: dancer.date_of_birth,
           registrations: [],
         })
       }
@@ -386,6 +388,11 @@ export default function RegistrationDeskPage({
                 <div className="min-w-0">
                   <div className="text-lg font-semibold">
                     {dancer.first_name} {dancer.last_name}
+                    {dancer.date_of_birth && (
+                      <span className="ml-2 text-sm font-normal text-muted-foreground">
+                        age {Math.floor((Date.now() - new Date(dancer.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))}
+                      </span>
+                    )}
                   </div>
                   {dancer.school_name && (
                     <div className="text-sm text-muted-foreground">{dancer.school_name}</div>
