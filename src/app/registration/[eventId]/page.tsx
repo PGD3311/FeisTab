@@ -429,13 +429,11 @@ export default function RegistrationDeskPage({
                           const w = window.open('', '_blank', 'width=400,height=500')
                           if (!w) return
                           w.document.write(`<!DOCTYPE html><html><head><title>#${checkInRow.competitor_number}</title><style>
-                            body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: system-ui, sans-serif; }
-                            .number { font-size: 200px; font-weight: 900; font-family: monospace; line-height: 1; }
-                            .name { font-size: 24px; margin-top: 16px; color: #666; }
+                            body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                            .number { font-size: 250px; font-weight: 900; font-family: monospace; line-height: 1; }
                             @media print { body { height: auto; padding: 20vh 0; } }
                           </style></head><body>
                             <div class="number">${checkInRow.competitor_number}</div>
-                            <div class="name">${dancer.first_name} ${dancer.last_name}</div>
                             <script>window.print();</script>
                           </body></html>`)
                           w.document.close()
