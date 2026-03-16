@@ -313,7 +313,7 @@ export default function ProgramPage({
                           </Badge>
                         )}
                         <CompetitionStatusBadge status={comp.status as CompetitionStatus} />
-                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -331,6 +331,25 @@ export default function ProgramPage({
                             onClick={() => handleReorder(stage.id, comp.id, 'down')}
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-1 text-[10px] text-muted-foreground hover:text-destructive"
+                            onClick={async () => {
+                              const { error } = await supabase
+                                .from('competitions')
+                                .update({ stage_id: null, schedule_position: null })
+                                .eq('id', comp.id)
+                              if (error) {
+                                showError('Failed to unassign', { description: error.message })
+                                return
+                              }
+                              await loadData()
+                              showSuccess('Unassigned from stage')
+                            }}
+                          >
+                            ✕
                           </Button>
                         </div>
                       </div>
