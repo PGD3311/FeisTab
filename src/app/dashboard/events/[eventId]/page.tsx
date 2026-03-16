@@ -176,7 +176,6 @@ export default function EventOverviewPage() {
   const activeCount = competitions.filter((c) => ACTIVE_STATUSES.includes(c.status)).length
   const needsAttention = competitions.filter(
     (c) =>
-      c.status === 'awaiting_scores' ||
       c.status === 'ready_to_tabulate' ||
       c.status === 'recalled_round_pending' ||
       c.status === 'complete_unpublished'
