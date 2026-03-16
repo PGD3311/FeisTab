@@ -356,10 +356,10 @@ export default function ProgramPage({
                     <div
                       key={comp.id}
                       draggable
-                      onDragStart={() => setDragCompId(comp.id)}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverCompId(comp.id) }}
+                      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragCompId(comp.id) }}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverCompId(comp.id) }}
                       onDragEnd={() => { setDragCompId(null); setDragOverCompId(null) }}
-                      onDrop={() => handleDrop(stage.id, comp.id)}
+                      onDrop={(e) => { e.preventDefault(); handleDrop(stage.id, comp.id) }}
                       className={`flex items-center justify-between p-2.5 rounded-lg transition-colors group cursor-grab active:cursor-grabbing ${
                         dragOverCompId === comp.id && dragCompId !== comp.id
                           ? 'bg-feis-green-light/50 border-2 border-feis-green/30 border-dashed'
