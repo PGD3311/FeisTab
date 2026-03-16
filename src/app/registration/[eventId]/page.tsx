@@ -9,7 +9,7 @@ import {
   type CheckInRow,
 } from '@/lib/check-in'
 import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
-import { showSuccess, showCritical } from '@/lib/feedback'
+import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -422,6 +422,40 @@ export default function RegistrationDeskPage({
                         #{checkInRow.competitor_number}
                       </span>
                       <CheckCircle2 className="h-5 w-5 text-feis-green" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        disabled={acting === dancer.dancer_id}
+                        onClick={async () => {
+                          if (!confirm(`Undo check-in for ${dancer.first_name} ${dancer.last_name}?`)) return
+                          setActing(dancer.dancer_id)
+                          try {
+                            await supabase
+                              .from('event_check_ins')
+                              .delete()
+                              .eq('event_id', eventId)
+                              .eq('dancer_id', dancer.dancer_id)
+                            await supabase
+                              .from('registrations')
+                              .update({ competitor_number: null })
+                              .eq('event_id', eventId)
+                              .eq('dancer_id', dancer.dancer_id)
+                            setCheckInMap((prev) => {
+                              const next = new Map(prev)
+                              next.delete(dancer.dancer_id)
+                              return next
+                            })
+                            showSuccess(`Undid check-in for ${dancer.first_name} ${dancer.last_name}`)
+                          } catch (err) {
+                            showError('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
+                          } finally {
+                            setActing(null)
+                          }
+                        }}
+                      >
+                        Undo
+                      </Button>
                     </div>
                   )}
                   {state === 'awaiting_arrival' && checkInRow && (
