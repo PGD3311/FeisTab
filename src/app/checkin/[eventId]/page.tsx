@@ -851,9 +851,9 @@ export default function RosterConfirmationPage({
             ) : (
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
             )}
-            {hasSchedulePositions && comp.schedule_position !== null && (
-              <span className="font-mono text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
-                {comp.schedule_position}
+            {comp.code && (
+              <span className="font-mono text-sm font-semibold text-feis-green w-6 text-right tabular-nums shrink-0">
+                {comp.code}
               </span>
             )}
             <div>
