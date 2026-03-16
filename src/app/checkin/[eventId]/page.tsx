@@ -1179,7 +1179,7 @@ export default function RosterConfirmationPage({
         </div>
       )}
 
-      {hasSchedulePositions && stageGroupings.length > 0 && (
+      {hasSchedulePositions && stageGroupings.length > 0 && !selectedStageId && (
         <div className="space-y-2">
           {stageGroupings.map(({ stage, grouping }) => {
             const nowComp = grouping.now
