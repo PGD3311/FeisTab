@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,6 +52,11 @@ export default function JudgeLoginPage() {
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Card className="feis-card w-full max-w-sm">
+        <div className="px-6 pt-4">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
+            &larr; Back
+          </Link>
+        </div>
         <CardHeader className="text-center">
           <CardTitle className="text-xl font-semibold">Judge Sign In</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
