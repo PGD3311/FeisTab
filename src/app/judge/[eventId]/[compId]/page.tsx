@@ -98,7 +98,8 @@ export default function JudgeScoringPage({
 
   // Track if competition has been recalled/changed by organizer
   const [compRecalled, setCompRecalled] = useState(false)
-  const SCORING_VALID = ['in_progress', 'awaiting_scores']
+  // Statuses that are normal progression — don't show recall banner for these
+  const SCORING_OR_DONE = ['in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked', 'recalled_round_pending']
 
   // Realtime subscriptions for instant updates from organizer actions
   useEffect(() => {
@@ -114,7 +115,7 @@ export default function JudgeScoringPage({
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, (payload) => {
         const updated = payload.new as { status: string }
-        if (!SCORING_VALID.includes(updated.status)) {
+        if (!SCORING_OR_DONE.includes(updated.status)) {
           setCompRecalled(true)
         }
       })
