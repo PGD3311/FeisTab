@@ -421,6 +421,28 @@ export default function RegistrationDeskPage({
                       <span className="font-mono font-semibold text-lg bg-feis-green-light text-feis-green px-3 py-1 rounded-md">
                         #{checkInRow.competitor_number}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          const w = window.open('', '_blank', 'width=400,height=500')
+                          if (!w) return
+                          w.document.write(`<!DOCTYPE html><html><head><title>#${checkInRow.competitor_number}</title><style>
+                            body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: system-ui, sans-serif; }
+                            .number { font-size: 200px; font-weight: 900; font-family: monospace; line-height: 1; }
+                            .name { font-size: 24px; margin-top: 16px; color: #666; }
+                            @media print { body { height: auto; padding: 20vh 0; } }
+                          </style></head><body>
+                            <div class="number">${checkInRow.competitor_number}</div>
+                            <div class="name">${dancer.first_name} ${dancer.last_name}</div>
+                            <script>window.print();</script>
+                          </body></html>`)
+                          w.document.close()
+                        }}
+                      >
+                        Print #
+                      </Button>
                       <CheckCircle2 className="h-5 w-5 text-feis-green" />
                       <Button
                         variant="ghost"
