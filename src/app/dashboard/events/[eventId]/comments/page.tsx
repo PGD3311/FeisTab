@@ -37,6 +37,7 @@ export default function CommentsIndexPage({
         'dancer_id, competitor_number, dancers(id, first_name, last_name, school_name)'
       )
       .eq('event_id', eventId)
+      .limit(10000)
 
     if (regErr) {
       console.error('Failed to load registrations:', regErr.message)
@@ -108,6 +109,7 @@ export default function CommentsIndexPage({
         .from('score_entries')
         .select('dancer_id, competition_id, comment_data, comments')
         .in('competition_id', competitionIds)
+        .limit(10000)
 
       if (scoreErr) {
         console.error('Failed to load score entries:', scoreErr.message)

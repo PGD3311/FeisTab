@@ -51,7 +51,8 @@ export default function RegistrationDeskPage({
         .from('registrations')
         .select('id, dancer_id, competition_id, dancers(id, first_name, last_name, school_name, date_of_birth), competitions(id, code, name)')
         .eq('event_id', eventId)
-        .order('dancer_id'),
+        .order('dancer_id')
+        .limit(10000),
       supabase
         .from('event_check_ins')
         .select('dancer_id, competitor_number, checked_in_at')
