@@ -1,79 +1,160 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSupabase } from '@/hooks/use-supabase'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+
+interface EventInfo {
+  id: string
+  name: string
+  start_date: string
+  location: string | null
+}
 
 export default function HomePage() {
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-feis-green">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center">
-          <span className="text-lg font-bold text-white tracking-wide uppercase">
-            FeisTab
-          </span>
-        </div>
-      </header>
+  const supabase = useSupabase()
+  const router = useRouter()
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [event, setEvent] = useState<EventInfo | null>(null)
 
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="max-w-xl w-full">
-          <div className="mb-10">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-2">
-              Competition Tabulation System
+  async function handleCodeSubmit() {
+    if (!code.trim()) return
+    setChecking(true)
+    setError('')
+
+    const { data, error: fetchErr } = await supabase
+      .from('events')
+      .select('id, name, start_date, location, registration_code')
+      .eq('registration_code', code.trim().toUpperCase())
+      .maybeSingle()
+
+    if (fetchErr || !data) {
+      setError('No event found with that code')
+      setChecking(false)
+      return
+    }
+
+    // Save access
+    localStorage.setItem(`feistab_access_${data.id}`, code.trim().toUpperCase())
+    setEvent({ id: data.id, name: data.name, start_date: data.start_date, location: data.location })
+    setChecking(false)
+  }
+
+  // Station selector after code validated
+  if (event) {
+    const stations = [
+      {
+        label: "I'm the Organizer",
+        description: 'Dashboard, tabulation, results',
+        href: `/dashboard/events/${event.id}`,
+        color: 'bg-feis-green text-white hover:bg-feis-green/90',
+      },
+      {
+        label: "I'm at Registration",
+        description: 'Check in dancers, assign numbers',
+        href: `/registration/${event.id}`,
+        color: 'bg-white border-2 border-feis-green text-feis-green hover:bg-feis-green-light',
+      },
+      {
+        label: "I'm at Side-Stage",
+        description: 'Confirm roster, send to judge',
+        href: `/checkin/${event.id}`,
+        color: 'bg-white border-2 border-feis-orange text-feis-orange hover:bg-feis-orange/5',
+      },
+    ]
+
+    return (
+      <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-feis-charcoal">{event.name}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {event.start_date}{event.location && ` · ${event.location}`}
             </p>
-            <h1 className="text-3xl font-bold tracking-tight mb-1">
-              Select your role
-            </h1>
           </div>
 
-          <div className="space-y-2">
-            <Link
-              href="/dashboard"
-              className="group flex items-center justify-between p-4 rounded border border-border bg-white hover:border-feis-green transition-colors"
-            >
-              <div>
-                <h2 className="text-base font-semibold">Organizer Dashboard</h2>
-                <p className="text-sm text-muted-foreground">
-                  Manage events, run tabulation, publish results
-                </p>
-              </div>
-              <span className="text-muted-foreground group-hover:text-feis-green transition-colors text-lg">
-                &rarr;
-              </span>
-            </Link>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground text-center">Choose your station</p>
+            {stations.map((s) => (
+              <button
+                key={s.href}
+                type="button"
+                onClick={() => router.push(s.href)}
+                className={`w-full p-4 rounded-lg text-left transition-colors ${s.color}`}
+              >
+                <span className="text-lg font-semibold block">{s.label}</span>
+                <span className="text-sm opacity-70">{s.description}</span>
+              </button>
+            ))}
+          </div>
 
-            <Link
-              href="/judge"
-              className="group flex items-center justify-between p-4 rounded border border-border bg-white hover:border-feis-green transition-colors"
-            >
-              <div>
-                <h2 className="text-base font-semibold">Judge Scoring</h2>
-                <p className="text-sm text-muted-foreground">
-                  Enter scores, flag anomalies, sign off rounds
-                </p>
-              </div>
-              <span className="text-muted-foreground group-hover:text-feis-green transition-colors text-lg">
-                &rarr;
-              </span>
+          <div className="text-center space-y-2">
+            <Link href="/judge" className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
+              Judge login →
             </Link>
-
-            <Link
-              href="/results"
-              className="group flex items-center justify-between p-4 rounded border border-border bg-white hover:border-feis-green transition-colors"
-            >
-              <div>
-                <h2 className="text-base font-semibold">Public Results</h2>
-                <p className="text-sm text-muted-foreground">
-                  View published placements and scores
-                </p>
-              </div>
-              <span className="text-muted-foreground group-hover:text-feis-green transition-colors text-lg">
-                &rarr;
-              </span>
+            <span className="text-muted-foreground mx-2">·</span>
+            <Link href={`/results/${event.id}`} className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
+              Public results →
             </Link>
           </div>
 
-          <p className="text-xs text-muted-foreground mt-8">
-            FeisTab &middot; Live tabulation for Irish dance competitions
-          </p>
+          <button
+            type="button"
+            onClick={() => { setEvent(null); setCode('') }}
+            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Different event
+          </button>
         </div>
-      </main>
+      </div>
+    )
+  }
+
+  // Code entry
+  return (
+    <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
+      <div className="w-full max-w-xs space-y-6 text-center">
+        <div>
+          <h1 className="text-3xl font-bold text-feis-charcoal">FeisTab</h1>
+          <p className="text-sm text-muted-foreground mt-2">Enter your event code</p>
+        </div>
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleCodeSubmit() }}
+          className="space-y-3"
+        >
+          <Input
+            value={code}
+            onChange={(e) => { setCode(e.target.value.toUpperCase()); setError('') }}
+            placeholder="ACCESS CODE"
+            className="text-center font-mono text-lg tracking-widest h-12"
+            autoFocus
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            disabled={!code.trim() || checking}
+            className="w-full"
+          >
+            {checking ? 'Checking...' : 'Enter'}
+          </Button>
+        </form>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <Link href="/dashboard" className="block hover:text-feis-green transition-colors">
+            Organizer dashboard →
+          </Link>
+          <Link href="/judge" className="block hover:text-feis-green transition-colors">
+            Judge login →
+          </Link>
+          <Link href="/results" className="block hover:text-feis-green transition-colors">
+            Public results →
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
