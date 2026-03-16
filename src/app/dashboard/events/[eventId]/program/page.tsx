@@ -301,10 +301,15 @@ export default function ProgramPage({
                         setReordering(true)
                         try {
                           const sorted = [...stageComps].sort((a, b) => {
-                            const numA = parseInt(a.code ?? '0', 10)
-                            const numB = parseInt(b.code ?? '0', 10)
+                            const numA = parseInt(a.code ?? '', 10)
+                            const numB = parseInt(b.code ?? '', 10)
+                            // Both numeric codes — sort numerically
                             if (!isNaN(numA) && !isNaN(numB)) return numA - numB
-                            return (a.code ?? '').localeCompare(b.code ?? '')
+                            // One numeric, one not — numbers first
+                            if (!isNaN(numA)) return -1
+                            if (!isNaN(numB)) return 1
+                            // Both non-numeric — sort by name
+                            return (a.name ?? '').localeCompare(b.name ?? '')
                           })
                           for (const c of sorted) {
                             await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
