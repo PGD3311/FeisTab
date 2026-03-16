@@ -41,6 +41,8 @@ export default function ProgramPage({
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
   const [reordering, setReordering] = useState(false)
+  const [dragCompId, setDragCompId] = useState<string | null>(null)
+  const [dragOverCompId, setDragOverCompId] = useState<string | null>(null)
 
   async function loadData() {
     const [stagesRes, compsRes] = await Promise.all([
@@ -129,6 +131,40 @@ export default function ProgramPage({
       })
     } finally {
       setReordering(false)
+    }
+  }
+
+  async function handleDrop(stageId: string, targetCompId: string) {
+    if (!dragCompId || dragCompId === targetCompId) return
+    setReordering(true)
+
+    try {
+      const stageComps = getCompsForStage(stageId)
+      const fromIdx = stageComps.findIndex((c) => c.id === dragCompId)
+      const toIdx = stageComps.findIndex((c) => c.id === targetCompId)
+      if (fromIdx < 0 || toIdx < 0) return
+
+      const newOrder = [...stageComps]
+      const [moved] = newOrder.splice(fromIdx, 1)
+      newOrder.splice(toIdx, 0, moved)
+
+      // Clear all positions first to avoid unique constraint
+      for (const c of newOrder) {
+        await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
+      }
+      // Set new positions
+      for (let i = 0; i < newOrder.length; i++) {
+        await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
+      }
+
+      await loadData()
+      showSuccess('Order updated')
+    } catch (err) {
+      showError('Failed to reorder', { description: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setReordering(false)
+      setDragCompId(null)
+      setDragOverCompId(null)
     }
   }
 
@@ -255,6 +291,39 @@ export default function ProgramPage({
                   </span>
                 )}
                 <div className="flex items-center gap-2">
+                  {stageComps.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-muted-foreground"
+                      disabled={reordering}
+                      onClick={async () => {
+                        setReordering(true)
+                        try {
+                          const sorted = [...stageComps].sort((a, b) => {
+                            const numA = parseInt(a.code ?? '0', 10)
+                            const numB = parseInt(b.code ?? '0', 10)
+                            if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+                            return (a.code ?? '').localeCompare(b.code ?? '')
+                          })
+                          for (const c of sorted) {
+                            await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
+                          }
+                          for (let i = 0; i < sorted.length; i++) {
+                            await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', sorted[i].id)
+                          }
+                          await loadData()
+                          showSuccess('Sorted by number')
+                        } catch (err) {
+                          showError('Failed to sort')
+                        } finally {
+                          setReordering(false)
+                        }
+                      }}
+                    >
+                      Sort by #
+                    </Button>
+                  )}
                   <Badge variant="outline">
                     {stageComps.length} competition{stageComps.length !== 1 ? 's' : ''}
                   </Badge>
@@ -281,7 +350,18 @@ export default function ProgramPage({
                   {stageComps.map((comp, idx) => (
                     <div
                       key={comp.id}
-                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-feis-green-light/30 transition-colors group"
+                      draggable
+                      onDragStart={() => setDragCompId(comp.id)}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverCompId(comp.id) }}
+                      onDragEnd={() => { setDragCompId(null); setDragOverCompId(null) }}
+                      onDrop={() => handleDrop(stage.id, comp.id)}
+                      className={`flex items-center justify-between p-2.5 rounded-lg transition-colors group cursor-grab active:cursor-grabbing ${
+                        dragOverCompId === comp.id && dragCompId !== comp.id
+                          ? 'bg-feis-green-light/50 border-2 border-feis-green/30 border-dashed'
+                          : dragCompId === comp.id
+                            ? 'opacity-40'
+                            : 'hover:bg-feis-green-light/30'
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="font-mono text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
