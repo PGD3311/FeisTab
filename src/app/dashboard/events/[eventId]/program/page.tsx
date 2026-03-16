@@ -96,75 +96,70 @@ export default function ProgramPage({
     if (direction === 'up' && idx <= 0) return
     if (direction === 'down' && (idx < 0 || idx >= stageComps.length - 1)) return
 
-    setReordering(true)
-    try {
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-      const newOrder = [...stageComps]
-      const temp = newOrder[idx]
-      newOrder[idx] = newOrder[swapIdx]
-      newOrder[swapIdx] = temp
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    const newOrder = [...stageComps]
+    const temp = newOrder[idx]
+    newOrder[idx] = newOrder[swapIdx]
+    newOrder[swapIdx] = temp
 
-      // Clear all positions first to avoid UNIQUE constraint violation during swap
-      const ids = newOrder.map(c => c.id)
-      for (const id of ids) {
-        const { error } = await supabase
-          .from('competitions')
-          .update({ schedule_position: null })
-          .eq('id', id)
-        if (error) throw new Error(`Failed to clear position: ${error.message}`)
-      }
-
-      // Set new positions
-      for (let i = 0; i < newOrder.length; i++) {
-        const { error } = await supabase
-          .from('competitions')
-          .update({ schedule_position: i + 1 })
-          .eq('id', newOrder[i].id)
-        if (error) throw new Error(`Failed to set position: ${error.message}`)
-      }
-
-      await loadData()
-      showSuccess('Order updated')
-    } catch (err) {
-      showError('Failed to reorder', {
-        description: err instanceof Error ? err.message : 'Unknown error',
+    // Optimistic update — instant UI
+    setCompetitions((prev) =>
+      prev.map((c) => {
+        const newIdx = newOrder.findIndex((n) => n.id === c.id)
+        if (newIdx >= 0) return { ...c, schedule_position: newIdx + 1 }
+        return c
       })
-    } finally {
-      setReordering(false)
+    )
+
+    // Save in background
+    try {
+      for (const c of newOrder) {
+        await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
+      }
+      for (let i = 0; i < newOrder.length; i++) {
+        await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
+      }
+    } catch (err) {
+      showError('Failed to save — refresh to retry')
+      await loadData()
     }
   }
 
   async function handleDrop(stageId: string, targetCompId: string) {
     if (!dragCompId || dragCompId === targetCompId) return
-    setReordering(true)
 
+    const stageComps = getCompsForStage(stageId)
+    const fromIdx = stageComps.findIndex((c) => c.id === dragCompId)
+    const toIdx = stageComps.findIndex((c) => c.id === targetCompId)
+    if (fromIdx < 0 || toIdx < 0) return
+
+    const newOrder = [...stageComps]
+    const [moved] = newOrder.splice(fromIdx, 1)
+    newOrder.splice(toIdx, 0, moved)
+
+    // Optimistic update — instant UI
+    setCompetitions((prev) =>
+      prev.map((c) => {
+        const newIdx = newOrder.findIndex((n) => n.id === c.id)
+        if (newIdx >= 0) return { ...c, schedule_position: newIdx + 1 }
+        return c
+      })
+    )
+    setDragCompId(null)
+    setDragOverCompId(null)
+
+    // Save in background
     try {
-      const stageComps = getCompsForStage(stageId)
-      const fromIdx = stageComps.findIndex((c) => c.id === dragCompId)
-      const toIdx = stageComps.findIndex((c) => c.id === targetCompId)
-      if (fromIdx < 0 || toIdx < 0) return
-
-      const newOrder = [...stageComps]
-      const [moved] = newOrder.splice(fromIdx, 1)
-      newOrder.splice(toIdx, 0, moved)
-
-      // Clear all positions first to avoid unique constraint
+      // Clear then set — sequential but non-blocking
       for (const c of newOrder) {
         await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
       }
-      // Set new positions
       for (let i = 0; i < newOrder.length; i++) {
         await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
       }
-
-      await loadData()
-      showSuccess('Order updated')
     } catch (err) {
-      showError('Failed to reorder', { description: err instanceof Error ? err.message : 'Unknown error' })
-    } finally {
-      setReordering(false)
-      setDragCompId(null)
-      setDragOverCompId(null)
+      showError('Failed to save order — refresh to retry')
+      await loadData()
     }
   }
 
