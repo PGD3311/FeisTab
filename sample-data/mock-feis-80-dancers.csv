@@ -1,248 +1,248 @@
 first_name,last_name,date_of_birth,school_name,teacher_name,competitor_number,competition_code,competition_name,age_group,level,dance_type
-Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,BU6SJ,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
-Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,BU6SJ,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
-Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Eimear,Connolly,2015-04-17,Scoil Rince Ni Bhriain,Colm Murphy,106,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Eimear,Connolly,2015-04-17,Scoil Rince Ni Bhriain,Colm Murphy,106,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,NU12SJ,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
-Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,NU14SJ,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
-Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Aine,Byrne,2019-03-25,Scoil Rince Ni Bhriain,Colm Murphy,114,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Aine,Byrne,2019-03-25,Scoil Rince Ni Bhriain,Colm Murphy,114,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Ava,Lynch,2017-10-11,Scoil Rince Ni Bhriain,Colm Murphy,115,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Ava,Lynch,2017-10-11,Scoil Rince Ni Bhriain,Colm Murphy,115,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Diarmuid,Carroll,2017-09-15,Scoil Rince Ni Bhriain,Colm Murphy,117,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Diarmuid,Carroll,2017-09-15,Scoil Rince Ni Bhriain,Colm Murphy,117,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,NU12SJ,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
-Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,BU6SJ,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
-Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Daire,Sullivan,2015-09-12,McGrath Academy,Fiona McGrath,208,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Daire,Sullivan,2015-09-12,McGrath Academy,Fiona McGrath,208,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,NU12HJ,Novice Under 12 Heavy Jig,Under 12,Novice,treble_jig
-Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Ruairi,Doyle,2018-06-15,McGrath Academy,Fiona McGrath,211,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Ruairi,Doyle,2018-06-15,McGrath Academy,Fiona McGrath,211,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,213,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,213,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,213,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,214,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,214,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,214,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,215,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,215,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,215,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,216,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,216,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,216,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,216,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Saoirse,Byrne,2019-01-15,Claddagh School,Sean Claddagh,301,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Saoirse,Byrne,2019-01-15,Claddagh School,Sean Claddagh,301,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Maeve,Fitzgerald,2018-09-03,Claddagh School,Sean Claddagh,302,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Maeve,Fitzgerald,2018-09-03,Claddagh School,Sean Claddagh,302,BU6SJ,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
-Aisling,Brennan,2016-12-01,Claddagh School,Sean Claddagh,303,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Aisling,Brennan,2016-12-01,Claddagh School,Sean Claddagh,303,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Clodagh,Nolan,2014-10-25,Claddagh School,Sean Claddagh,304,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Clodagh,Nolan,2014-10-25,Claddagh School,Sean Claddagh,304,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,NU12SJ,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
-Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Tadhg,Nolan,2016-11-23,Claddagh School,Sean Claddagh,309,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Tadhg,Nolan,2016-11-23,Claddagh School,Sean Claddagh,309,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,NU14SJ,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
-Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,NU12HJ,Novice Under 12 Heavy Jig,Under 12,Novice,treble_jig
-Darragh,Quinn,2015-08-14,Claddagh School,Sean Claddagh,312,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Darragh,Quinn,2015-08-14,Claddagh School,Sean Claddagh,312,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,PW14SJ,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
-Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Caoimhe,Ryan,2017-02-19,Harney Academy,Bridget Harney,401,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Caoimhe,Ryan,2017-02-19,Harney Academy,Bridget Harney,401,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Sinead,O'Brien,2012-11-05,Harney Academy,Bridget Harney,404,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Sinead,O'Brien,2012-11-05,Harney Academy,Bridget Harney,404,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,NU12SJ,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
-Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,NU14SJ,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
-Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,NU14SJ,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
-Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,BU6SJ,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
-Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,ABU12HJ,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
-Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Ronan,Coffey,2016-02-17,Harney Academy,Bridget Harney,418,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Ronan,Coffey,2016-02-17,Harney Academy,Bridget Harney,418,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,PW14R,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
-Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,PW14LJ,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
-Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,PW14HP,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
-Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,PW14HJ,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
-Lorcan,Healy,2015-11-18,Harney Academy,Bridget Harney,420,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Lorcan,Healy,2015-11-18,Harney Academy,Bridget Harney,420,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Oonagh,Walsh,2018-02-08,Harney Academy,Bridget Harney,421,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Oonagh,Walsh,2018-02-08,Harney Academy,Bridget Harney,421,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,NU14R,Novice Under 14 Reel,Under 14,Novice,reel
-Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,NU14LJ,Novice Under 14 Light Jig,Under 14,Novice,jig
-Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,NU14HP,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
-Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Sarah,Griffin,2019-05-20,Harney Academy,Bridget Harney,424,BU6R,Beginner Under 6 Reel,Under 6,Beginner,reel
-Sarah,Griffin,2019-05-20,Harney Academy,Bridget Harney,424,BU6LJ,Beginner Under 6 Light Jig,Under 6,Beginner,jig
-Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,BU10R,Beginner Under 10 Reel,Under 10,Beginner,reel
-Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,BU10LJ,Beginner Under 10 Light Jig,Under 10,Beginner,jig
-Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,BU10SJ,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
-Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
-Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,NU12R,Novice Under 12 Reel,Under 12,Novice,reel
-Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,NU12LJ,Novice Under 12 Light Jig,Under 12,Novice,jig
-Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,NU12SJ,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
-Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,NU12HP,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
-Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,BU8R,Beginner Under 8 Reel,Under 8,Beginner,reel
-Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,BU8LJ,Beginner Under 8 Light Jig,Under 8,Beginner,jig
-Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,BU8SJ,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
-Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,ABU12R,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
-Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,ABU12LJ,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
-Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,ABU12HP,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Aoife,Kelly,2018-04-12,Scoil Rince Ni Bhriain,Colm Murphy,101,3,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
+Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Ciara,Walsh,2018-07-23,McGrath Academy,Fiona McGrath,201,3,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
+Saoirse,Byrne,2019-01-15,Claddagh School,Sean Claddagh,301,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Saoirse,Byrne,2019-01-15,Claddagh School,Sean Claddagh,301,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Maeve,Fitzgerald,2018-09-03,Claddagh School,Sean Claddagh,302,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Maeve,Fitzgerald,2018-09-03,Claddagh School,Sean Claddagh,302,3,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
+Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Roisin,Doyle,2018-11-08,Scoil Rince Ni Bhriain,Colm Murphy,104,3,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
+Aine,Byrne,2019-03-25,Scoil Rince Ni Bhriain,Colm Murphy,114,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Aine,Byrne,2019-03-25,Scoil Rince Ni Bhriain,Colm Murphy,114,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Cara,Healy,2018-05-20,Harney Academy,Bridget Harney,415,3,Beginner Under 6 Slip Jig,Under 6,Beginner,slip_jig
+Ruairi,Doyle,2018-06-15,McGrath Academy,Fiona McGrath,211,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Ruairi,Doyle,2018-06-15,McGrath Academy,Fiona McGrath,211,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Oonagh,Walsh,2018-02-08,Harney Academy,Bridget Harney,421,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Oonagh,Walsh,2018-02-08,Harney Academy,Bridget Harney,421,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Sarah,Griffin,2019-05-20,Harney Academy,Bridget Harney,424,1,Beginner Under 6 Reel,Under 6,Beginner,reel
+Sarah,Griffin,2019-05-20,Harney Academy,Bridget Harney,424,2,Beginner Under 6 Light Jig,Under 6,Beginner,jig
+Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Niamh,O'Sullivan,2016-03-22,Scoil Rince Ni Bhriain,Colm Murphy,102,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Orla,McCarthy,2016-08-14,McGrath Academy,Fiona McGrath,202,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Fionnuala,Gallagher,2016-05-30,Scoil Rince Ni Bhriain,Colm Murphy,103,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Caoimhe,Ryan,2017-02-19,Harney Academy,Bridget Harney,401,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Caoimhe,Ryan,2017-02-19,Harney Academy,Bridget Harney,401,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Aisling,Brennan,2016-12-01,Claddagh School,Sean Claddagh,303,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Aisling,Brennan,2016-12-01,Claddagh School,Sean Claddagh,303,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Ava,Lynch,2017-10-11,Scoil Rince Ni Bhriain,Colm Murphy,115,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Ava,Lynch,2017-10-11,Scoil Rince Ni Bhriain,Colm Murphy,115,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Fiadh,O'Brien,2017-06-30,Scoil Rince Ni Bhriain,Colm Murphy,116,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Tadhg,Nolan,2016-11-23,Claddagh School,Sean Claddagh,309,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Tadhg,Nolan,2016-11-23,Claddagh School,Sean Claddagh,309,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Finn,Walsh,2017-04-30,Harney Academy,Bridget Harney,411,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Grace,Hennessy,2016-06-07,McGrath Academy,Fiona McGrath,212,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Diarmuid,Carroll,2017-09-15,Scoil Rince Ni Bhriain,Colm Murphy,117,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Diarmuid,Carroll,2017-09-15,Scoil Rince Ni Bhriain,Colm Murphy,117,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Ronan,Coffey,2016-02-17,Harney Academy,Bridget Harney,418,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Ronan,Coffey,2016-02-17,Harney Academy,Bridget Harney,418,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,4,Beginner Under 8 Reel,Under 8,Beginner,reel
+Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,5,Beginner Under 8 Light Jig,Under 8,Beginner,jig
+Aoife,Dunne,2016-08-15,Brady Campbell School,Mary Brady,504,6,Beginner Under 8 Slip Jig,Under 8,Beginner,slip_jig
+Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Siobhan,Murphy,2014-06-18,Scoil Rince Ni Bhriain,Colm Murphy,105,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Grainne,Daly,2015-01-09,Harney Academy,Bridget Harney,402,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Clodagh,Nolan,2014-10-25,Claddagh School,Sean Claddagh,304,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Clodagh,Nolan,2014-10-25,Claddagh School,Sean Claddagh,304,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Eimear,Connolly,2015-04-17,Scoil Rince Ni Bhriain,Colm Murphy,106,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Eimear,Connolly,2015-04-17,Scoil Rince Ni Bhriain,Colm Murphy,106,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Deirdre,Quinn,2014-08-03,McGrath Academy,Fiona McGrath,203,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Conor,Moore,2013-08-27,Harney Academy,Bridget Harney,409,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Daire,Sullivan,2015-09-12,McGrath Academy,Fiona McGrath,208,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Daire,Sullivan,2015-09-12,McGrath Academy,Fiona McGrath,208,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Eoin,Gallagher,2014-02-07,Scoil Rince Ni Bhriain,Colm Murphy,112,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Ella,Moore,2013-05-19,Brady Campbell School,Mary Brady,501,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Megan,Moore,2015-07-04,Harney Academy,Bridget Harney,413,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Katie,Donovan,2014-12-19,Harney Academy,Bridget Harney,412,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Darragh,Quinn,2015-08-14,Claddagh School,Sean Claddagh,312,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Darragh,Quinn,2015-08-14,Claddagh School,Sean Claddagh,312,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Saoirse,Kennedy,2014-07-09,Harney Academy,Bridget Harney,423,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Lorcan,Healy,2015-11-18,McGrath Academy,Fiona McGrath,213,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Lorcan,Healy,2015-11-18,McGrath Academy,Fiona McGrath,213,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,214,7,Beginner Under 10 Reel,Under 10,Beginner,reel
+Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,214,8,Beginner Under 10 Light Jig,Under 10,Beginner,jig
+Cliona,Murray,2014-04-30,McGrath Academy,Fiona McGrath,214,9,Beginner Under 10 Slip Jig,Under 10,Beginner,slip_jig
+Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Sorcha,Maguire,2012-09-11,Harney Academy,Bridget Harney,403,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Bronagh,Healy,2013-02-28,Scoil Rince Ni Bhriain,Colm Murphy,107,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Tara,Flanagan,2012-06-14,McGrath Academy,Fiona McGrath,204,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Emer,Duffy,2013-07-20,Claddagh School,Sean Claddagh,305,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Sinead,O'Brien,2012-11-05,Harney Academy,Bridget Harney,404,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Sinead,O'Brien,2012-11-05,Harney Academy,Bridget Harney,404,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Padraig,Maguire,2012-03-14,Harney Academy,Bridget Harney,408,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Isobel,Kelly,2013-01-26,Scoil Rince Ni Bhriain,Colm Murphy,113,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Alannah,Daly,2012-04-08,McGrath Academy,Fiona McGrath,210,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Abby,Tobin,2012-08-30,Brady Campbell School,Mary Brady,502,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Brendan,Moran,2012-10-22,Scoil Rince Academy,Patrick Moran,601,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Molly,Ryan,2013-10-12,Harney Academy,Bridget Harney,416,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,10,Adv Beginner Under 12 Reel,Under 12,Advanced Beginner,reel
+Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,11,Adv Beginner Under 12 Light Jig,Under 12,Advanced Beginner,jig
+Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,12,Adv Beginner Under 12 Hornpipe,Under 12,Advanced Beginner,hornpipe
+Riona,Sweeney,2012-07-22,Claddagh School,Sean Claddagh,313,13,Adv Beginner Under 12 Heavy Jig,Under 12,Advanced Beginner,treble_jig
+Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,14,Novice Under 12 Reel,Under 12,Novice,reel
+Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,16,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
+Meadhbh,Kavanagh,2011-04-09,Scoil Rince Ni Bhriain,Colm Murphy,108,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,14,Novice Under 12 Reel,Under 12,Novice,reel
+Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Keelin,Murray,2010-08-22,McGrath Academy,Fiona McGrath,205,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,14,Novice Under 12 Reel,Under 12,Novice,reel
+Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,16,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
+Ailbhe,Lawlor,2011-01-30,Harney Academy,Bridget Harney,405,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,14,Novice Under 12 Reel,Under 12,Novice,reel
+Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,16,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
+Sadhbh,Tierney,2011-06-17,Claddagh School,Sean Claddagh,306,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,14,Novice Under 12 Reel,Under 12,Novice,reel
+Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Cian,O'Donnell,2011-10-16,McGrath Academy,Fiona McGrath,209,18,Novice Under 12 Heavy Jig,Under 12,Novice,treble_jig
+Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,14,Novice Under 12 Reel,Under 12,Novice,reel
+Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Shauna,Tobin,2011-11-08,Scoil Rince Ni Bhriain,Colm Murphy,120,16,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
+Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,14,Novice Under 12 Reel,Under 12,Novice,reel
+Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Cillian,Doyle,2011-07-28,Claddagh School,Sean Claddagh,311,18,Novice Under 12 Heavy Jig,Under 12,Novice,treble_jig
+Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,14,Novice Under 12 Reel,Under 12,Novice,reel
+Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,15,Novice Under 12 Light Jig,Under 12,Novice,jig
+Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,16,Novice Under 12 Slip Jig,Under 12,Novice,slip_jig
+Ciara,Collins,2011-09-03,Brady Campbell School,Mary Brady,503,17,Novice Under 12 Hornpipe,Under 12,Novice,hornpipe
+Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,19,Novice Under 14 Reel,Under 14,Novice,reel
+Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,21,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
+Caoilfhionn,Reilly,2010-03-08,Scoil Rince Ni Bhriain,Colm Murphy,109,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,19,Novice Under 14 Reel,Under 14,Novice,reel
+Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Blathnaid,Burke,2009-11-14,McGrath Academy,Fiona McGrath,206,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,19,Novice Under 14 Reel,Under 14,Novice,reel
+Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,21,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
+Muireann,Coffey,2010-07-26,Harney Academy,Bridget Harney,406,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,19,Novice Under 14 Reel,Under 14,Novice,reel
+Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Laoise,Dunne,2009-05-02,Claddagh School,Sean Claddagh,307,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,19,Novice Under 14 Reel,Under 14,Novice,reel
+Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Sean,Kelly,2009-12-05,Harney Academy,Bridget Harney,422,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,19,Novice Under 14 Reel,Under 14,Novice,reel
+Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Liam,Brennan,2010-05-21,Claddagh School,Sean Claddagh,310,21,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
+Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,19,Novice Under 14 Reel,Under 14,Novice,reel
+Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Erin,Gallagher,2010-12-01,Scoil Rince Ni Bhriain,Colm Murphy,118,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,19,Novice Under 14 Reel,Under 14,Novice,reel
+Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,21,Novice Under 14 Slip Jig,Under 14,Novice,slip_jig
+Aoife,Tobin,2010-02-14,Harney Academy,Bridget Harney,414,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,215,19,Novice Under 14 Reel,Under 14,Novice,reel
+Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,215,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Rory,Flanagan,2009-03-16,McGrath Academy,Fiona McGrath,215,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,19,Novice Under 14 Reel,Under 14,Novice,reel
+Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Aidan,Burke,2009-09-04,Claddagh School,Sean Claddagh,314,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,19,Novice Under 14 Reel,Under 14,Novice,reel
+Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,20,Novice Under 14 Light Jig,Under 14,Novice,jig
+Declan,Kavanagh,2010-01-09,Harney Academy,Bridget Harney,417,22,Novice Under 14 Hornpipe,Under 14,Novice,hornpipe
+Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Aoibhin,Carroll,2008-02-11,Scoil Rince Ni Bhriain,Colm Murphy,110,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Róisín,Whelan,2007-09-19,McGrath Academy,Fiona McGrath,207,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Naoise,Sweeney,2007-06-15,Scoil Rince Ni Bhriain,Colm Murphy,111,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Eabha,Griffin,2008-12-30,Claddagh School,Sean Claddagh,308,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Ciannait,Flynn,2007-04-08,Harney Academy,Bridget Harney,407,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Oisin,Ryan,2008-01-18,Harney Academy,Bridget Harney,410,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Emma,Tierney,2008-03-27,Scoil Rince Ni Bhriain,Colm Murphy,119,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,216,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,216,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Roisin,McCarthy,2009-07-15,McGrath Academy,Fiona McGrath,216,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,25,Prizewinner 14 & Over Slip Jig,14 & Over,Prizewinner,slip_jig
+Niamh,Moore,2009-04-22,Claddagh School,Sean Claddagh,315,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,217,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,217,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,217,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Niall,Connolly,2008-11-07,McGrath Academy,Fiona McGrath,217,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
+Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,23,Prizewinner 14 & Over Reel,14 & Over,Prizewinner,reel
+Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,24,Prizewinner 14 & Over Light Jig,14 & Over,Prizewinner,jig
+Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,26,Prizewinner 14 & Over Hornpipe,14 & Over,Prizewinner,hornpipe
+Cathal,Murphy,2008-06-09,Harney Academy,Bridget Harney,419,27,Prizewinner 14 & Over Heavy Jig,14 & Over,Prizewinner,treble_jig
