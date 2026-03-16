@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useEvent } from '@/contexts/event-context'
 import { useSupabase } from '@/hooks/use-supabase'
+import { showSuccess, showError } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
+import { Button } from '@/components/ui/button'
 import { ACTIVE_STATUSES } from '@/lib/competition-states'
 import { type CompetitionStatus } from '@/lib/competition-states'
 import {
@@ -213,6 +215,37 @@ export default function EventOverviewPage() {
           <strong className="text-foreground tabular-nums">{progressPct}%</strong> complete
         </span>
       </div>
+
+      {/* Bulk advance imported competitions */}
+      {(() => {
+        const importedComps = competitions.filter((c) => c.status === 'imported')
+        if (importedComps.length === 0) return null
+        return (
+          <div className="flex items-center justify-between p-3 rounded-lg border border-feis-orange/30 bg-feis-orange/5">
+            <span className="text-sm">
+              <strong>{importedComps.length}</strong> imported competition{importedComps.length !== 1 ? 's' : ''} not yet ready
+            </span>
+            <Button
+              size="sm"
+              onClick={async () => {
+                const ids = importedComps.map((c) => c.id)
+                const { error } = await supabase
+                  .from('competitions')
+                  .update({ status: 'ready_for_day_of' })
+                  .in('id', ids)
+                if (error) {
+                  showError('Failed to advance competitions', { description: error.message })
+                  return
+                }
+                showSuccess(`${ids.length} competitions marked ready`)
+                reload()
+              }}
+            >
+              Mark All Ready
+            </Button>
+          </div>
+        )
+      })()}
 
       {/* Needs Attention */}
       <div>
