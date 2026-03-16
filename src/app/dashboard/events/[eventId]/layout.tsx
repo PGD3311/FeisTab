@@ -73,7 +73,14 @@ export default function EventLayout({
             <p className="text-muted-foreground text-sm">
               {event.start_date} {event.location && `· ${event.location}`}
               {String((event as unknown as Record<string, unknown>).registration_code ?? '') !== '' && (
-                <span className="ml-2">· Access code: <code className="font-mono font-semibold text-feis-green">{String((event as unknown as Record<string, unknown>).registration_code)}</code></span>
+                <span className="ml-2">· Access code: <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(String((event as unknown as Record<string, unknown>).registration_code))
+                  }}
+                  className="font-mono font-semibold text-feis-green hover:text-feis-green/70 transition-colors cursor-pointer"
+                  title="Click to copy"
+                >{String((event as unknown as Record<string, unknown>).registration_code)}</button></span>
               )}
             </p>
           </div>
