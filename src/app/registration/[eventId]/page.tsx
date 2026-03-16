@@ -182,6 +182,7 @@ export default function RegistrationDeskPage({
       (d) =>
         d.first_name.toLowerCase().includes(q) ||
         d.last_name.toLowerCase().includes(q) ||
+        `${d.first_name} ${d.last_name}`.toLowerCase().includes(q) ||
         (d.school_name && d.school_name.toLowerCase().includes(q))
     )
   }, [dancers, search])
