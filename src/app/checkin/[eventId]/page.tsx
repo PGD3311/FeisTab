@@ -999,38 +999,10 @@ export default function RosterConfirmationPage({
                           <span className="text-lg">
                             {reg.first_name} {reg.last_name}
                           </span>
-                          {/* Arrival state indicator */}
-                          {!isPresent && hasArrived && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
-                                Arrived
-                              </span>
-                              {showCallToStage && (
-                                <span className="text-xs text-teal-600 ml-1">
-                                  Call to stage
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {!isPresent && !hasArrived && !hasNumber && (
-                            <div className="mt-0.5">
-                              <span className="text-xs text-muted-foreground">
-                                Not arrived
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-1">
-                                {'\u00b7'} No number
-                              </span>
-                            </div>
-                          )}
-                          {!isPresent && !hasArrived && hasNumber && (
-                            <div className="mt-0.5">
-                              <span className="text-xs text-muted-foreground">
-                                Not arrived
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-1">
-                                {'\u00b7'} Number assigned, not checked in
-                              </span>
-                            </div>
+                          {!hasArrived && (
+                            <span className="text-xs text-muted-foreground mt-0.5 block">
+                              Not checked in
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1048,7 +1020,9 @@ export default function RosterConfirmationPage({
                               reg.status === 'no_show' ||
                               reg.status === 'scratched'
                                 ? reg.status
-                                : 'registered'
+                                : hasArrived
+                                  ? 'present'
+                                  : 'registered'
                             }
                             onChange={(e) =>
                               void handleDancerStatusChange(reg.id, e.target.value)
