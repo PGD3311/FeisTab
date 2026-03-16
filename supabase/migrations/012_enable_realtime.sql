@@ -4,3 +4,4 @@
 ALTER PUBLICATION supabase_realtime ADD TABLE score_entries;
 ALTER PUBLICATION supabase_realtime ADD TABLE rounds;
 ALTER PUBLICATION supabase_realtime ADD TABLE registrations;
+ALTER PUBLICATION supabase_realtime ADD TABLE event_check_ins;

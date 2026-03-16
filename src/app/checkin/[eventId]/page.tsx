@@ -381,14 +381,14 @@ export default function RosterConfirmationPage({
     }
   }, [loading, competitions.length, pollStatuses, loadCheckIns])
 
-  // Supabase Realtime subscription for near-instant competition status updates.
+  // Supabase Realtime for instant updates: competition statuses + check-ins
   useEffect(() => {
     if (loading || competitions.length === 0) return
 
     const compIds = competitions.map((c) => c.id)
 
     const channel = supabase
-      .channel('side-stage-competitions')
+      .channel('side-stage-all')
       .on(
         'postgres_changes',
         {
@@ -417,6 +417,18 @@ export default function RosterConfirmationPage({
                 : c
             )
           )
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'event_check_ins',
+        },
+        () => {
+          // Dancer checked in at registration desk — refresh check-in data
+          void loadCheckIns()
         }
       )
       .subscribe()
