@@ -22,6 +22,12 @@ interface Competition {
   name: string
   age_group: string | null
   level: string | null
+  stage_id: string | null
+}
+
+interface Stage {
+  id: string
+  name: string
 }
 
 interface AssignmentCounts {
@@ -57,6 +63,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [loadError, setLoadError] = useState(false)
 
   // Assignment state
+  const [stages, setStages] = useState<Stage[]>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [assignmentCounts, setAssignmentCounts] = useState<AssignmentCounts>({})
   const [expandedJudgeId, setExpandedJudgeId] = useState<string | null>(null)
@@ -87,10 +94,19 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     setLoading(false)
   }, [supabase, eventId])
 
+  const loadStages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('stages')
+      .select('id, name')
+      .eq('event_id', eventId)
+      .order('display_order')
+    if (!error) setStages((data as Stage[]) ?? [])
+  }, [supabase, eventId])
+
   const loadCompetitions = useCallback(async () => {
     const { data, error } = await supabase
       .from('competitions')
-      .select('id, code, name, age_group, level')
+      .select('id, code, name, age_group, level, stage_id')
       .eq('event_id', eventId)
       .order('code')
     if (error) {
@@ -136,7 +152,8 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     void loadJudges()
     void loadCompetitions()
     void loadAssignmentCounts()
-  }, [loadJudges, loadCompetitions, loadAssignmentCounts])
+    void loadStages()
+  }, [loadJudges, loadCompetitions, loadAssignmentCounts, loadStages])
 
   async function loadJudgeAssignments(judgeId: string) {
     setLoadingAssignments(true)
@@ -608,6 +625,32 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                                 >
                                   Assign Age Group
                                 </Button>
+                              </div>
+                            )}
+
+                            {/* Assign to Stage */}
+                            {stages.length > 0 && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Assign to stage:</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {stages.map((s) => {
+                                    const stageComps = competitions.filter((c) => c.stage_id === s.id)
+                                    return (
+                                      <Button
+                                        key={s.id}
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={assigningBatch || stageComps.length === 0}
+                                        onClick={() => {
+                                          const ids = stageComps.map((c) => c.id)
+                                          void assignCompetitions(judge.id, ids)
+                                        }}
+                                      >
+                                        {s.name} ({stageComps.length})
+                                      </Button>
+                                    )
+                                  })}
+                                </div>
                               </div>
                             )}
 
