@@ -905,7 +905,7 @@ export default function CompetitionDetailPage({
 
       {/* Roster */}
       {(() => {
-        const rosterLocked = ['ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(comp.status)
+        const rosterLocked = ['released_to_judge', 'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(comp.status)
         return (
       <Card className="feis-card">
         <CardHeader>
