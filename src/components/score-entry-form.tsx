@@ -158,11 +158,14 @@ export function ScoreEntryForm({
           <button
             type="button"
             onClick={() => onToggleExpand?.(dancerId)}
-            className="flex items-center justify-end min-w-[56px] cursor-pointer select-none"
+            className="flex flex-col items-center justify-center min-w-[56px] cursor-pointer select-none"
             aria-label={`Expand details for competitor ${competitorNumber}`}
           >
             <span className="font-mono text-[28px] font-bold text-feis-green text-right leading-none tabular-nums">
               {competitorNumber}
+            </span>
+            <span className="text-[10px] text-muted-foreground mt-0.5">
+              {isExpanded ? 'close' : hasContent ? '\u2713 notes' : 'notes'}
             </span>
           </button>
 
