@@ -216,6 +216,25 @@ export default function EventOverviewPage() {
         </span>
       </div>
 
+      {/* Station links */}
+      <div className="flex gap-2 flex-wrap">
+        <Link
+          href={`/registration/${eventId}`}
+          target="_blank"
+          className="text-sm text-muted-foreground hover:text-feis-green transition-colors py-1"
+        >
+          Registration Desk &#8599;
+        </Link>
+        <span className="text-muted-foreground">·</span>
+        <Link
+          href={`/checkin/${eventId}`}
+          target="_blank"
+          className="text-sm text-muted-foreground hover:text-feis-green transition-colors py-1"
+        >
+          Side-Stage &#8599;
+        </Link>
+      </div>
+
       {/* Bulk advance imported competitions */}
       {(() => {
         const importedComps = competitions.filter((c) => c.status === 'imported')
