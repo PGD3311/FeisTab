@@ -3,7 +3,9 @@
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useSupabase } from '@/hooks/use-supabase'
+import { showSuccess } from '@/lib/feedback'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface DancerRow {
@@ -243,12 +245,19 @@ export default function CommentsIndexPage({
                     <td className="p-2 text-sm text-muted-foreground">
                       {d.school ?? '—'}
                     </td>
-                    <td className="p-2 text-right font-mono text-sm">
-                      {d.commentCount > 0 ? (
-                        <span>{d.commentCount} comp{d.commentCount === 1 ? '' : 's'}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <td className="p-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          const url = `${window.location.origin}/results/${eventId}/feedback/${d.dancerId}`
+                          navigator.clipboard.writeText(url)
+                          showSuccess('Feedback link copied')
+                        }}
+                      >
+                        Copy Link
+                      </Button>
                     </td>
                   </tr>
                 ))}
