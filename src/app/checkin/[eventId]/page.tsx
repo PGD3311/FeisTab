@@ -564,10 +564,24 @@ export default function RosterConfirmationPage({
   async function handleConfirmRoster(compId: string) {
     setConfirmingRoster(compId)
 
+    const comp = competitions.find((c) => c.id === compId)
+    if (!comp) { setConfirmingRoster(null); return }
+
     const now = new Date().toISOString()
+
+    // Auto-advance to ready_for_day_of if still in an earlier status
+    const needsAdvance = comp.status === 'draft' || comp.status === 'imported'
+    const updateFields: Record<string, unknown> = {
+      roster_confirmed_at: now,
+      roster_confirmed_by: 'Side-Stage',
+    }
+    if (needsAdvance) {
+      updateFields.status = 'ready_for_day_of'
+    }
+
     const { error } = await supabase
       .from('competitions')
-      .update({ roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' })
+      .update(updateFields)
       .eq('id', compId)
 
     if (error) {
@@ -579,11 +593,16 @@ export default function RosterConfirmationPage({
     setCompetitions((prev) =>
       prev.map((c) =>
         c.id === compId
-          ? { ...c, roster_confirmed_at: now, roster_confirmed_by: 'Side-Stage' }
+          ? {
+              ...c,
+              roster_confirmed_at: now,
+              roster_confirmed_by: 'Side-Stage',
+              status: needsAdvance ? ('ready_for_day_of' as CompetitionStatus) : c.status,
+            }
           : c
       )
     )
-    showSuccess('Roster confirmed')
+    showSuccess(needsAdvance ? 'Roster confirmed — ready to send to judge' : 'Roster confirmed')
     setConfirmingRoster(null)
   }
 

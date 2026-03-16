@@ -311,25 +311,43 @@ export default function CompetitionDetailPage({
   useEffect(() => { loadData() }, [])
 
   async function handlePreviewTabulation() {
-    if (!ruleset || !comp) return
+    if (!ruleset || !comp) {
+      showError('Competition data not loaded — try refreshing')
+      return
+    }
 
     const currentStatus = comp.status as CompetitionStatus
-    if (!canTransition(currentStatus, 'complete_unpublished')) return
+    if (!canTransition(currentStatus, 'complete_unpublished')) {
+      showError('Cannot tabulate from current status', { description: `Status is "${currentStatus}" — needs to be "ready_to_tabulate"` })
+      return
+    }
 
     const latestRound = rounds[rounds.length - 1]
-    if (!latestRound) return
+    if (!latestRound) {
+      showError('No round found — scores may not have been entered yet')
+      return
+    }
 
-    const roundScores: ScoreInput[] = scores
-      .filter(s => s.round_id === latestRound.id)
-      .map(s => ({
-        dancer_id: s.dancer_id,
-        judge_id: s.judge_id,
-        raw_score: Number(s.raw_score),
-        flagged: s.flagged ?? false,
-      }))
+    try {
+      const roundScores: ScoreInput[] = scores
+        .filter(s => s.round_id === latestRound.id)
+        .map(s => ({
+          dancer_id: s.dancer_id,
+          judge_id: s.judge_id,
+          raw_score: Number(s.raw_score),
+          flagged: s.flagged ?? false,
+        }))
 
-    const tabulationResults = tabulate(roundScores, ruleset)
-    setPreviewResults(tabulationResults)
+      if (roundScores.length === 0) {
+        showError('No scores found for this round')
+        return
+      }
+
+      const tabulationResults = tabulate(roundScores, ruleset)
+      setPreviewResults(tabulationResults)
+    } catch (err) {
+      showCritical('Tabulation failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    }
   }
 
   async function handleApproveResults() {
