@@ -364,16 +364,11 @@ export default function ProgramPage({
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-mono text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
-                          {comp.schedule_position ?? idx + 1}
+                        <span className="font-mono text-sm font-semibold text-feis-green w-6 text-right tabular-nums shrink-0">
+                          {comp.code ?? idx + 1}
                         </span>
                         <div className="min-w-0">
                           <span className="font-medium text-sm">
-                            {comp.code && (
-                              <span className="font-mono text-feis-green/50 mr-1.5">
-                                {comp.code}
-                              </span>
-                            )}
                             {comp.name}
                           </span>
                           {comp.dance_type && (
