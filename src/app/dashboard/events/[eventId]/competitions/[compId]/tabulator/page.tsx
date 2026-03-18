@@ -107,6 +107,10 @@ export default function TabulatorEntryPage({
   // --- Flag/comment expand ---
   const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
 
+  // --- Submission guard ---
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const didAutoFocusRef = useRef(false)
+
   // --- Derived values ---
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
@@ -259,6 +263,8 @@ export default function TabulatorEntryPage({
     setPacketBlocked(null)
     setSignedOff(false)
     setExpandedDancerId(null)
+    setIsSubmitting(false)
+    didAutoFocusRef.current = false
 
     if (selectedJudgeId && round) {
       loadJudgeScores(selectedJudgeId)
@@ -266,17 +272,17 @@ export default function TabulatorEntryPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJudgeId, round])
 
-  // Auto-focus first empty editable after loading
+  // Auto-focus first empty editable after loading (fires once per judge load)
   useEffect(() => {
-    if (rows.length === 0) return
+    if (rows.length === 0 || didAutoFocusRef.current) return
+    didAutoFocusRef.current = true
     const firstEmpty = getFirstEmptyEditableId(rows)
     if (firstEmpty) {
-      // Small delay to let DOM settle
       requestAnimationFrame(() => {
         inputRefs.current.get(firstEmpty)?.focus()
       })
     }
-  }, [rows.length > 0 && rows[0]?.dancerId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows])
 
   // ---------------------------------------------------------------------------
   // saveRow
@@ -405,10 +411,16 @@ export default function TabulatorEntryPage({
   // ---------------------------------------------------------------------------
 
   async function retryAllFailed() {
-    const failedRows = rows.filter(r => r.status === 'failed')
-    for (const row of failedRows) {
-      saveRow(row.dancerId)
-      await new Promise(resolve => setTimeout(resolve, 200))
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const failedRows = rows.filter(r => r.status === 'failed')
+      for (const row of failedRows) {
+        saveRow(row.dancerId)
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -417,13 +429,14 @@ export default function TabulatorEntryPage({
   // ---------------------------------------------------------------------------
 
   async function handleSignOff() {
-    if (!selectedJudgeId || !round) return
+    if (!selectedJudgeId || !round || isSubmitting) return
+    setIsSubmitting(true)
 
     try {
-      // Re-fetch score entries for revalidation
+      // Re-fetch score entries for revalidation (include dancer_id for ID-level check)
       const { data: dbScores, error: revalidateErr } = await supabase
         .from('score_entries')
-        .select('id')
+        .select('id, dancer_id')
         .eq('round_id', round.id)
         .eq('judge_id', selectedJudgeId)
 
@@ -434,11 +447,20 @@ export default function TabulatorEntryPage({
         return
       }
 
-      const dbCount = dbScores?.length ?? 0
-      const localCount = enteredCount
-      if (dbCount !== localCount) {
-        showCritical('Score count mismatch', {
-          description: `Local: ${localCount}, Server: ${dbCount}. Refresh the page and try again.`,
+      // Compare dancer IDs, not just count
+      const dbDancerIds = new Set(
+        (dbScores ?? []).map((s: { dancer_id: string }) => s.dancer_id)
+      )
+      const localEnteredIds = new Set(
+        rows
+          .filter(r => isEditable(r) && r.score !== '')
+          .map(r => r.dancerId)
+      )
+
+      if (dbDancerIds.size !== localEnteredIds.size ||
+          [...localEnteredIds].some(id => !dbDancerIds.has(id))) {
+        showCritical('Sign-off blocked: data changed since you started entering scores.', {
+          description: `Local: ${localEnteredIds.size} dancers, Server: ${dbDancerIds.size}. Refresh and verify.`,
         })
         return
       }
@@ -572,6 +594,8 @@ export default function TabulatorEntryPage({
         description:
           err instanceof Error ? err.message : 'Unknown error',
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1125,8 +1149,9 @@ export default function TabulatorEntryPage({
                     variant="destructive"
                     size="sm"
                     onClick={retryAllFailed}
+                    disabled={isSubmitting}
                   >
-                    Retry All
+                    {isSubmitting ? 'Retrying...' : 'Retry All'}
                   </Button>
                 </span>
               ) : allAreSaved && enteredCount > 0 ? (
@@ -1143,11 +1168,11 @@ export default function TabulatorEntryPage({
             {/* Right: sign off */}
             <Button
               onClick={handleSignOff}
-              disabled={!canDoSignOff}
+              disabled={!canDoSignOff || isSubmitting}
               size="lg"
               className="font-semibold"
             >
-              Sign Off
+              {isSubmitting ? 'Signing off...' : 'Sign Off'}
             </Button>
           </div>
         </div>

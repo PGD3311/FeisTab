@@ -3,7 +3,6 @@ import {
   scoreReducer,
   buildInitialRows,
   type ScoreRow,
-  type ScoreAction,
   isEditable,
   getEnteredCount,
   getActiveTotal,
