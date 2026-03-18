@@ -61,13 +61,29 @@ A vertical column of rows, one per active dancer, in competitor-number order:
 
 ### Keyboard Flow
 
-1. Page loads → first empty score input is auto-focused
+1. Page loads → first editable empty score input is auto-focused
 2. Type score → press Tab or Enter
-3. Focus advances immediately to the next empty input (from local state, no network wait)
+3. Focus advances immediately to the next editable row (from local state, no network wait)
 4. Background save fires for the score just entered
 5. Repeat until all dancers scored
 
-**Correction flow:** Click any score input to jump to it. Edit the value, press Tab — focus advances from that point. Press Escape to re-focus the first row with status `empty` (same logic as initial load).
+**Key bindings:**
+- **Tab** → validate + save current row, move focus to next editable row
+- **Enter** → same as Tab (not newline, not form submit)
+- **Shift+Tab** → move focus to previous editable row; if current row is dirty and valid, save it
+- **Escape** → re-focus the first editable row with status `empty` (same logic as initial load)
+
+**"Editable row" definition:** A row is editable if the registration status is active (not scratched, no_show, disqualified, did_not_complete, or medical). All keyboard navigation (Tab, Shift+Tab, auto-focus) skips non-editable rows. The progress denominator in the sticky bar counts only editable rows.
+
+**Correction flow:** Click any score input to jump to it. Edit the value, press Tab — focus advances from that point.
+
+### Save Dispatch Deduplication
+
+Tab and Enter trigger save via `onKeyDown`. This also causes the input to blur. Without dedup, two saves fire for the same row.
+
+**Rule:** Save dispatches on `onKeyDown` for Tab/Enter. The handler sets a per-row `savedByKeydown` flag (ref, not state). The `onBlur` handler checks this flag — if set, it clears the flag and skips the save. If the flag is not set (meaning blur was caused by a click-away, not a keypress), `onBlur` dispatches the save.
+
+This ensures exactly one save per navigation event, regardless of how focus changes.
 
 ### Per-Row Status Model
 
@@ -100,20 +116,34 @@ Transitions:
 - On Tab/Enter/blur, the score is written to local state immediately (focus advances) AND a background save is dispatched
 - Each save is an independent Supabase upsert (same `onConflict: 'round_id,dancer_id,judge_id'` as today)
 - Each save carries a monotonic sequence number per row. `MARK_SAVED` and `MARK_FAILED` are only applied if the sequence number matches the latest dispatched save for that row. Stale callbacks from superseded saves are ignored. This prevents a race condition where rapid edits to the same row cause an older save's confirmation to overwrite a newer save's in-flight state.
-- Audit logging fires alongside each save (non-blocking, same as today)
-- Failed saves are retried on the next user interaction with that row, or via a "Retry failed" action in the sticky bar
+- Audit logging fires alongside each save (non-blocking, same as today). Audit failures must never flip a row into `failed` state — score persistence is what matters. Audit is fire-and-forget.
+- Failed saves are retried on the next user interaction with that row, or via a "Retry All" button in the sticky bar
 - **Sign Off is disabled until all active rows are `saved` or `empty`** — no unsaved or failed scores allowed
 - `canEnterScores` check runs during the initial DB load, before dispatching `LOAD_EXISTING`. If blocked, the reducer is never initialized and the packet-blocked UI renders as today.
 
+### Retry Semantics
+
+- Retry uses the **current local row data** (score, flag, comment), not the stale `dbScore`
+- Retry only applies to rows in `failed` status
+- "Retry All" processes failed rows sequentially (one at a time), not a blast of parallel writes — hotel wifi can't handle 30 concurrent upserts
+
 ### Sign Off
 
-Sign Off does exactly what it does today:
-1. Lock all score entries (`locked_at` timestamp)
-2. Record sign-off in round's `judge_sign_offs` JSONB
-3. Check if all assigned judges have signed off → auto-advance competition status
-4. Log audit entry
+The button label is **"Sign Off"** (not "Save & Sign Off"), because by this point all scores are already persisted. Subtext in the sticky bar confirms: "All scores saved."
 
-The only difference: by the time Sign Off runs, all scores are already persisted. It's a lock/validate/complete action, not a save action.
+**Sign Off performs a server-side revalidation before completing:**
+
+1. Re-fetch score entries for this judge/round from the DB
+2. Verify: count matches local active row count, no missing active dancers
+3. Verify: round and competition are still in a valid state for sign-off
+4. If any mismatch → abort sign-off, show error explaining what's wrong
+5. If clean → proceed with lock + sign-off:
+   - Lock all score entries (`locked_at` timestamp)
+   - Record sign-off in round's `judge_sign_offs` JSONB
+   - Check if all assigned judges have signed off → auto-advance competition status
+   - Log audit entry
+
+This prevents a subtle race where a stale local screen signs off something that changed elsewhere (e.g., organizer scratched a dancer, or another tab modified scores).
 
 ### What Changes vs. Current Code
 
@@ -172,6 +202,18 @@ type ScoreAction =
 
 **Non-active registrations** (scratched, no_show, disqualified, did_not_complete, medical) are included in the display array but excluded from save logic and the sign-off completeness check. They render as read-only greyed-out rows with no score input.
 
+**Derived values (not stored in reducer state):** The following are computed from the rows array, not stored:
+- Entered count (rows where `score !== ''` and registration is active)
+- Unsaved/failed count (rows where `status === 'failed'`)
+- First empty editable row (for auto-focus / Escape target)
+- Progress denominator (active rows only)
+
+These are cheap to compute and keeping them out of the reducer prevents state duplication.
+
+### Heat Collapse Rules
+
+When heats exist, completed heats collapse to a single summary line (same as current judge variant). **Exception:** a heat with any row in `failed` status must remain expanded — do not hide failed rows behind a collapsed heat. Rule: only collapse a heat where every active row is `saved` or `empty`.
+
 ### Flag and Comment Handling
 
 Flags and comments are secondary actions — the tabulator is mostly just blasting through scores. The design:
@@ -185,7 +227,7 @@ Flags and comments are secondary actions — the tabulator is mostly just blasti
 
 - **Single row save fails:** Row shows `failed` status (red border). Tabulator can keep entering other scores. Failed count shows in sticky bar.
 - **Multiple rows fail (network down):** Sticky bar shows "5 unsaved ⚠" with a "Retry All" button. Sign Off remains disabled.
-- **Browser crash/refresh:** Scores that were already `saved` are in the DB. Scores that were `dirty` or `saving` are lost — but the page reloads existing scores from DB on mount, so the tabulator sees what was persisted and can fill in the gaps. This is acceptable because saves fire on every Tab, so at most 1 score is lost.
+- **Browser crash/refresh:** Scores that were already `saved` are in the DB. Scores that were `dirty` or `saving` are lost — but the page reloads existing scores from DB on mount, so the tabulator sees what was persisted and can fill in the gaps. Unsaved risk is limited to the currently-being-edited row, because save dispatches on every Tab/Enter/blur navigation event before focus moves.
 - **Sign Off with failed rows:** Disabled. Sticky bar explains: "Fix or retry 3 failed scores before signing off."
 
 ### Testing Strategy
