@@ -138,6 +138,12 @@ describe('scoreReducer', () => {
       expect(result[0].commentData).toEqual({ codes: ['turnout'], note: null })
       expect(result[0].status).toBe('dirty')
     })
+
+    it('empty → dirty when comment is set (comment without score must be saveable)', () => {
+      const rows = [makeRow({ status: 'empty' })]
+      const result = scoreReducer(rows, { type: 'SET_COMMENT', dancerId: 'd1', commentData: { codes: ['timing'], note: null } })
+      expect(result[0].status).toBe('dirty')
+    })
   })
 
   describe('LOAD_EXISTING', () => {
