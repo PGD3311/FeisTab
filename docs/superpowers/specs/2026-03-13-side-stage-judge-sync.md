@@ -65,7 +65,7 @@ Derived check: `is_confirmed = roster_confirmed_at IS NOT NULL`. Unconfirming cl
 
 ### Schema Migration
 
-The `competitions.status` column is an unconstrained text field (no Postgres enum or CHECK constraint). No migration is needed for the new status value. The state machine in `competition-states.ts` is the single source of truth for valid statuses and transitions.
+The `competitions.status` column has a CHECK constraint (added in migration `010_schedule_backbone.sql`) that enumerates valid status values. Adding `released_to_judge` requires a migration to DROP and re-add the constraint with the new value included. The state machine in `competition-states.ts` is the authoritative source for valid transitions, but the DB constraint must also be kept in sync.
 
 **Migration required for roster confirmation upgrade:**
 - Add `roster_confirmed_at: timestamptz default null` to `competitions`
@@ -140,32 +140,24 @@ Both the side-stage and judge pages subscribe to Supabase Realtime on the `compe
 
 **Page:** `/judge/[eventId]`
 
-**Group changes:**
+**Three groups (simplified):**
 
 | Group | Statuses | Behavior |
 |---|---|---|
-| **Scoring** | `in_progress`, `awaiting_scores` | Links to score entry (existing) |
-| **Incoming** | `released_to_judge` | Orange accent, pulsing dot, "Start Scoring" button |
-| **Ready to Start** | `ready_for_day_of` + `roster_confirmed_at` | Fallback start (existing behavior, for small feiseanna) |
-| **Waiting** | `ready_for_day_of` + NOT confirmed, `imported` | Greyed out (existing) |
-| **Complete** | `ready_to_tabulate`, `complete_unpublished`, `published`, `locked`, `recalled_round_pending` | Checkmark (existing, renamed from "Done") |
+| **Score Now** | `in_progress`, `awaiting_scores`, `released_to_judge` | Active competitions. `released_to_judge` cards show orange accent + "Start Scoring" button. Already-active competitions link to score entry. |
+| **Queued** | `ready_for_day_of` (confirmed or not), `imported`, `draft` | Upcoming competitions. Confirmed roster + judges assigned = eligible for fallback direct start. |
+| **Done** | `ready_to_tabulate`, `complete_unpublished`, `published`, `locked`, `recalled_round_pending` | Completed competitions. Collapsed/dimmed. |
 
-**New "Incoming" group:**
+**`released_to_judge` within Score Now:**
 
-- Positioned between Scoring and Ready to Start
-- Orange border + faint orange background (`border-feis-orange`, `bg-feis-orange/5`)
-- Pulsing orange dot next to "Incoming" header
-- Each competition card shows:
-  - Competition code + name + age/level
-  - "N dancers ready · Sent by side-stage" in orange text
-  - Relative timestamp: "Sent just now" / "Sent 2 min ago"
-  - **"Start Scoring"** button (green, right-aligned)
-- Tapping "Start Scoring" transitions to `in_progress` and navigates to the scoring page
+- Orange border + faint orange background to distinguish from already-active competitions
+- "Start Scoring" button (transitions to `in_progress` and navigates to scoring page)
+- Uses the same Score Now group — not a separate category. Judges don't need the full state taxonomy.
 
 **Realtime subscription:**
 - Judge page subscribes to `competitions` table changes for assigned competition IDs
-- When a competition enters `released_to_judge`, it appears in the Incoming group without page refresh
-- When a competition leaves `released_to_judge` (recalled by side-stage), it disappears from Incoming
+- When a competition enters `released_to_judge`, it appears in Score Now without page refresh
+- When a competition leaves `released_to_judge` (recalled by side-stage), it moves back to Queued
 
 ### Judge Scoring Page
 
@@ -198,9 +190,9 @@ The only change: when the judge navigates here from "Incoming," the competition 
 **No new engine tests** — tabulation, scoring, and anomaly detection are unaffected.
 
 **Manual testing:**
-- Side-stage sends → judge sees Incoming in real-time
+- Side-stage sends → judge sees it in Score Now with orange highlight in real-time
 - Judge starts → side-stage sees it move to Scoring/Complete
 - Side-stage recalls before judge starts → competition returns to Ready
 - Side-stage cannot recall after judge starts
-- Fallback: judge starts from Ready to Start without side-stage send
+- Fallback: judge starts from Queued without side-stage send (allowed but not the preferred path)
 - Realtime reconnects after tab switch / network drop

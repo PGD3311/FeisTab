@@ -1,5 +1,7 @@
 # Phase 1 Completion — Operator Control Layer
 
+> **Status (2026-03-18):** All 8 gaps have been implemented. This document serves as the original gap analysis.
+
 **Date:** 2026-03-12
 **Goal:** Build the control layer that makes FeisTab usable and trustworthy in the real world.
 **North star:** Make tabulation and results trustworthy, fast, and hard to screw up.

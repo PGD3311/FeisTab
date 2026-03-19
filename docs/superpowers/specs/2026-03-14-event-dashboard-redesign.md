@@ -18,7 +18,7 @@ The current overview page leads with a large Event Progress card (percentage, pi
 - **Event header** (compact: name, date/location, active badge) — already handled by layout
 - **Tab row** (Overview, Competitions, Program, Judges, Import, Results) — already handled by layout
 - **Stage Activity section** — already exists, good structure, keep it
-- **Needs Attention section** — already exists, promote it to first position
+- **Action Needed section** — already exists, promote it to first position
 - **All Competitions section** — already exists, keep as final section
 
 ### What gets removed
@@ -52,7 +52,7 @@ Implementation:
 - Style: `text-sm text-muted-foreground` with `font-semibold text-foreground` on the numbers
 - No card, no border — just a text line with light bottom border as separator
 
-### 2. Needs Attention
+### 2. Action Needed
 
 **First main section.** Promoted from its current position (was after Stage Activity).
 
@@ -63,7 +63,7 @@ Implementation:
   - `ready_to_tabulate` → "Ready to tabulate"
   - `recalled_round_pending` → "Recall round pending"
   - `complete_unpublished` → "Ready to publish"
-- If no competitions need attention: show "No competitions need attention right now." in muted text. Do not hide the section heading — the absence of items is itself useful information.
+- If no competitions need attention: show "No competitions need attention right now." in muted text. Do not hide the section heading -- the absence of items is itself useful information.
 
 ### 3. Stage Activity
 
@@ -113,7 +113,7 @@ Two-file change. No new components, no new data queries. All data is already loa
 ## Acceptance Criteria
 
 1. Summary strip shows stats in one compact line (using "need attention" not "blocked")
-2. Needs Attention is the first section after the summary strip
+2. Action Needed is the first section after the summary strip
 3. Stage Activity is the second section
 4. All Competitions is the final section
 5. No Event Progress card (percentage hero, pipeline bar, phase legend)

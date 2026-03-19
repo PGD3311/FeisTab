@@ -2,7 +2,7 @@
 
 ## Goal
 
-Replace raw-score-average tabulation with Irish Points, the standard scoring system used across all major Irish dance organizations (CLRG, WIDA, NAFC). Add lightweight operational controls: judge sign-off, number release gates, score flagging, and teacher tracking.
+Replace raw-score-average tabulation with Irish Points, the standard scoring system used across all major Irish dance organizations (CLRG, WIDA, NAFC). Add lightweight operational controls: judge sign-off, score flagging, and teacher tracking.
 
 ## Decisions
 
@@ -11,7 +11,7 @@ Replace raw-score-average tabulation with Irish Points, the standard scoring sys
 | Scoring method | Irish Points only (replace raw average) | Industry standard across all orgs. Single code path. |
 | Judge panel | 1-3 judges (local feis). Drop high/low config preserved for future championship support. | Friend's dad runs local events. |
 | Teacher tracking | `teacher_name` text field on dancers | Captures data without building a teacher portal. |
-| Number release | `numbers_released` boolean on competitions, default false | Anti-bias control without workflow complexity. Organizer flips when ready. |
+| ~~Number release~~ | ~~`numbers_released` boolean on competitions, default false~~ | **Removed from Phase 1 scope (2026-03-18).** Number visibility gating is deferred until it can be implemented as a real cross-surface feature. The DB column remains but is unused. |
 | Judge sign-off | `judge_sign_offs` jsonb on rounds, mapping judge_id to timestamp | Prevents premature tabulation. Lightweight. |
 | Infractions | `flagged` boolean + `flag_reason` text on score_entries | Covers early start, did not complete, etc. without a separate table. |
 
@@ -25,7 +25,7 @@ For each round of a competition:
 2. **Tied raw scores**: dancers share the same rank (next rank skips). E.g., two dancers tied for 2nd → both rank 2, next dancer is rank 4.
 3. **Rank to Irish Points**: lookup table. 1st=100, 2nd=75, 3rd=65, 4th=60, 5th=56, 6th=53, 7th=50, 8th=47, 9th=45, 10th=43... down to 50th=1.
 4. **Tied ranks get averaged points**: tie for 2nd/3rd → each gets (75+65)/2 = 70.
-5. **Flagged scores**: if `flagged=true`, dancer gets 0 Irish Points from that judge.
+5. **Flagged scores**: excluded from ranking pool before other dancers are ranked (see [Flagged Score Semantics](#flagged-score-semantics) below).
 6. **Sum** Irish Points across all judges for that round → `round_total`.
 7. **Multi-round**: sum `round_total` across rounds → `grand_total`.
 8. **Final ranking**: highest `grand_total` = 1st place.
@@ -34,6 +34,8 @@ For each round of a competition:
 ### Integer Math
 
 All Irish Points multiplied by 1000 internally. Averaged tied-rank points computed as integer division of (sum_of_points * 1000) / count_of_tied. No floating point comparisons.
+
+**Rounding method (updated 2026-03-18):** Tied-rank point averaging uses `Math.round` (half-up rounding). This is an intentional design decision, not an implementation accident. When tied ranks span positions whose points don't divide evenly, the averaged value rounds to the nearest integer. Example: 2-way tie at ranks 49-50 = (2+1)/2 = 1.5, rounds to 2. Implementation: `averagePointsForTiedRanks()` in `src/lib/engine/irish-points.ts`.
 
 ### Irish Points Table
 
@@ -53,6 +55,20 @@ Ranks beyond 50 get 0 points (extended Irish Points deferred to future).
 
 Config fields `drop_high` and `drop_low` remain in `RuleSetConfig` but default to `false`. When enabled (championship mode with 5+ judges), the highest and lowest Irish Points per dancer per round are dropped before summing. Not implemented in this phase — config is preserved so the engine interface doesn't change later.
 
+### Flagged Score Semantics
+
+**Updated 2026-03-18:** Documented actual implementation behavior. Code handles this correctly.
+
+When a judge flags a score (`flagged=true` on a `score_entry`), the following rules apply:
+
+- **Excluded from ranking pool.** Flagged dancers are removed from the list _before_ unflagged dancers are sorted and ranked. This means flagged dancers do not occupy rank positions and do not distort other dancers' ranks — ranks compress upward as if the flagged dancer was never scored by that judge.
+- **Terminal rank.** Flagged dancers receive a rank of `unflagged_count + 1` (non-competitive last place). Multiple flagged dancers from the same judge all share this same terminal rank.
+- **Zero points.** Flagged dancers receive 0 Irish Points from that judge, regardless of their raw score.
+- **Raw score preserved.** The `raw_score` value is kept in the database for audit purposes but is neutralized for ranking — it has no effect on rank or point calculations.
+- **Per-judge, not per-competition.** Flagging is scoped to a single judge's score entry. A dancer flagged by one judge still competes normally via other judges' scores. Only the flagged judge's contribution becomes 0 points.
+
+Implementation: `rankByJudge()` in `src/lib/engine/rank-judges.ts` separates flagged and unflagged scores, ranks only the unflagged pool, then appends flagged dancers at the terminal rank with 0 points.
+
 ## Schema Changes
 
 ### New columns
@@ -61,7 +77,7 @@ Config fields `drop_high` and `drop_low` remain in `RuleSetConfig` but default t
 ALTER TABLE dancers ADD COLUMN teacher_name text;
 ALTER TABLE score_entries ADD COLUMN flagged boolean NOT NULL DEFAULT false;
 ALTER TABLE score_entries ADD COLUMN flag_reason text;
-ALTER TABLE competitions ADD COLUMN numbers_released boolean NOT NULL DEFAULT false;
+ALTER TABLE competitions ADD COLUMN numbers_released boolean NOT NULL DEFAULT false;  -- NOTE: Column exists but is unused in Phase 1. Number release deferred (2026-03-18).
 ALTER TABLE rounds ADD COLUMN judge_sign_offs jsonb NOT NULL DEFAULT '{}'::jsonb;
 ```
 
@@ -123,7 +139,7 @@ Changes from current:
 - Show sign-off status per judge
 
 ### Competition detail page (`src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx`)
-- Add "Release Numbers" toggle in header area
+- ~~Add "Release Numbers" toggle in header area~~ **Removed from Phase 1 scope (2026-03-18).** Number visibility gating is deferred until it can be implemented as a real cross-surface feature. The DB column remains but is unused.
 - Tabulate button disabled until all assigned judges have signed off
 - Results display shows Irish Points totals, not raw averages
 

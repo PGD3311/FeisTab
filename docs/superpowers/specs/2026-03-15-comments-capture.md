@@ -131,7 +131,7 @@ onSubmit: (dancerId: string, score: number, flagged: boolean, flagReason: string
 - Trims note whitespace
 - Returns `null` when all codes were unknown and note is blank
 
-**`getCommentIndicator` (display state helper):**
+**`hasCommentContent` (display state helper):**
 - Returns `false` when no `comment_data` and no legacy `comments`
 - Returns `true` when `comment_data` has codes
 - Returns `true` when `comment_data` has only a note

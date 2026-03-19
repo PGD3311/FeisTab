@@ -1,5 +1,7 @@
 # Save/Error Feedback — Design Spec
 
+> **Status (2026-03-18):** All items in this spec have been implemented.
+
 **Date:** 2026-03-12
 **Goal:** Make every user action produce visible, trustworthy feedback. No silent successes. No swallowed errors. No guessing.
 **Truth test questions addressed:** #12 (fail safely), #13 (tabulator speed — no hesitation), #14 (judge usability — clear confirmation)
@@ -128,7 +130,7 @@ Every action path gets a toast. Existing inline error states (`actionError`, `ad
 | Publish results | `showSuccess('Results published')` | `showCritical(...)` | Critical — public visibility | Remove from `actionError` |
 | Generate recalls | `showSuccess('Recalls generated')` | `showCritical(...)` | Critical — writes recall state | Remove from `actionError` |
 | Unlock for correction | `showSuccess('Unlocked for correction')` | `showCritical(...)` | Critical — invalidates downstream trust state | Remove from `actionError` |
-| Release numbers | `showSuccess('Numbers released')` / `showSuccess('Numbers hidden')` | `showError('Failed to release numbers')` / `showError('Failed to hide numbers')` | Error — clear state | Remove from `actionError` |
+| ~~Release numbers~~ | ~~`showSuccess('Numbers released')` / `showSuccess('Numbers hidden')`~~ | ~~`showError('Failed to release numbers')` / `showError('Failed to hide numbers')`~~ | ~~Error — clear state~~ | **Removed from Phase 1 scope (2026-03-18).** `numbers_released` DB column exists but is unused. Number visibility gating deferred. |
 | Registration status | `showSuccess('Dancer status updated')` | `showError('Failed to update status')` | Error — retryable | Remove from `actionError` |
 | Preview tabulation | No toast (UI-only state change — sets `previewResults`) | No toast (silently returns if prerequisites missing) | N/A | No change |
 | Cancel preview | No toast (clears `previewResults`) | N/A | N/A | No change |
@@ -230,7 +232,7 @@ Already has explicit error handling. No change needed.
 
 1. Wire `<Toaster />` globally + clean up sonner component
 2. Add toast helper (`src/lib/feedback.ts`)
-3. Fix tabulator error-swallow bug (most critical — stops active lying)
+3. ~~Fix tabulator error-swallow bug (most critical — stops active lying)~~ (Fixed)
 4. Standardize action handlers on competition detail page (most actions, highest impact)
 5. Standardize tabulator page actions
 6. Standardize judge page actions

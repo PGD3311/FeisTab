@@ -90,9 +90,9 @@ Two new pages. No new components, no engine changes. Uses existing `COMMENT_CODE
 
 ## Navigation
 
-Add "Comments" to the event tab bar (`src/components/event-tabs.tsx`) between Judges and Import:
+Add "Comments" to the event tab bar (`src/components/event-tabs.tsx`) as the last tab, after Results:
 
-`Overview | Competitions | Program | Side-Stage ↗ | Judges | Comments | Import | Results`
+`Overview | Schedule | Side-Stage ↗ | Judges | Import | Results | Comments`
 
 ---
 

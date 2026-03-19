@@ -10,18 +10,24 @@ Phase 1 only. Checks are limited to what the current schema supports (score entr
 
 ## Workflow Position
 
+**Updated 2026-03-18:** Anomaly detection currently runs client-side only, inside the competition detail page (`[compId]/page.tsx`). There is no server-side enforcement — no API route or middleware re-validates anomalies before executing tabulation or publish operations. Server-side enforcement is deferred to production hardening.
+
 Anomaly checks run continuously as scoring data changes, not as a one-time gate.
 
 ```
 Scores entered
   → anomaly engine runs
-  → blockers prevent sign-off
+  → blockers prevent sign-off          ← see note below
   → sign-off available when blockers clear
   → tabulation available when all signed off + no blockers
   → publish available when results verified + no blockers
 ```
 
-Warnings and review signals surface alongside blockers but do not prevent workflow progression. The organizer can acknowledge warnings and proceed.
+**Updated 2026-03-18:** The diagram above is aspirational. In practice, blockers do NOT gate sign-off — sign-off is controlled by the state machine independently. Blockers currently gate only the tabulation and publish buttons (uniformly). See "UI Placement" section for details.
+
+Warnings and review signals surface alongside blockers but do not prevent workflow progression. ~~The organizer can acknowledge warnings and proceed.~~
+
+**Updated 2026-03-18:** No acknowledgment mechanism exists. Warnings are display-only with no persistence — there is no record of whether an operator reviewed or accepted a warning.
 
 ## Anomaly Contract
 
@@ -70,8 +76,12 @@ interface Anomaly {
 **1. `detectDuplicateScoreEntries()`**
 Same judge + dancer + round scored more than once. Also enforced at DB level via unique constraint, but engine detection catches legacy data or migration leftovers.
 
+**Updated 2026-03-18:** This check runs competition-wide (across all rounds), not per-round as the scope field might suggest.
+
 **2. `detectScoresForNonRosterDancers()`**
 A score entry exists for a dancer_id that has no registration in the competition. Hard integrity failure.
+
+**Updated 2026-03-18:** This check runs competition-wide (across all rounds), not per-round.
 
 **3. `detectMissingRequiredScores()`**
 A dancer has scores from some judges but not all judges assigned to the round. Scope: dancer. This is the competitor-level view of incomplete data.
@@ -103,11 +113,17 @@ A dancer is marked withdrawn/absent/disqualified but has score entries, or a dan
 **10. `detectLargeScoreSpread()`**
 Cross-judge variance for a dancer exceeds a configurable threshold. This is a review signal, not an error. Judges are allowed to disagree. In five-judge systems, high/low dropping exists because spread is expected.
 
+**Updated 2026-03-18:** `SCORE_SPREAD_THRESHOLD` is hardcoded to 30, not configurable via input as originally implied by "configurable threshold." The threshold is a constant in the detection code.
+
 **11. `detectJudgeFlaggedAll()`**
 A judge flagged every single dancer in the round. Likely a UI mistake or packet-mode error.
 
 **12. `detectJudgeFlatScores()`**
 A judge gave the identical score to every dancer. On small rounds this can happen legitimately, so severity is info, blocking is false.
+
+### Scope field note
+
+**Updated 2026-03-18:** Three competition-wide checks — `detectDuplicateScoreEntries`, `detectScoresForNonRosterDancers`, and `detectInvalidScoringReason` — run once across all rounds (not per-round in the loop) but emit anomalies with `scope: 'dancer'` rather than `scope: 'competition'`. This is because each anomaly references a specific dancer, so `dancer` is the correct entity scope for UI grouping. The check execution scope (competition-wide) and the anomaly entity scope (`dancer`) are intentionally different. This is informational only and not a bug.
 
 ## Architecture
 
@@ -171,9 +187,11 @@ The `calculated_payload` jsonb column on `results` will include the `RuleSetConf
 
 In the competition detail page (`[compId]/page.tsx`), anomaly results surface in a panel between the rounds/scores section and the action buttons.
 
-- **Blockers** show as a red list. While any blocker exists, sign-off and tabulation buttons are disabled.
+- **Blockers** show as a red list. While any blocker exists, ~~sign-off and~~ tabulation ~~buttons are~~ and publish buttons are disabled.
 - **Warnings** show as an amber collapsible section. Organizer can review and proceed.
 - **Info signals** show as a subtle expandable section for review.
+
+**Updated 2026-03-18:** Blocking anomalies gate tabulation and publish uniformly — `anomalies.some(a => a.blocking)` disables both buttons with no per-action gating matrix. Sign-off is not gated by anomaly blockers; it is controlled separately by the state machine. There is no differentiation between which blockers gate which actions.
 
 ## Testing
 

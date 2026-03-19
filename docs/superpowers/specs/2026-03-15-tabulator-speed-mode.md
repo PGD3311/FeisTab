@@ -1,5 +1,7 @@
 # Tabulator Speed Mode
 
+> **Superseded (2026-03-18):** This spec has been superseded by the Tabulator Speed Optimization spec (`docs/superpowers/specs/2026-03-18-tabulator-speed-optimization.md`), which expands on the keyboard-first approach with batch entry, auto-advance, and additional performance improvements.
+
 **Date:** 2026-03-15
 **Goal:** Make tabulator score entry keyboard-first. Type score, hit Enter, advance to next dancer. No mouse required.
 

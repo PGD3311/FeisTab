@@ -618,7 +618,7 @@ This task fixes 4 problems:
 2. `handleTabulate` — no try/catch, no `.error` checks
 3. `handlePublish` — no try/catch, no `.error` checks
 4. `handleGenerateRecalls` — no try/catch, no `.error` checks
-5. Inline `onClick` for Release Numbers — no `.error` check
+5. ~~Inline `onClick` for Release Numbers — no `.error` check~~ **Removed from scope (2026-03-18) — `numbers_released` is unused in Phase 1**
 
 - [ ] **Step 1: Add actionError state**
 
@@ -962,47 +962,7 @@ Replace `loadData` function body. Critical query (competition) bails on error. S
   }
 ```
 
-- [ ] **Step 6: Fix Release Numbers inline onClick with .error check**
-
-**old_string:**
-```tsx
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              const newValue = !comp.numbers_released
-              await supabase
-                .from('competitions')
-                .update({ numbers_released: newValue })
-                .eq('id', compId)
-              loadData()
-            }}
-          >
-            {comp.numbers_released ? '✓ Numbers Released' : 'Release Numbers'}
-          </Button>
-```
-
-**new_string:**
-```tsx
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              const newValue = !comp.numbers_released
-              const { error } = await supabase
-                .from('competitions')
-                .update({ numbers_released: newValue })
-                .eq('id', compId)
-              if (error) {
-                setActionError(`Failed to update numbers: ${error.message}`)
-                return
-              }
-              loadData()
-            }}
-          >
-            {comp.numbers_released ? '✓ Numbers Released' : 'Release Numbers'}
-          </Button>
-```
+- [ ] ~~**Step 6: Fix Release Numbers inline onClick with .error check**~~ — **SKIPPED (removed from scope 2026-03-18).** `numbers_released` is unused in Phase 1. Number visibility gating is deferred until it can be implemented as a real cross-surface feature. The DB column remains but no UI reads or writes it.
 
 - [ ] **Step 7: Add actionError display in the Actions card**
 

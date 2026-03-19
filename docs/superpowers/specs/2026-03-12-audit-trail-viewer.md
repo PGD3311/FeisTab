@@ -10,7 +10,7 @@
 
 Two components:
 
-1. **Inline summary panel** on the competition detail page — compact table, last 5 entries, link to full page
+1. **Inline summary panel** on the competition detail page — compact table, last 5 entries displayed (20 fetched), link to full page
 2. **Full audit page** at `/dashboard/events/[eventId]/competitions/[compId]/audit` — filterable, all entries, expandable raw data
 
 Both surfaces render the same `audit_log` data with human-readable summaries and optional raw data inspection.
@@ -23,7 +23,7 @@ Both surfaces render the same `audit_log` data with human-readable summaries and
 
 All audit events relevant to competition-level inspection **must** include `competition_id` in `after_data` (or `before_data` for deletions), regardless of what `entity_type`/`entity_id` are set to.
 
-This is the query contract. If an audit action omits `competition_id`, it silently disappears from the competition audit view. This convention must be enforced in code reviews and treated as a bug when violated.
+This is the query contract. If an audit action omits `competition_id`, it silently disappears from the competition audit view. This convention must be enforced in code reviews and treated as a bug when violated. Audit rows missing `competition_id` should be treated as data corruption bugs and surfaced in development logs/tests, not just quietly omitted from the view.
 
 Current audit calls that need checking/fixing:
 - `sign_off` entries use `entity_id = round.id` — must include `competition_id` in `afterData`
@@ -37,12 +37,17 @@ Current audit calls that need checking/fixing:
 1. **Unknown action type** → show action name as badge text + raw `after_data` key-value pairs + raw data toggle. Page never breaks.
 2. **Unresolved actor** → fallback hierarchy: resolved name > role-based label (`Judge`, `Organizer`, `System`) > `Unknown`. No blank cells.
 3. **Missing raw payload** → no "View raw data" toggle. Don't show a useless button.
-4. **Formatter failure** → catch, show generic fallback. A broken formatter must never break table rendering.
+4. **Non-object payload** → if `after_data` or `before_data` is not a plain object (e.g., string, array, null from legacy or malformed data), treat it as absent payload — do not attempt to iterate keys.
+5. **Formatter failure** → catch, show generic fallback. A broken formatter must never break table rendering.
 
 ### Time display
 
 - Inline summary: relative time (`2 min ago`) with absolute timestamp in `title` attribute (tooltip on hover)
 - Full page: absolute timestamp (`Mar 12, 10:48 AM`)
+
+### Review-oriented, not live operations
+
+The audit trail is review-oriented — it does not use realtime subscriptions or live polling. Data reflects the state at page load. This is intentional for Phase 1; operators should not expect instant audit reflection during competition-day troubleshooting.
 
 ### Empty states
 
@@ -76,13 +81,13 @@ This catches:
 
 ## Inline Summary Panel
 
-**Location:** Competition detail page, after Anomaly Checks section, before Corrections section.
+**Location:** Competition detail page, between the Anomaly Checks section and the Corrections section.
 
 **Behavior:**
-- Shows last 5 entries, newest first (not hard-locked — easy to bump to 8 later)
+- Fetches last 20 entries; displays 5 in the inline view, newest first. Fetches 20 to ensure sufficient data after deduplication of the two-branch query. Only the first 5 are displayed.
 - 3 columns: When (relative + tooltip), Action (badge with text label), Details (human-readable summary). Intentionally omits Actor column for compactness — actor info is folded into the summary where relevant.
 - "View full audit trail →" link to the full page
-- Fetched as part of `loadData()` — single additional query with `LIMIT 5`
+- Fetched as part of `loadData()` — single additional query with `LIMIT 20`
 - Collapsible card, default open
 
 **Empty state:** "No audit entries yet." with muted styling.
@@ -183,7 +188,7 @@ In Phase 1 (no auth), `user_id` is always `null` on all audit entries. Actor is 
 
 - **Score/sign-off actions:** resolve `after_data.judge_id` via `NameMaps.judges`. If not found, fall back to role label (`"Judge"` for self-service, `"Tabulator"` for transcription).
 - **Status/tabulate/publish/correction actions:** literal `"Organizer"` (no user identity to resolve).
-- **Auto-triggered status changes:** literal `"System"` (identified by `after_data.trigger` field).
+- **Auto-triggered status changes:** literal `"System"` (identified by `after_data.trigger` field). Auto-triggered status changes (e.g., status reverting due to judge reassignment) must include a machine-readable `trigger` or `source` field in `after_data` so actor resolution doesn't drift into fake certainty. Example values: `trigger: 'assignment_change'` vs `trigger: 'organizer_action'`.
 - **Unknown or unresolvable:** literal `"Unknown"`.
 
 When auth is added later, `user_id` becomes the primary resolution path. `NameMaps` can be extended with a `users` map at that point.

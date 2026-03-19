@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace raw-score-average tabulation with Irish Points scoring, add judge sign-off, number release gates, score flagging, and teacher tracking.
+**Goal:** Replace raw-score-average tabulation with Irish Points scoring, add judge sign-off, score flagging, and teacher tracking.
 
-**Architecture:** Pure engine functions (no DB imports) compute Irish Points from raw scores via rank-then-convert pipeline. UI pages read new schema columns for sign-off/flagging/number-release state. All math uses integer thousandths to avoid float bugs.
+**Architecture:** Pure engine functions (no DB imports) compute Irish Points from raw scores via rank-then-convert pipeline. UI pages read new schema columns for sign-off/flagging state. All math uses integer thousandths to avoid float bugs.
 
 **Tech Stack:** TypeScript, Vitest, Next.js 15, Supabase, Tailwind CSS, shadcn/ui
 
@@ -872,14 +872,14 @@ These tasks update the database schema and UI components. Tasks 7–11 are indep
 Create `supabase/migrations/002_irish_points.sql`:
 
 ```sql
--- Irish Points refactor: new columns for flagging, sign-off, number release, teacher tracking
+-- Irish Points refactor: new columns for flagging, sign-off, teacher tracking (number release column exists but unused in Phase 1)
 
 ALTER TABLE dancers ADD COLUMN IF NOT EXISTS teacher_name text;
 
 ALTER TABLE score_entries ADD COLUMN IF NOT EXISTS flagged boolean NOT NULL DEFAULT false;
 ALTER TABLE score_entries ADD COLUMN IF NOT EXISTS flag_reason text;
 
-ALTER TABLE competitions ADD COLUMN IF NOT EXISTS numbers_released boolean NOT NULL DEFAULT false;
+ALTER TABLE competitions ADD COLUMN IF NOT EXISTS numbers_released boolean NOT NULL DEFAULT false;  -- NOTE: Column exists but is unused in Phase 1. Number release deferred (2026-03-18).
 
 ALTER TABLE rounds ADD COLUMN IF NOT EXISTS judge_sign_offs jsonb NOT NULL DEFAULT '{}'::jsonb;
 
@@ -1149,28 +1149,11 @@ git commit -m "feat: add judge sign-off workflow and flag support to scoring pag
 **Files:**
 - Modify: `src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx`
 
-This task updates: (a) number release toggle, (b) sign-off gate before tabulation, (c) Irish Points display in results, (d) recall percentage-based generation.
+This task updates: (a) sign-off gate before tabulation, (b) Irish Points display in results, (c) recall percentage-based generation.
 
-- [ ] **Step 1: Add number release toggle**
+> **Number release toggle removed from Phase 1 scope (2026-03-18).** The `numbers_released` DB column exists but is unused. Number visibility gating is deferred until it can be implemented as a real cross-surface feature.
 
-Add a toggle button in the header area (after the status badge):
-
-```tsx
-<Button
-  variant="outline"
-  size="sm"
-  onClick={async () => {
-    const newValue = !comp.numbers_released
-    await supabase
-      .from('competitions')
-      .update({ numbers_released: newValue })
-      .eq('id', compId)
-    loadData()
-  }}
->
-  {comp.numbers_released ? 'Numbers Released' : 'Release Numbers'}
-</Button>
-```
+- [ ] ~~**Step 1: Add number release toggle**~~ — **SKIPPED (removed from scope 2026-03-18)**
 
 - [ ] **Step 2: Add sign-off status display and gate tabulation**
 
@@ -1305,7 +1288,7 @@ Run: `npx tsc --noEmit`
 
 ```bash
 git add src/app/dashboard/events/[eventId]/competitions/[compId]/page.tsx
-git commit -m "feat: add number release, sign-off gate, and Irish Points display"
+git commit -m "feat: add sign-off gate and Irish Points display"
 ```
 
 ---
