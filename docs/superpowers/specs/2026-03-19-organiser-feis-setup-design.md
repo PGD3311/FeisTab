@@ -217,9 +217,9 @@ The pre-registration syllabus. Generated when organiser expands a template or cl
 | `age_group_label` | `text` | NOT NULL | Frozen: "Under 10" |
 | `age_max_jan1` | `integer` | NULL | Frozen eligibility: max age on Jan 1 (NULL for adult groups) |
 | `age_min_jan1` | `integer` | NULL | Frozen eligibility: min age on Jan 1 (NULL for youth groups) |
-| `level_key` | `text` | NOT NULL | e.g., "BG" (NULL for championships/specials that are cross-level) |
-| `level_label` | `text` | NOT NULL | Frozen: "Beginner" |
-| `dance_key` | `text` | NOT NULL | e.g., "reel" (NULL for championships that cover multiple dances) |
+| `level_key` | `text` | NULL | e.g., "BG" (NULL for specials that are cross-level) |
+| `level_label` | `text` | NULL | Frozen: "Beginner" (NULL when level_key is NULL) |
+| `dance_key` | `text` | NULL | e.g., "reel" (NULL for championships that cover multiple dances) |
 | `dance_label` | `text` | NULL | Frozen: "Reel" |
 | `competition_type` | `text` | `'solo'` | 'solo', 'championship', 'special' |
 | `championship_key` | `text` | NULL | 'prelim' or 'open' — only set when competition_type = 'championship' |
@@ -231,7 +231,7 @@ The pre-registration syllabus. Generated when organiser expands a template or cl
 | `sort_order` | `integer` | `0` | Display ordering |
 | `created_at` | `timestamptz` | `now()` | |
 
-**Unique constraint:** `(feis_listing_id, age_group_key, level_key, dance_key, competition_type, championship_key)`
+**Unique constraint:** `(feis_listing_id, age_group_key, COALESCE(level_key, ''), COALESCE(dance_key, ''), competition_type, COALESCE(championship_key, ''))` — uses COALESCE because Postgres treats NULL != NULL in unique indexes.
 
 **Championship rows:** For championships, `dance_key` is NULL (championships cover multiple dances), `level_key` is the minimum eligible level. For example, "Prelim Championship U14" has `age_group_key = 'U14'`, `level_key = 'PW'`, `dance_key = NULL`, `competition_type = 'championship'`, `championship_key = 'prelim'`.
 
@@ -390,14 +390,28 @@ Before a listing can go live, ALL must pass:
 
 Return a `string[]` of human-readable reasons for any failures, so the organiser sees a checklist of what to fix.
 
-### `ListingTransitionContext` interface
+### `FeisListing` and `ListingTransitionContext` interfaces
 
 ```typescript
+interface FeisListing {
+  id: string;
+  name: string | null;
+  feis_date: string | null;       // ISO date
+  end_date: string | null;
+  venue_name: string | null;
+  contact_email: string | null;
+  timezone: string | null;
+  status: ListingStatus;
+  reg_opens_at: string | null;    // ISO timestamp
+  reg_closes_at: string | null;
+  late_reg_closes_at: string | null;
+  stripe_charges_enabled: boolean;
+}
+
 interface ListingTransitionContext {
   listing: FeisListing;
   feeSchedule: FeeSchedule | null;
-  enabledCompetitions: { competition_type: string; championship_key: string | null }[];
-  stripeChargesEnabled: boolean;
+  enabledCompetitions: { competition_type: string; championship_key: string | null; fee_category: FeeCategoryType }[];
 }
 ```
 
@@ -460,9 +474,11 @@ interface FeeSchedule {
   day_of_surcharge_cents: number;
 }
 
+type FeeCategoryType = 'solo' | 'prelim_champ' | 'open_champ';
+
 interface FeeEntry {
   dancer_id: string;
-  fee_category: 'solo' | 'prelim_champ' | 'open_champ';
+  fee_category: FeeCategoryType;
   is_late: boolean;
   is_day_of: boolean;
 }
@@ -553,13 +569,13 @@ interface ExpandedCompetition {
   age_group_label: string;
   age_max_jan1: number | null;
   age_min_jan1: number | null;
-  level_key: string;
-  level_label: string;
+  level_key: string | null;
+  level_label: string | null;
   dance_key: string | null;
   dance_label: string | null;
   competition_type: 'solo' | 'championship' | 'special';
   championship_key: string | null;
-  fee_category: string;
+  fee_category: FeeCategoryType;
   display_name: string;
   sort_order: number;
 }
