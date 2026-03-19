@@ -2,9 +2,13 @@
 
 import { useEffect, useState, use } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
-import { showSuccess, showCritical } from '@/lib/feedback'
+import { useEvent } from '@/contexts/event-context'
+import { showSuccess, showError, showCritical } from '@/lib/feedback'
+import { logAudit } from '@/lib/audit'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
+import { ApprovalDialog, type ApprovalChecks } from '@/components/approval-dialog'
+import { UnpublishDialog } from '@/components/unpublish-dialog'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { CopyLinkButton } from '@/components/copy-link-button'
 import { Button } from '@/components/ui/button'
@@ -34,6 +38,7 @@ export default function ResultsPublishingPage({
 }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
+  const { reload } = useEvent()
   const [competitions, setCompetitions] = useState<CompetitionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -41,6 +46,8 @@ export default function ResultsPublishingPage({
   const [expandedResults, setExpandedResults] = useState<ResultRow[]>([])
   const [loadingResults, setLoadingResults] = useState(false)
   const [expandError, setExpandError] = useState(false)
+  const [approvalTarget, setApprovalTarget] = useState<{ id: string; code: string; name: string; status: CompetitionStatus } | null>(null)
+  const [unpublishTarget, setUnpublishTarget] = useState<{ id: string; code: string; name: string; status: CompetitionStatus } | null>(null)
 
   async function loadData(): Promise<void> {
     const { data, error } = await supabase
@@ -95,37 +102,107 @@ export default function ResultsPublishingPage({
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handlePublish(compId: string, currentStatus: CompetitionStatus): Promise<void> {
-    if (!canTransition(currentStatus, 'published')) return
-    const now = new Date().toISOString()
-    const { error: pubErr } = await supabase.from('results').update({ published_at: now }).eq('competition_id', compId)
-    if (pubErr) {
-      showCritical('Failed to publish results', { description: pubErr.message })
-      return
+  async function handlePublish(
+    compId: string,
+    currentStatus: CompetitionStatus,
+    approvedBy: string,
+    checks: ApprovalChecks
+  ): Promise<void> {
+    try {
+      if (!canTransition(currentStatus, 'published')) {
+        showError('Cannot publish from current status')
+        return
+      }
+      const now = new Date().toISOString()
+      const { error: pubErr } = await supabase
+        .from('results')
+        .update({ published_at: now })
+        .eq('competition_id', compId)
+      if (pubErr) {
+        showCritical('Failed to publish results', { description: pubErr.message })
+        return
+      }
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({
+          status: 'published',
+          approved_by: approvedBy,
+          approved_at: now,
+          unpublished_by: null,
+          unpublished_at: null,
+        })
+        .eq('id', compId)
+      if (statusErr) {
+        showCritical('Failed to publish results', { description: statusErr.message })
+        return
+      }
+      await logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'result_publish',
+        afterData: { approved_by: approvedBy, checks: { ...checks }, competition_id: compId },
+      })
+      showSuccess('Results published')
+      loadData()
+      void reload()
+    } catch (err) {
+      showCritical('Unexpected error publishing results', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
-    const { error: statusErr } = await supabase.from('competitions').update({ status: 'published' }).eq('id', compId)
-    if (statusErr) {
-      showCritical('Failed to publish results', { description: statusErr.message })
-      return
-    }
-    showSuccess('Results published')
-    loadData()
   }
 
-  async function handleUnpublish(compId: string, currentStatus: CompetitionStatus): Promise<void> {
-    if (!canTransition(currentStatus, 'complete_unpublished')) return
-    const { error: pubErr } = await supabase.from('results').update({ published_at: null }).eq('competition_id', compId)
-    if (pubErr) {
-      showCritical('Failed to unpublish results', { description: pubErr.message })
-      return
+  async function handleUnpublish(
+    compId: string,
+    currentStatus: CompetitionStatus,
+    unpublishedBy: string,
+    reason: string,
+    note: string | null
+  ): Promise<void> {
+    try {
+      if (!canTransition(currentStatus, 'complete_unpublished')) {
+        showError('Cannot unpublish from current status')
+        return
+      }
+      const now = new Date().toISOString()
+      const { error: statusErr } = await supabase
+        .from('competitions')
+        .update({
+          status: 'complete_unpublished',
+          unpublished_by: unpublishedBy,
+          unpublished_at: now,
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq('id', compId)
+      if (statusErr) {
+        showCritical('Failed to unpublish results', { description: statusErr.message })
+        return
+      }
+      const { error: pubErr } = await supabase
+        .from('results')
+        .update({ published_at: null })
+        .eq('competition_id', compId)
+      if (pubErr) {
+        showCritical('Failed to unpublish results', { description: pubErr.message })
+        return
+      }
+      await logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'result_unpublish',
+        afterData: { unpublished_by: unpublishedBy, reason, note, competition_id: compId },
+      })
+      showSuccess('Results unpublished')
+      loadData()
+      void reload()
+    } catch (err) {
+      showCritical('Unexpected error unpublishing results', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
-    const { error: statusErr } = await supabase.from('competitions').update({ status: 'complete_unpublished' }).eq('id', compId)
-    if (statusErr) {
-      showCritical('Failed to unpublish results', { description: statusErr.message })
-      return
-    }
-    showSuccess('Results unpublished')
-    loadData()
   }
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
@@ -221,7 +298,7 @@ export default function ResultsPublishingPage({
           </CardHeader>
           <CardContent className="space-y-2">
             {publishable.map(c => renderCompRow(c,
-              <Button size="sm" onClick={() => handlePublish(c.id, c.status)}>Publish</Button>
+              <Button size="sm" onClick={() => setApprovalTarget({ id: c.id, code: c.code ?? '', name: c.name, status: c.status })}>Publish</Button>
             ))}
           </CardContent>
         </Card>
@@ -234,7 +311,7 @@ export default function ResultsPublishingPage({
           </CardHeader>
           <CardContent className="space-y-2">
             {published.map(c => renderCompRow(c,
-              <Button size="sm" variant="outline" onClick={() => handleUnpublish(c.id, c.status)}>
+              <Button size="sm" variant="outline" onClick={() => setUnpublishTarget({ id: c.id, code: c.code ?? '', name: c.name, status: c.status })}>
                 Unpublish
               </Button>
             ))}
@@ -245,6 +322,27 @@ export default function ResultsPublishingPage({
       {publishable.length === 0 && published.length === 0 && (
         <p className="text-muted-foreground">No competitions with results yet.</p>
       )}
+
+      <ApprovalDialog
+        open={!!approvalTarget}
+        onOpenChange={(open) => { if (!open) setApprovalTarget(null) }}
+        compCode={approvalTarget?.code ?? ''}
+        compName={approvalTarget?.name ?? ''}
+        onApprove={(approvedBy, checks) => {
+          if (approvalTarget) handlePublish(approvalTarget.id, approvalTarget.status, approvedBy, checks)
+          setApprovalTarget(null)
+        }}
+      />
+      <UnpublishDialog
+        open={!!unpublishTarget}
+        onOpenChange={(open) => { if (!open) setUnpublishTarget(null) }}
+        compCode={unpublishTarget?.code ?? ''}
+        compName={unpublishTarget?.name ?? ''}
+        onUnpublish={(unpublishedBy, reason, note) => {
+          if (unpublishTarget) handleUnpublish(unpublishTarget.id, unpublishTarget.status, unpublishedBy, reason, note)
+          setUnpublishTarget(null)
+        }}
+      />
     </div>
   )
 }
