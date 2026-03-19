@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-interface ApprovalChecks {
+export interface ApprovalChecks {
   reviewed_preview: boolean
   judge_signoffs_complete: boolean
   anomalies_reviewed: boolean

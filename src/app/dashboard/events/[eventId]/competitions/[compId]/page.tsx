@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, use } from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
+import { useEvent } from '@/contexts/event-context'
 import { tabulate, type ScoreInput, type TabulationResult } from '@/lib/engine/tabulate'
 import { generateRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
@@ -28,6 +29,8 @@ import { ResultsTable } from '@/components/results-table'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ApprovalDialog, type ApprovalChecks } from '@/components/approval-dialog'
+import { UnpublishDialog } from '@/components/unpublish-dialog'
 
 export default function CompetitionDetailPage({
   params,
@@ -36,6 +39,7 @@ export default function CompetitionDetailPage({
 }) {
   const { eventId, compId } = use(params)
   const supabase = useSupabase()
+  const { reload } = useEvent()
   const [comp, setComp] = useState<any>(null)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [rounds, setRounds] = useState<any[]>([])
@@ -55,6 +59,8 @@ export default function CompetitionDetailPage({
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [loadWarning, setLoadWarning] = useState(false)
   const [stages, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false)
+  const [showUnpublishDialog, setShowUnpublishDialog] = useState(false)
 
   // Polling
   const POLL_INTERVAL_MS = 5000
@@ -405,14 +411,20 @@ export default function CompetitionDetailPage({
 
       setPreviewResults(null)
       await loadData()
+      void reload()
       showSuccess('Results approved and saved')
     } catch (err) {
       showCritical('Failed to save results', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
-  async function handlePublish() {
+  async function handlePublish(approvedBy: string, checks: ApprovalChecks) {
     if (!comp) return
+
+    if (anomalies.some(a => a.blocking)) {
+      showError('Cannot publish with unresolved anomaly blockers')
+      return
+    }
 
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'published')) return
@@ -427,7 +439,13 @@ export default function CompetitionDetailPage({
 
       const { error: statusErr } = await supabase
         .from('competitions')
-        .update({ status: 'published' })
+        .update({
+          status: 'published',
+          approved_by: approvedBy,
+          approved_at: now,
+          unpublished_by: null,
+          unpublished_at: null,
+        })
         .eq('id', compId)
       if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
 
@@ -436,13 +454,51 @@ export default function CompetitionDetailPage({
         entityType: 'competition',
         entityId: compId,
         action: 'result_publish',
-        afterData: { published_at: now },
+        afterData: { published_at: now, approved_by: approvedBy, checks },
       })
 
-      await loadData()
       showSuccess('Results published')
+      void reload()
+      loadData()
     } catch (err) {
       showCritical('Publish failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    }
+  }
+
+  async function handleUnpublish(unpublishedBy: string, reason: string, note: string | null) {
+    if (!comp) return
+    const currentStatus = comp.status as CompetitionStatus
+    if (!canTransition(currentStatus, 'complete_unpublished')) return
+    try {
+      const now = new Date().toISOString()
+      const { error: compErr } = await supabase
+        .from('competitions')
+        .update({
+          status: 'complete_unpublished',
+          unpublished_by: unpublishedBy,
+          unpublished_at: now,
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq('id', compId)
+      if (compErr) throw compErr
+      const { error: pubErr } = await supabase
+        .from('results')
+        .update({ published_at: null })
+        .eq('competition_id', compId)
+      if (pubErr) throw pubErr
+      void logAudit(supabase, {
+        userId: null,
+        entityType: 'competition',
+        entityId: compId,
+        action: 'result_unpublish',
+        afterData: { unpublished_by: unpublishedBy, reason, note, competition_id: compId },
+      })
+      showSuccess('Results unpublished')
+      void reload()
+      loadData()
+    } catch (err) {
+      showCritical('Failed to unpublish results', { description: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
@@ -597,6 +653,7 @@ export default function CompetitionDetailPage({
       })
 
       await loadData()
+      void reload()
       showSuccess(`Status updated to ${getTransitionLabel(currentStatus, targetStatus)}`)
     } catch (err) {
       showCritical('Status update failed', { description: err instanceof Error ? err.message : 'Unknown error' })
@@ -682,6 +739,7 @@ export default function CompetitionDetailPage({
       setUnlockReason('')
       setUnlockNote('')
       await loadData()
+      void reload()
       showSuccess('Unlocked for correction')
     } catch (err) {
       showCritical('Unlock failed', { description: err instanceof Error ? err.message : 'Unknown error' })
@@ -697,6 +755,16 @@ export default function CompetitionDetailPage({
     : judges
   const allSignedOff = latestRound && signOffJudges.length > 0 &&
     signOffJudges.every(j => latestRound.judge_sign_offs?.[j.id])
+
+  function getRelativeTime(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins} min ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+  }
 
   function resolveAnomalyMessage(anomaly: Anomaly): string {
     let msg = anomaly.message
@@ -825,12 +893,29 @@ export default function CompetitionDetailPage({
                 </Button>
               )}
               {showPublish && (
-                <Button onClick={handlePublish} className="w-full justify-start text-left" size="lg">
-                  Publish Results
+                <Button
+                  onClick={() => setShowApprovalDialog(true)}
+                  disabled={anomalies.some(a => a.blocking)}
+                  className="w-full justify-start text-left"
+                  size="lg"
+                >
+                  {anomalies.some(a => a.blocking)
+                    ? 'Resolve blockers before publishing'
+                    : 'Publish Results'}
                 </Button>
               )}
               {(currentStatus === 'published' || currentStatus === 'locked') && (
                 <p className="text-sm text-feis-green">Results published.</p>
+              )}
+              {(currentStatus === 'published') && (
+                <Button
+                  onClick={() => setShowUnpublishDialog(true)}
+                  variant="outline"
+                  className="w-full justify-start text-left"
+                  size="lg"
+                >
+                  Unpublish Results
+                </Button>
               )}
               <Link
                 href={`/dashboard/events/${eventId}/competitions/${compId}/audit`}
@@ -1043,6 +1128,61 @@ export default function CompetitionDetailPage({
         </Card>
       )}
 
+      {/* Audit Trail Summary */}
+      <Card className="feis-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Recent Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {auditEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No audit entries yet. Entries appear as scores are entered, sign-offs recorded, and actions taken.
+            </p>
+          ) : (
+            <div className="space-y-1">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 pr-3 font-normal">When</th>
+                    <th className="py-1 pr-3 font-normal">Action</th>
+                    <th className="py-1 font-normal">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditEntries.slice(0, 5).map((entry) => {
+                    const nameMaps: NameMaps = {
+                      judges: new Map(judges.map((j) => [j.id, `${j.first_name} ${j.last_name}`])),
+                      dancers: new Map(registrations.map((r: any) => [r.dancer_id, `${r.first_name} ${r.last_name}${r.competitor_number ? ` (#${r.competitor_number})` : ''}`])),
+                    }
+                    const formatted = formatAuditEntry(entry, nameMaps)
+                    const relTime = getRelativeTime(entry.created_at)
+                    return (
+                      <tr key={entry.id} className={formatted.isCorrection ? 'bg-feis-orange-light' : ''}>
+                        <td className="py-1 pr-3 text-muted-foreground whitespace-nowrap" title={new Date(entry.created_at).toLocaleString()}>
+                          {relTime}
+                        </td>
+                        <td className="py-1 pr-3">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${formatted.badgeColor}`}>
+                            {formatted.badgeText}
+                          </span>
+                        </td>
+                        <td className="py-1">{formatted.summary}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <Link
+                href={`/dashboard/events/${eventId}/competitions/${compId}/audit`}
+                className="text-xs text-muted-foreground hover:underline mt-2 inline-block"
+              >
+                View full audit trail &rarr;
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Corrections */}
       {(comp.status === 'ready_to_tabulate' || comp.status === 'complete_unpublished') && (
         <Card className="feis-card border-feis-orange/30">
@@ -1211,6 +1351,21 @@ export default function CompetitionDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <ApprovalDialog
+        open={showApprovalDialog}
+        onOpenChange={setShowApprovalDialog}
+        compCode={comp?.code ?? ''}
+        compName={comp?.name ?? ''}
+        onApprove={handlePublish}
+      />
+      <UnpublishDialog
+        open={showUnpublishDialog}
+        onOpenChange={setShowUnpublishDialog}
+        compCode={comp?.code ?? ''}
+        compName={comp?.name ?? ''}
+        onUnpublish={handleUnpublish}
+      />
     </div>
   )
 }
