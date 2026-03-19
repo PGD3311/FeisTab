@@ -42,7 +42,7 @@ export default function JudgeScoringPage({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
-  const [collapsedHeats, setCollapsedHeats] = useState<Set<number>>(new Set())
+  const [expandedHeats, setCollapsedHeats] = useState<Set<number>>(new Set())
 
   // Polling
   const POLL_INTERVAL_MS = 5000
@@ -514,11 +514,11 @@ export default function JudgeScoringPage({
           const heatActiveSlots = heat.slots.filter(s => s.status === 'active')
           const heatScoredCount = heatActiveSlots.filter(s => scoredDancerIds.has(s.dancer_id)).length
           const isHeatComplete = heatScoredCount === heatActiveSlots.length && heatActiveSlots.length > 0
-          const isCollapsed = collapsedHeats.has(heat.heat_number)
+          const isCollapsed = !expandedHeats.has(heat.heat_number)
           const isUpcoming = !isCurrentHeat && !isHeatComplete
 
           // Completed heats collapse to single line (user can re-expand)
-          if (isHeatComplete && !isCurrentHeat) {
+          if (isHeatComplete && !isCurrentHeat && isCollapsed) {
             return (
               <button
                 key={heat.heat_number}
