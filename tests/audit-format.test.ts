@@ -118,14 +118,26 @@ describe('formatAuditEntry', () => {
     expect(result.badgeText).toBe('Correction')
   })
 
-  it('formats tabulate', () => {
+  it('formats tabulate with round context', () => {
     const entry = makeEntry({
       action: 'tabulate',
       after_data: { result_count: 12, round_id: 'r-1' },
     })
     const result = formatAuditEntry(entry, names)
     expect(result.summary).toContain('12 results saved')
+    expect(result.summary).toContain('round r-1')
     expect(result.actor).toBe('Organizer')
+  })
+
+  it('formats tabulate with approval flag', () => {
+    const entry = makeEntry({
+      action: 'tabulate',
+      after_data: { result_count: 8, preview_approved: true, round_id: 'r-2' },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toContain('8 results saved')
+    expect(result.summary).toContain('(approved)')
+    expect(result.summary).toContain('round r-2')
   })
 
   it('formats result_publish', () => {
@@ -145,6 +157,54 @@ describe('formatAuditEntry', () => {
     })
     const result = formatAuditEntry(entry, names)
     expect(result.summary).toContain('8 dancers recalled')
+  })
+
+  it('formats import with counts', () => {
+    const entry = makeEntry({
+      action: 'import',
+      after_data: { competition_count: 5, dancer_count: 42, registration_count: 100 },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('Imported 5 competitions, 42 dancers, 100 registrations')
+    expect(result.actor).toBe('Organizer')
+  })
+
+  it('formats import without counts as CSV fallback', () => {
+    const entry = makeEntry({
+      action: 'import',
+      after_data: null,
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('CSV data imported')
+  })
+
+  it('formats import with partial counts', () => {
+    const entry = makeEntry({
+      action: 'import',
+      after_data: { dancer_count: 30 },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('Imported 30 dancers')
+  })
+
+  it('treats non-object after_data as absent for hasRawData', () => {
+    const entry = makeEntry({
+      action: 'some_future_action',
+      after_data: 'just a string' as unknown as Record<string, unknown>,
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.hasRawData).toBe(false)
+    expect(result.summary).toBe('some_future_action')
+  })
+
+  it('treats array after_data as absent for hasRawData', () => {
+    const entry = makeEntry({
+      action: 'some_future_action',
+      after_data: [1, 2, 3] as unknown as Record<string, unknown>,
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.hasRawData).toBe(false)
+    expect(result.summary).toBe('some_future_action')
   })
 
   it('falls back gracefully for unknown action', () => {
@@ -177,6 +237,49 @@ describe('formatAuditEntry', () => {
     const result = formatAuditEntry(entry, names)
     expect(result.summary).toBeDefined()
     expect(result.actor).toBeDefined()
+  })
+
+  it('formats result_publish with approver', () => {
+    const entry = makeEntry({
+      action: 'result_publish',
+      after_data: {
+        approved_by: 'Bridget',
+        checks: { reviewed_preview: true, judge_signoffs_complete: true, anomalies_reviewed: true },
+      },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toContain('Bridget')
+    expect(result.summary).toContain('published')
+  })
+
+  it('formats result_publish without approver (legacy)', () => {
+    const entry = makeEntry({ action: 'result_publish', after_data: { published_at: '2026-03-18' } })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('Results published')
+  })
+
+  it('formats result_unpublish with reason', () => {
+    const entry = makeEntry({
+      action: 'result_unpublish',
+      after_data: { unpublished_by: 'Bridget', reason: 'score_correction_needed', note: null },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toContain('Score correction needed')
+  })
+
+  it('formats result_unpublish with other reason and note', () => {
+    const entry = makeEntry({
+      action: 'result_unpublish',
+      after_data: { unpublished_by: 'Bridget', reason: 'other', note: 'Judge 2 was incorrect' },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toContain('Judge 2 was incorrect')
+  })
+
+  it('formats result_unpublish with null after_data', () => {
+    const entry = makeEntry({ action: 'result_unpublish', after_data: null })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('Results unpublished')
   })
 
   it('resolves unresolved judge_id to "Judge" fallback', () => {

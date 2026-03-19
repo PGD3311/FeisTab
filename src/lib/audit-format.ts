@@ -69,7 +69,13 @@ export function matchesFilter(action: string, filter: string): boolean {
   return getBadge(action).filterGroup === filter
 }
 
+import { UNPUBLISH_REASONS } from '@/lib/unpublish-reasons'
+
 // --- Formatter helpers (not exported) ---
+
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === 'object' && !Array.isArray(val)
+}
 
 function humanizeStatus(status: string): string {
   return status
@@ -152,16 +158,48 @@ const formatters: Record<string, Formatter> = {
   },
 
   tabulate(entry) {
-    const count = get(entry.after_data, 'result_count') ?? '?'
-    return { summary: `${count} results saved`, actor: 'Organizer' }
+    const d = entry.after_data
+    const count = get(d, 'result_count') ?? '?'
+    const approved = get(d, 'preview_approved')
+    const roundId = get(d, 'round_id')
+    let summary = `${count} results saved`
+    if (approved) summary += ' (approved)'
+    if (roundId) summary += ` · round ${roundId}`
+    return { summary, actor: 'Organizer' }
   },
 
-  result_publish() {
+  result_publish(entry) {
+    const d = entry.after_data
+    const approvedBy = typeof get(d, 'approved_by') === 'string' ? (get(d, 'approved_by') as string) : null
+    if (approvedBy) {
+      return { summary: `Results published by ${approvedBy}`, actor: approvedBy }
+    }
     return { summary: 'Results published', actor: 'Organizer' }
   },
 
-  result_unpublish() {
-    return { summary: 'Results unpublished', actor: 'Organizer' }
+  result_unpublish(entry) {
+    const d = entry.after_data
+    const unpublishedBy =
+      typeof get(d, 'unpublished_by') === 'string' ? (get(d, 'unpublished_by') as string) : null
+    const reason = typeof get(d, 'reason') === 'string' ? (get(d, 'reason') as string) : null
+    const note = typeof get(d, 'note') === 'string' ? (get(d, 'note') as string) : null
+
+    if (!reason) {
+      return { summary: 'Results unpublished', actor: unpublishedBy ?? 'Organizer' }
+    }
+
+    let reasonLabel: string
+    if (reason === 'other' && note) {
+      reasonLabel = note
+    } else {
+      const match = UNPUBLISH_REASONS.find((r) => r.value === reason)
+      reasonLabel = match ? match.label : reason
+    }
+
+    return {
+      summary: `Results unpublished · ${reasonLabel}`,
+      actor: unpublishedBy ?? 'Organizer',
+    }
   },
 
   unlock_for_correction(entry, names) {
@@ -180,14 +218,23 @@ const formatters: Record<string, Formatter> = {
     return { summary: `${count} dancers recalled`, actor: 'Organizer' }
   },
 
-  import() {
-    return { summary: 'Data imported', actor: 'Organizer' }
+  import(entry) {
+    const d = entry.after_data
+    const parts: string[] = []
+    const compCount = get(d, 'competition_count')
+    const dancerCount = get(d, 'dancer_count')
+    const registrationCount = get(d, 'registration_count')
+    if (compCount) parts.push(`${compCount} competitions`)
+    if (dancerCount) parts.push(`${dancerCount} dancers`)
+    if (registrationCount) parts.push(`${registrationCount} registrations`)
+    const summary = parts.length > 0 ? `Imported ${parts.join(', ')}` : 'CSV data imported'
+    return { summary, actor: 'Organizer' }
   },
 }
 
 export function formatAuditEntry(entry: AuditEntry, names: NameMaps): FormattedAudit {
   const badge = getBadge(entry.action)
-  const hasRawData = entry.after_data !== null || entry.before_data !== null
+  const hasRawData = isPlainObject(entry.after_data) || isPlainObject(entry.before_data)
 
   try {
     const formatter = formatters[entry.action]
@@ -207,7 +254,7 @@ export function formatAuditEntry(entry: AuditEntry, names: NameMaps): FormattedA
   }
 
   // Generic fallback for unknown or failed actions
-  const pairs = entry.after_data
+  const pairs = isPlainObject(entry.after_data)
     ? Object.entries(entry.after_data)
         .map(([k, v]) => `${k}: ${v}`)
         .join(', ')
