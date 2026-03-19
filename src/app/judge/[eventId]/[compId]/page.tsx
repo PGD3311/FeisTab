@@ -198,18 +198,35 @@ export default function JudgeScoringPage({
 
     setComp(compRes.data)
     setRegistrations(regRes.data ?? [])
-    setRound(roundRes.error ? null : roundRes.data)
     setRuleConfig(compRes.data?.rule_sets?.config)
 
-    if (!roundRes.error && roundRes.data) {
-      if (roundRes.data.judge_sign_offs?.[judgeId]) {
+    // Ensure a round exists — create one if the event page's best-effort creation failed
+    let round = roundRes.error ? null : roundRes.data
+    if (!round) {
+      const { data: newRound, error: createErr } = await supabase
+        .from('rounds')
+        .insert({ competition_id: compId, round_number: 1, round_type: 'standard' })
+        .select()
+        .single()
+      if (createErr) {
+        console.error('Failed to create round:', createErr.message)
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
+      round = newRound
+    }
+    setRound(round)
+
+    if (round) {
+      if (round.judge_sign_offs?.[judgeId]) {
         setSubmitted(true)
       }
 
       const { data: existingScores, error: scoresErr } = await supabase
         .from('score_entries')
         .select('*')
-        .eq('round_id', roundRes.data.id)
+        .eq('round_id', round.id)
         .eq('judge_id', judgeId)
       if (scoresErr) {
         console.error('Failed to load scores:', scoresErr.message)
@@ -461,7 +478,6 @@ export default function JudgeScoringPage({
         scoreMax={scoreMax}
         onSubmit={handleScoreSubmit}
         locked={submitted}
-        variant="judge"
         isCurrentDancer={reg.dancer_id === currentDancerId}
         isExpanded={expandedDancerId === reg.dancer_id}
         onToggleExpand={(id) =>

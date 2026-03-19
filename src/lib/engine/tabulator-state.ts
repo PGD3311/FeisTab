@@ -1,4 +1,4 @@
-import { type CommentData } from '@/lib/comment-codes'
+import { type CommentData, hasCommentContent } from '@/lib/comment-codes'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -111,19 +111,29 @@ export function scoreReducer(state: ScoreRow[], action: ScoreAction): ScoreRow[]
       })
 
     case 'SET_FLAG':
-      return updateRow(state, action.dancerId, row => ({
-        ...row,
-        flagged: action.flagged,
-        flagReason: action.flagReason,
-        status: 'dirty',
-      }))
+      return updateRow(state, action.dancerId, row => {
+        const newFlagged = action.flagged
+        const rowHasContent =
+          row.score !== '' || newFlagged || hasCommentContent(row.commentData, null)
+        return {
+          ...row,
+          flagged: newFlagged,
+          flagReason: action.flagReason,
+          status: rowHasContent ? 'dirty' : row.dbScore === null ? 'empty' : 'dirty',
+        }
+      })
 
     case 'SET_COMMENT':
-      return updateRow(state, action.dancerId, row => ({
-        ...row,
-        commentData: action.commentData,
-        status: 'dirty',
-      }))
+      return updateRow(state, action.dancerId, row => {
+        const newCommentData = action.commentData
+        const rowHasContent =
+          row.score !== '' || row.flagged || hasCommentContent(newCommentData, null)
+        return {
+          ...row,
+          commentData: newCommentData,
+          status: rowHasContent ? 'dirty' : row.dbScore === null ? 'empty' : 'dirty',
+        }
+      })
 
     case 'MARK_SAVING':
       return updateRow(state, action.dancerId, row => ({

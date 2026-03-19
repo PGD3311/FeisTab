@@ -17,7 +17,7 @@ export const DEFAULT_RULES: RuleSetConfig = {
   score_max: 100,
   scoring_method: 'irish_points',
   tie_breaker: 'countback',
-  recall_top_percent: 0,
+  recall_top_percent: 50,
   drop_high: false,
   drop_low: false,
 }

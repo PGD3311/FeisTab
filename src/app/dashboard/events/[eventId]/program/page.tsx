@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
+import { useEvent } from '@/contexts/event-context'
 import { showSuccess, showError } from '@/lib/feedback'
 import { type CompetitionStatus } from '@/lib/competition-states'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
@@ -37,6 +38,7 @@ export default function ProgramPage({
 }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
+  const { reload } = useEvent()
   const [stages, setStages] = useState<Stage[]>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
@@ -180,6 +182,7 @@ export default function ProgramPage({
     }
 
     await loadData()
+    void reload()
     showSuccess('Stage assigned')
   }
 
@@ -421,6 +424,7 @@ export default function ProgramPage({
                                 return
                               }
                               await loadData()
+                              void reload()
                               showSuccess('Unassigned from stage')
                             }}
                           >
@@ -472,6 +476,7 @@ export default function ProgramPage({
                         }
                       }
                       await loadData()
+                      void reload()
                       showSuccess(`${ids.length} competitions assigned to ${s.name}`)
                     }}
                   >

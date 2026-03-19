@@ -7,7 +7,7 @@ import { ChevronDown } from 'lucide-react'
 interface JudgeScoreData {
   judge_id: string
   judge_name: string
-  raw_score: number
+  raw_score: number | null
   rank: number
   irish_points: number
   flagged?: boolean
@@ -117,7 +117,7 @@ function BreakdownPanel({ row, eventId }: { row: ResultRow; eventId?: string }) 
                         <td
                           className={`text-right font-mono py-0.5 ${js.flagged ? 'line-through text-muted-foreground' : ''}`}
                         >
-                          {js.raw_score}
+                          {js.raw_score !== null ? js.raw_score : '—'}
                         </td>
                         <td
                           className={`text-right font-mono py-0.5 ${js.flagged ? 'line-through text-muted-foreground' : ''}`}
@@ -217,7 +217,7 @@ export function ResultsTable({ results, eventId, publicMode }: { results: Result
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   function handleRowClick(i: number, payload: CalculatedPayloadData | null) {
-    if (publicMode) return // No expansion on public results
+    if (publicMode) return
     if (!isExpandable(payload)) return
     setExpandedIndex(expandedIndex === i ? null : i)
   }

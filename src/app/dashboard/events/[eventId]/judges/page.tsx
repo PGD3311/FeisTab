@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback, use } from 'react'
-import { useSupabase } from '@/hooks/use-supabase'
 import { showSuccess, showError } from '@/lib/feedback'
+import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { logAudit } from '@/lib/audit'
+import { useSupabase } from '@/hooks/use-supabase'
+import { useEvent } from '@/contexts/event-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,6 +58,7 @@ function parseCodeAsNumber(code: string | null): number | null {
 export default function JudgeManagementPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
+  const { reload } = useEvent()
   const [judges, setJudges] = useState<Judge[]>([])
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -194,6 +198,104 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     setLoadingAssignments(false)
   }
 
+  /**
+   * After any judge assignment mutation, check if affected competitions that
+   * were `ready_to_tabulate` now have incomplete sign-offs. If so, revert
+   * their status to `awaiting_scores` and audit-log the change.
+   */
+  async function revertStaleReadyToTabulate(competitionIds: string[]) {
+    if (competitionIds.length === 0) return
+
+    // 1. Find which of these competitions are currently ready_to_tabulate
+    const { data: comps, error: compErr } = await supabase
+      .from('competitions')
+      .select('id, status')
+      .in('id', competitionIds)
+      .eq('status', 'ready_to_tabulate')
+    if (compErr) {
+      console.error('Failed to check competition statuses:', compErr.message)
+      return
+    }
+    if (!comps || comps.length === 0) return
+
+    for (const comp of comps as Array<{ id: string; status: string }>) {
+      // 2. Get the latest round's sign-offs
+      const { data: rounds, error: roundErr } = await supabase
+        .from('rounds')
+        .select('id, judge_sign_offs')
+        .eq('competition_id', comp.id)
+        .order('round_number', { ascending: false })
+        .limit(1)
+      if (roundErr) {
+        console.error(`Failed to load rounds for ${comp.id}:`, roundErr.message)
+        continue
+      }
+      const latestRound = rounds?.[0] as
+        | { id: string; judge_sign_offs: Record<string, string> | null }
+        | undefined
+      const signOffs = latestRound?.judge_sign_offs ?? {}
+
+      // 3. Get the NEW assignment list for this competition
+      const { data: assignments, error: assignErr } = await supabase
+        .from('judge_assignments')
+        .select('judge_id')
+        .eq('competition_id', comp.id)
+      if (assignErr) {
+        console.error(`Failed to load assignments for ${comp.id}:`, assignErr.message)
+        continue
+      }
+
+      const assignedJudgeIds = (assignments ?? []).map(
+        (a: { judge_id: string }) => a.judge_id
+      )
+
+      // 4. Check if every assigned judge has signed off
+      const allSignedOff =
+        assignedJudgeIds.length > 0 &&
+        assignedJudgeIds.every((id: string) => signOffs[id])
+
+      if (!allSignedOff) {
+        const from = comp.status as CompetitionStatus
+        const to: CompetitionStatus = 'awaiting_scores'
+
+        if (!canTransition(from, to)) {
+          console.error(
+            `Cannot transition competition ${comp.id} from ${from} to ${to}`
+          )
+          continue
+        }
+
+        const { error: updateErr } = await supabase
+          .from('competitions')
+          .update({ status: to })
+          .eq('id', comp.id)
+        if (updateErr) {
+          console.error(
+            `Failed to revert competition ${comp.id} status:`,
+            updateErr.message
+          )
+          continue
+        }
+
+        await logAudit(supabase, {
+          userId: null,
+          entityType: 'competition',
+          entityId: comp.id,
+          action: 'status_change',
+          beforeData: { status: from },
+          afterData: {
+            status: to,
+            reason: 'Judge assignment changed — sign-offs no longer complete',
+          },
+        })
+
+        console.log(
+          `Reverted competition ${comp.id} from ${from} to ${to} due to assignment change`
+        )
+      }
+    }
+  }
+
   function toggleExpanded(judgeId: string) {
     if (expandedJudgeId === judgeId) {
       setExpandedJudgeId(null)
@@ -286,10 +388,16 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     showSuccess(`Assigned ${newIds.length} competition${newIds.length === 1 ? '' : 's'}`)
     await loadJudgeAssignments(judgeId)
     void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(newIds)
+    void reload()
     setAssigningBatch(false)
   }
 
   async function handleRemoveAssignment(assignmentId: string, judgeId: string) {
+    // Capture affected competition before deleting
+    const affected = judgeAssignments.find((a) => a.id === assignmentId)
+    const affectedCompIds = affected ? [affected.competition_id] : []
+
     const { error } = await supabase.from('judge_assignments').delete().eq('id', assignmentId)
     if (error) {
       showError('Failed to remove assignment', { description: error.message })
@@ -298,9 +406,14 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     showSuccess('Assignment removed')
     await loadJudgeAssignments(judgeId)
     void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(affectedCompIds)
+    void reload()
   }
 
   async function handleClearAll(judgeId: string) {
+    // Capture affected competition IDs before clearing
+    const affectedCompIds = judgeAssignments.map((a) => a.competition_id)
+
     const { error } = await supabase
       .from('judge_assignments')
       .delete()
@@ -312,6 +425,8 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     showSuccess('All assignments cleared')
     await loadJudgeAssignments(judgeId)
     void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(affectedCompIds)
+    void reload()
   }
 
   function handleAssignByCodeRange(judgeId: string) {

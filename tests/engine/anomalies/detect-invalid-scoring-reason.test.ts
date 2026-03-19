@@ -27,8 +27,16 @@ describe('detectInvalidScoringReason', () => {
   })
 
   it('allows flagged score with valid flag_reason', () => {
-    const scores = [{ ...base, flagged: true, flag_reason: 'Early Start' }]
+    const scores = [{ ...base, flagged: true, flag_reason: 'early_start' }]
     expect(detectInvalidScoringReason(scores, 'c1')).toEqual([])
+  })
+
+  it('detects flagged score with unrecognized flag_reason', () => {
+    const scores = [{ ...base, flagged: true, flag_reason: 'bogus_reason' }]
+    const result = detectInvalidScoringReason(scores, 'c1')
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('invalid_scoring_reason')
+    expect(result[0].message).toContain('unrecognized flag reason')
   })
 
   it('detects zero score without flag', () => {
@@ -39,7 +47,7 @@ describe('detectInvalidScoringReason', () => {
   })
 
   it('allows zero score when flagged with reason', () => {
-    const scores = [{ ...base, raw_score: 0, flagged: true, flag_reason: 'Did Not Complete' }]
+    const scores = [{ ...base, raw_score: 0, flagged: true, flag_reason: 'did_not_complete' }]
     expect(detectInvalidScoringReason(scores, 'c1')).toEqual([])
   })
 

@@ -6,7 +6,7 @@ import { type RuleSetConfig } from '@/lib/engine/rules'
 export interface JudgeScore {
   judge_id: string
   judge_name: string
-  raw_score: number
+  raw_score: number | null
   rank: number
   irish_points: number
   flagged?: boolean
@@ -60,8 +60,8 @@ export function buildJudgeScores(
     const judge = judges.find(j => j.id === ir.judge_id)
     const score = scores.find(s => s.dancer_id === result.dancer_id && s.judge_id === ir.judge_id)
 
-    const judgeName = judge ? `${judge.first_name} ${judge.last_name}` : ir.judge_id
-    const rawScore = score?.raw_score ?? 0
+    const judgeName = judge ? `${judge.first_name} ${judge.last_name}` : 'Judge (unknown)'
+    const rawScore = score ? Number(score.raw_score) : null
 
     return {
       judge_id: ir.judge_id,

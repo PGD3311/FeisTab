@@ -128,6 +128,25 @@ describe('scoreReducer', () => {
       const result = scoreReducer(rows, { type: 'SET_FLAG', dancerId: 'd1', flagged: true, flagReason: 'early_start' })
       expect(result[0].status).toBe('dirty')
     })
+
+    it('dirty → empty when flag is removed on row with no score and no comments', () => {
+      const rows = [makeRow({ status: 'dirty', flagged: true, flagReason: 'early_start' })]
+      const result = scoreReducer(rows, { type: 'SET_FLAG', dancerId: 'd1', flagged: false, flagReason: null })
+      expect(result[0].flagged).toBe(false)
+      expect(result[0].status).toBe('empty')
+    })
+
+    it('stays dirty when flag is removed but row has a score', () => {
+      const rows = [makeRow({ status: 'dirty', score: '75', flagged: true, flagReason: 'early_start' })]
+      const result = scoreReducer(rows, { type: 'SET_FLAG', dancerId: 'd1', flagged: false, flagReason: null })
+      expect(result[0].status).toBe('dirty')
+    })
+
+    it('stays dirty when flag is removed but row has comments', () => {
+      const rows = [makeRow({ status: 'dirty', flagged: true, flagReason: 'early_start', commentData: { codes: ['turnout'], note: null } })]
+      const result = scoreReducer(rows, { type: 'SET_FLAG', dancerId: 'd1', flagged: false, flagReason: null })
+      expect(result[0].status).toBe('dirty')
+    })
   })
 
   describe('SET_COMMENT', () => {
@@ -141,6 +160,25 @@ describe('scoreReducer', () => {
     it('empty → dirty when comment is set (comment without score must be saveable)', () => {
       const rows = [makeRow({ status: 'empty' })]
       const result = scoreReducer(rows, { type: 'SET_COMMENT', dancerId: 'd1', commentData: { codes: ['timing'], note: null } })
+      expect(result[0].status).toBe('dirty')
+    })
+
+    it('dirty → empty when comment is removed on row with no score and no flag', () => {
+      const rows = [makeRow({ status: 'dirty', commentData: { codes: ['turnout'], note: null } })]
+      const result = scoreReducer(rows, { type: 'SET_COMMENT', dancerId: 'd1', commentData: null })
+      expect(result[0].commentData).toBeNull()
+      expect(result[0].status).toBe('empty')
+    })
+
+    it('stays dirty when comment is removed but row has a score', () => {
+      const rows = [makeRow({ status: 'dirty', score: '75', commentData: { codes: ['turnout'], note: null } })]
+      const result = scoreReducer(rows, { type: 'SET_COMMENT', dancerId: 'd1', commentData: null })
+      expect(result[0].status).toBe('dirty')
+    })
+
+    it('stays dirty when comment is removed but row is flagged', () => {
+      const rows = [makeRow({ status: 'dirty', flagged: true, flagReason: 'early_start', commentData: { codes: ['turnout'], note: null } })]
+      const result = scoreReducer(rows, { type: 'SET_COMMENT', dancerId: 'd1', commentData: null })
       expect(result[0].status).toBe('dirty')
     })
   })

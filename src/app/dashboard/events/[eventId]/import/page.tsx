@@ -3,6 +3,7 @@
 import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
+import { useEvent } from '@/contexts/event-context'
 import { parseRegistrationCSV, type ImportRow, type ImportResult } from '@/lib/csv/import'
 import { CSVPreviewTable } from '@/components/csv-preview-table'
 import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
@@ -19,6 +20,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
   const [syncFailures, setSyncFailures] = useState<number>(0)
   const router = useRouter()
   const supabase = useSupabase()
+  const { reload } = useEvent()
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -231,6 +233,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       setSyncFailures(syncFailureCount)
 
       setDone(true)
+      void reload()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Import failed')
     } finally {

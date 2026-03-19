@@ -15,11 +15,11 @@ export function detectJudgeFlaggedAll(
   }
 
   for (const [judge_id, judgeScores] of byJudge) {
-    if (judgeScores.length < 2) continue
+    if (judgeScores.length < 3) continue
     if (judgeScores.every(s => s.flagged)) {
       anomalies.push({
         type: 'judge_flagged_all',
-        severity: 'info',
+        severity: 'warning',
         scope: 'judge_packet',
         entity_ids: { judge_id, round_id, competition_id },
         message: `Judge ${judge_id} flagged all ${judgeScores.length} dancers in this round`,

@@ -1020,9 +1020,24 @@ export default function RosterConfirmationPage({
                           <span className="text-lg">
                             {reg.first_name} {reg.last_name}
                           </span>
-                          {!hasArrived && (
+                          {hasArrived && !isPresent && (
+                            <span className="text-xs text-teal-600 font-medium mt-0.5 block">
+                              Arrived
+                              {showCallToStage && (
+                                <span className="text-feis-orange ml-2">
+                                  — Call to stage
+                                </span>
+                              )}
+                            </span>
+                          )}
+                          {!hasArrived && !isPresent && !hasNumber && (
                             <span className="text-xs text-destructive/70 mt-0.5 block">
-                              Not checked in at registration
+                              Not arrived · No number
+                            </span>
+                          )}
+                          {!hasArrived && !isPresent && hasNumber && (
+                            <span className="text-xs text-destructive/70 mt-0.5 block">
+                              Not arrived · Number assigned, not checked in
                             </span>
                           )}
                         </div>

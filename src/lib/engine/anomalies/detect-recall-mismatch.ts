@@ -17,11 +17,11 @@ export function detectRecallMismatch(
     return [
       {
         type: 'recall_mismatch',
-        severity: 'info',
+        severity: 'blocker',
         scope: 'round',
         entity_ids: { round_id, competition_id },
         message: `Recalls not generated: ${actualCount} of ${expectedCount} expected (${recallTopPercent}% of ${totalDancers}). Generate recalls if this is a championship competition.`,
-        blocking: false,
+        blocking: true,
         dedupe_key: `recall_mismatch|${round_id}`,
       },
     ]

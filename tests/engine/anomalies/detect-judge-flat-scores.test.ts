@@ -10,7 +10,12 @@ const score = (dancer_id: string, judge_id: string, raw_score: number): ScoreEnt
 
 describe('detectJudgeFlatScores', () => {
   it('returns empty for varied scores', () => {
-    const scores = [score('d1', 'j1', 80), score('d2', 'j1', 75)]
+    const scores = [score('d1', 'j1', 80), score('d2', 'j1', 75), score('d3', 'j1', 70)]
+    expect(detectJudgeFlatScores(scores, 'r1', 'c1')).toEqual([])
+  })
+
+  it('skips judge with only two dancers (too few to be suspicious)', () => {
+    const scores = [score('d1', 'j1', 80), score('d2', 'j1', 80)]
     expect(detectJudgeFlatScores(scores, 'r1', 'c1')).toEqual([])
   })
 

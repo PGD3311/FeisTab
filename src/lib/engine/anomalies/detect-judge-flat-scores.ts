@@ -15,7 +15,7 @@ export function detectJudgeFlatScores(
   }
 
   for (const [judge_id, judgeScores] of byJudge) {
-    if (judgeScores.length < 2) continue
+    if (judgeScores.length < 3) continue
     const unique = new Set(judgeScores)
     if (unique.size === 1) {
       anomalies.push({

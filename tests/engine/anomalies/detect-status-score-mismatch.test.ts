@@ -35,6 +35,18 @@ describe('detectStatusScoreMismatch', () => {
     expect(result).toHaveLength(1)
   })
 
+  it('detects did_not_complete dancer with scores', () => {
+    const result = detectStatusScoreMismatch([score('d1')], [reg('d1', 'did_not_complete')], 'r1', 'c1')
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('status_score_mismatch')
+  })
+
+  it('detects medical dancer with scores', () => {
+    const result = detectStatusScoreMismatch([score('d1')], [reg('d1', 'medical')], 'r1', 'c1')
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('status_score_mismatch')
+  })
+
   it('returns empty for empty inputs', () => {
     expect(detectStatusScoreMismatch([], [], 'r1', 'c1')).toEqual([])
   })

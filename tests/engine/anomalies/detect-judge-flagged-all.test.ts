@@ -11,24 +11,24 @@ const score = (dancer_id: string, judge_id: string, flagged = false): ScoreEntry
 describe('detectJudgeFlaggedAll', () => {
   it('returns empty when no judge flagged all dancers', () => {
     const scores = [
-      score('d1', 'j1', true), score('d2', 'j1', false),
+      score('d1', 'j1', true), score('d2', 'j1', false), score('d3', 'j1', false),
     ]
     expect(detectJudgeFlaggedAll(scores, 'r1', 'c1')).toEqual([])
   })
 
   it('detects judge who flagged every dancer', () => {
     const scores = [
-      score('d1', 'j1', true), score('d2', 'j1', true),
+      score('d1', 'j1', true), score('d2', 'j1', true), score('d3', 'j1', true),
     ]
     const result = detectJudgeFlaggedAll(scores, 'r1', 'c1')
     expect(result).toHaveLength(1)
     expect(result[0].type).toBe('judge_flagged_all')
-    expect(result[0].severity).toBe('info')
+    expect(result[0].severity).toBe('warning')
     expect(result[0].entity_ids.judge_id).toBe('j1')
   })
 
-  it('ignores judge with only one dancer (single entry is not suspicious)', () => {
-    const scores = [score('d1', 'j1', true)]
+  it('ignores judge with fewer than 3 dancers (too few to be suspicious)', () => {
+    const scores = [score('d1', 'j1', true), score('d2', 'j1', true)]
     expect(detectJudgeFlaggedAll(scores, 'r1', 'c1')).toEqual([])
   })
 

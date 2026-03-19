@@ -176,6 +176,7 @@ export default function EventOverviewPage() {
   const activeCount = competitions.filter((c) => ACTIVE_STATUSES.includes(c.status)).length
   const needsAttention = competitions.filter(
     (c) =>
+      c.status === 'awaiting_scores' ||
       c.status === 'ready_to_tabulate' ||
       c.status === 'recalled_round_pending' ||
       c.status === 'complete_unpublished'
@@ -207,8 +208,8 @@ export default function EventOverviewPage() {
           <strong className="text-foreground tabular-nums">{activeCount}</strong> active
         </span>
         <span>
-          <strong className="text-foreground tabular-nums">{needsAttention.length}</strong> need
-          attention
+          <strong className="text-foreground tabular-nums">{needsAttention.length}</strong> action
+          needed
         </span>
         <span>
           <strong className="text-foreground tabular-nums">{progressPct}%</strong> complete
@@ -284,23 +285,23 @@ export default function EventOverviewPage() {
         )
       })()}
 
-      {/* Needs Attention */}
+      {/* Action Needed */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           {needsAttention.length > 0 && (
             <div className="w-1.5 h-1.5 rounded-full bg-feis-orange animate-pulse" />
           )}
-          <h2 className="text-base font-semibold">Needs Attention</h2>
+          <h2 className="text-base font-semibold">Action Needed</h2>
           {needsAttention.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              {needsAttention.length} competition{needsAttention.length !== 1 ? 's' : ''} waiting
-              on you
+              {needsAttention.length} competition{needsAttention.length !== 1 ? 's' : ''} awaiting
+              next step
             </span>
           )}
         </div>
         {needsAttention.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No competitions need attention right now.
+            All competitions are on track — nothing to action right now.
           </p>
         ) : (
           <div className="space-y-2">

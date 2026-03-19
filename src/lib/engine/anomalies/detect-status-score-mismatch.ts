@@ -1,8 +1,6 @@
-import { type Anomaly, type ScoreEntry, type Registration } from './types'
+import { type Anomaly, type ScoreEntry, type Registration, NON_ACTIVE_STATUSES } from './types'
 
-const SHOULD_NOT_HAVE_SCORES = new Set([
-  'scratched', 'no_show', 'disqualified',
-])
+const SHOULD_NOT_HAVE_SCORES = new Set(NON_ACTIVE_STATUSES)
 
 export function detectStatusScoreMismatch(
   scores: ScoreEntry[],

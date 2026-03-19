@@ -79,18 +79,18 @@ describe('buildJudgeScores', () => {
     expect(j2Score.flag_reason).toBeUndefined()
   })
 
-  it('falls back to judge_id as name when judge not found', () => {
+  it('falls back to "Judge (unknown)" when judge not found', () => {
     const result = buildJudgeScores(resultD1, [], scores)
 
     const j1Score = result.find(s => s.judge_id === 'j1')!
-    expect(j1Score.judge_name).toBe('j1')
+    expect(j1Score.judge_name).toBe('Judge (unknown)')
   })
 
-  it('falls back to raw_score=0 when score entry not found', () => {
+  it('falls back to raw_score=null when score entry not found', () => {
     const result = buildJudgeScores(resultD1, judges, [])
 
     const j1Score = result.find(s => s.judge_id === 'j1')!
-    expect(j1Score.raw_score).toBe(0)
+    expect(j1Score.raw_score).toBeNull()
   })
 })
 
