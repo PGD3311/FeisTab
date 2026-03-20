@@ -1139,10 +1139,6 @@ export default function CompetitionDetailPage({
                 </thead>
                 <tbody>
                   {auditEntries.slice(0, 5).map((entry) => {
-                    const nameMaps: NameMaps = {
-                      judges: new Map(judges.map((j) => [j.id, `${j.first_name} ${j.last_name}`])),
-                      dancers: new Map(registrations.map((r: any) => [r.dancer_id, `${r.first_name} ${r.last_name}${r.competitor_number ? ` (#${r.competitor_number})` : ''}`])),
-                    }
                     const formatted = formatAuditEntry(entry, nameMaps)
                     const relTime = getRelativeTime(entry.created_at)
                     return (
