@@ -210,7 +210,14 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       router.push('/judge')
       return
     }
-    const parsed: JudgeSession = JSON.parse(stored)
+    let parsed: JudgeSession
+    try {
+      parsed = JSON.parse(stored)
+    } catch {
+      localStorage.removeItem('judge_session')
+      router.push('/judge')
+      return
+    }
     if (parsed.event_id !== eventId) {
       router.push('/judge')
       return

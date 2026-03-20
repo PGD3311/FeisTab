@@ -51,11 +51,13 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       }
 
       // Get default ruleset
-      const { data: defaultRuleset } = await supabase
+      const { data: defaultRuleset, error: rulesetErr } = await supabase
         .from('rule_sets')
         .select('id')
         .eq('name', 'Default - Irish Points')
         .single()
+
+      if (rulesetErr) throw new Error(`Failed to load default ruleset: ${rulesetErr.message}`)
 
       // --- Step 1: Batch upsert all unique dancers ---
       const uniqueDancers = new Map<string, ImportRow>()
@@ -77,9 +79,13 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         .upsert(dancerInserts, { onConflict: 'first_name,last_name,coalesce(school_name, \'\')' })
         .select()
 
-      const { data: allDancers } = await supabase
+      if (dancerErr) throw new Error(`Failed to upsert dancers: ${dancerErr.message}`)
+
+      const { data: allDancers, error: allDancersErr } = await supabase
         .from('dancers')
         .select('id, first_name, last_name, school_name')
+
+      if (allDancersErr) throw new Error(`Failed to load dancers: ${allDancersErr.message}`)
 
       const dancerLookup = new Map<string, string>()
       for (const d of allDancers ?? []) {
@@ -134,11 +140,13 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
           if (compErr) throw compErr
           comp = newComp
 
-          await supabase.from('rounds').insert({
+          const { error: roundErr } = await supabase.from('rounds').insert({
             competition_id: comp!.id,
             round_number: 1,
             round_type: 'standard',
           })
+
+          if (roundErr) throw new Error(`Failed to create round for ${code}: ${roundErr.message}`)
         }
 
         // --- Step 3: Batch upsert registrations ---
@@ -158,10 +166,12 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
           .filter(Boolean)
 
         if (regInserts.length > 0) {
-          await supabase.from('registrations').upsert(
+          const { error: regErr } = await supabase.from('registrations').upsert(
             regInserts as any[],
             { onConflict: 'competition_id,dancer_id' }
           )
+
+          if (regErr) throw new Error(`Failed to upsert registrations for ${code}: ${regErr.message}`)
         }
       }
 
