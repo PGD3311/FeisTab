@@ -482,16 +482,28 @@ export default function RegistrationDeskPage({
                           if (!confirm(`Undo check-in for ${dancer.first_name} ${dancer.last_name}?`)) return
                           setActing(dancer.dancer_id)
                           try {
-                            await supabase
+                            const { error: deleteErr } = await supabase
                               .from('event_check_ins')
                               .delete()
                               .eq('event_id', eventId)
                               .eq('dancer_id', dancer.dancer_id)
-                            await supabase
+
+                            if (deleteErr) {
+                              showCritical('Failed to undo check-in', { description: deleteErr.message })
+                              return
+                            }
+
+                            const { error: regErr } = await supabase
                               .from('registrations')
                               .update({ competitor_number: null })
                               .eq('event_id', eventId)
                               .eq('dancer_id', dancer.dancer_id)
+
+                            if (regErr) {
+                              showCritical('Check-in removed but registration update failed', { description: regErr.message })
+                              return
+                            }
+
                             setCheckInMap((prev) => {
                               const next = new Map(prev)
                               next.delete(dancer.dancer_id)
@@ -499,7 +511,7 @@ export default function RegistrationDeskPage({
                             })
                             showSuccess(`Undid check-in for ${dancer.first_name} ${dancer.last_name}`)
                           } catch (err) {
-                            showError('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
+                            showCritical('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
                           } finally {
                             setActing(null)
                           }

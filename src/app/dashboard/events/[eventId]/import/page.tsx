@@ -95,7 +95,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
 
       for (const [key, row] of uniqueDancers) {
         if (!dancerLookup.has(key)) {
-          const { data: newDancer } = await supabase
+          const { data: newDancer, error: insertErr } = await supabase
             .from('dancers')
             .insert({
               first_name: row.first_name,
@@ -106,6 +106,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
             })
             .select()
             .single()
+          if (insertErr) throw new Error(`Failed to insert dancer ${row.first_name} ${row.last_name}: ${insertErr.message}`)
           if (newDancer) dancerLookup.set(key, newDancer.id)
         }
       }

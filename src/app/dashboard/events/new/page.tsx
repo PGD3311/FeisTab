@@ -77,11 +77,16 @@ export default function NewEventPage() {
       localStorage.setItem(`feistab_access_${data.id}`, accessCode)
 
       // Auto-create Stage 1 so the event is immediately usable
-      await supabase.from('stages').insert({
+      const { error: stageErr } = await supabase.from('stages').insert({
         event_id: data.id,
         name: 'Stage 1',
         display_order: 1,
       })
+
+      if (stageErr) {
+        console.error('Failed to create default stage:', stageErr.message)
+      }
+
       router.push(`/dashboard/events/${data.id}`)
     }
   }
