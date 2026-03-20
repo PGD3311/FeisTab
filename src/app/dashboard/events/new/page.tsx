@@ -28,26 +28,51 @@ export default function NewEventPage() {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // Generate a 6-character access code
-    const accessCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    // Generate a unique 6-character access code with collision retry
+    let accessCode = ''
+    let data = null
+    let attempts = 0
+    const MAX_ATTEMPTS = 5
 
-    const { data, error: insertError } = await supabase
-      .from('events')
-      .insert({
-        name,
-        start_date: startDate,
-        location: location || null,
-        status: 'active',
-        registration_code: accessCode,
-        created_by: user?.id,
-      })
-      .select()
-      .single()
+    while (attempts < MAX_ATTEMPTS) {
+      accessCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      const { data: inserted, error: insertError } = await supabase
+        .from('events')
+        .insert({
+          name,
+          start_date: startDate,
+          location: location || null,
+          status: 'active',
+          registration_code: accessCode,
+          created_by: user?.id,
+        })
+        .select()
+        .single()
 
-    if (insertError) {
+      if (!insertError) {
+        data = inserted
+        break
+      }
+
+      // If it's a unique constraint violation, retry with a new code
+      if (insertError.code === '23505' && insertError.message.includes('registration_code')) {
+        attempts++
+        continue
+      }
+
+      // Any other error is a real failure
       setError(insertError.message)
       setLoading(false)
-    } else {
+      return
+    }
+
+    if (!data) {
+      setError('Failed to generate unique access code. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    {
       // Auto-authorize the creator
       localStorage.setItem(`feistab_access_${data.id}`, accessCode)
 

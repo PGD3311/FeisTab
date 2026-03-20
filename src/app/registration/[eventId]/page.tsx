@@ -426,17 +426,48 @@ export default function RegistrationDeskPage({
                         size="sm"
                         className="text-xs"
                         onClick={() => {
-                          const w = window.open('', '_blank', 'width=400,height=500')
-                          if (!w) return
-                          w.document.write(`<!DOCTYPE html><html><head><title>#${checkInRow.competitor_number}</title><style>
-                            body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
-                            .number { font-size: 250px; font-weight: 900; font-family: monospace; line-height: 1; }
-                            @media print { body { height: auto; padding: 20vh 0; } }
-                          </style></head><body>
-                            <div class="number">${checkInRow.competitor_number}</div>
-                            <script>window.print();</script>
-                          </body></html>`)
-                          w.document.close()
+                          const printWindow = window.open('', '_blank', 'width=400,height=500')
+                          if (!printWindow) return
+
+                          const number = String(checkInRow.competitor_number)
+                          const { document } = printWindow
+
+                          document.title = `#${number}`
+                          document.head.innerHTML = ''
+                          document.body.innerHTML = ''
+
+                          const style = document.createElement('style')
+                          style.textContent = `
+                            body {
+                              margin: 0;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              height: 100vh;
+                            }
+                            .number {
+                              font-size: 250px;
+                              font-weight: 900;
+                              font-family: monospace;
+                              line-height: 1;
+                            }
+                            @media print {
+                              body {
+                                height: auto;
+                                padding: 20vh 0;
+                              }
+                            }
+                          `
+
+                          const numberEl = document.createElement('div')
+                          numberEl.className = 'number'
+                          numberEl.textContent = number
+
+                          document.head.appendChild(style)
+                          document.body.appendChild(numberEl)
+
+                          printWindow.focus()
+                          printWindow.print()
                         }}
                       >
                         Print #

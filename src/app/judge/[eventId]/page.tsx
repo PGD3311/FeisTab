@@ -131,19 +131,8 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         }
         compData = (data as Competition[] | null) ?? []
       } else {
-        // Fallback: show all competitions for the event
-        const { data, error } = await supabase
-          .from('competitions')
-          .select(
-            'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, group_size'
-          )
-          .eq('event_id', eventId)
-          .order('code')
-
-        if (error) {
-          console.error('Failed to load competitions:', error.message)
-        }
-        compData = (data as Competition[] | null) ?? []
+        // No assignments: show empty list instead of exposing all competitions
+        compData = []
       }
 
       return compData
