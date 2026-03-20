@@ -1,5 +1,3 @@
-// src/lib/engine/anomalies/types.ts
-
 import { type RuleSetConfig } from '../rules'
 
 export type AnomalyType =

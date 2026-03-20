@@ -1,5 +1,3 @@
-// src/lib/audit-format.ts
-
 export interface AuditEntry {
   id: string
   user_id: string | null

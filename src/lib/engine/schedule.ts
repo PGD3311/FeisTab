@@ -23,7 +23,9 @@ export interface ScheduleGrouping {
 }
 
 // ---------------------------------------------------------------------------
-// Status sets — local to schedule derivation, NOT imported from competition-states
+// Status sets for schedule grouping. Defined locally (not imported from
+// competition-states) because the schedule view groups statuses differently
+// than the state machine does.
 // ---------------------------------------------------------------------------
 
 /** Statuses where the stage is currently occupied */

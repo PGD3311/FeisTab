@@ -10,6 +10,8 @@ export function detectNonReproducibleResults(
 ): Anomaly[] {
   if (storedResults.length === 0) return []
 
+  // Use rules snapshot frozen at tabulation time. Falls back to DEFAULT_RULES
+  // for results stored before rules_snapshot was added to calculated_payload.
   const frozenRules = storedResults[0]?.calculated_payload?.rules_snapshot ?? DEFAULT_RULES
 
   const roundScores = scores.filter(s => s.round_id === round_id)

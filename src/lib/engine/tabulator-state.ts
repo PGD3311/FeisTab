@@ -33,6 +33,8 @@ export type ScoreAction =
 // Derived selectors (compute from rows, never store)
 // ---------------------------------------------------------------------------
 
+// Keep in sync with NON_ACTIVE_STATUSES in anomalies/types.ts.
+// Defined separately because this module must stay pure (no anomaly dependency).
 const NON_ACTIVE = new Set(['scratched', 'no_show', 'disqualified', 'did_not_complete', 'medical'])
 
 export function isEditable(row: ScoreRow): boolean {

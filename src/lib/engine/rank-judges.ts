@@ -10,7 +10,8 @@ export interface JudgeRanking {
 /**
  * For each judge, rank all dancers by raw_score descending.
  * Tied raw scores share the same rank; Irish Points are averaged
- * across the tied positions. Flagged scores get rank=last and 0 points.
+ * across the tied positions. Flagged scores are excluded from ranking — they
+ * receive rank = (unflagged_count + 1) and 0 Irish Points.
  *
  * Returns a Map of judge_id → JudgeRanking[]
  */

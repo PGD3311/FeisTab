@@ -15,7 +15,8 @@ export interface TabulationResult {
   individual_ranks: { judge_id: string; rank: number; irish_points: number }[]
 }
 
-// Precision multiplier for integer comparisons
+// Defensive integer comparison: multiply totals by 1000 before comparing,
+// in case future scoring changes introduce fractional points.
 const PRECISION = 1000
 
 /**
@@ -106,7 +107,7 @@ export function tabulate(
 /**
  * Countback tie-breaker: compare dancers by number of 1st-place ranks,
  * then 2nd-place ranks, etc. Returns negative if a wins, positive if b wins,
- * 0 if still tied. Exported for direct testing.
+ * 0 if still tied.
  */
 export function resolveCountback(a: TabulationResult, b: TabulationResult): number {
   const maxRank = Math.max(

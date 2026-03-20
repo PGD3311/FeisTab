@@ -1,5 +1,5 @@
 // Standard Irish Points table: rank → points
-// 1st=100, 2nd=75, 3rd=65, then decreasing pattern down to 50th=1
+// 1st=100, 2nd=75, 3rd=65, 4th-10th decrease irregularly, 11th+ decrease by 1 per rank down to 50th=1
 const IRISH_POINTS_TABLE: number[] = [
   0,   // index 0 (unused — ranks are 1-based)
   100, // 1st
@@ -32,7 +32,8 @@ export function irishPointsForRank(rank: number): number {
  * for the positions they span. E.g., 2-way tie at rank 2 averages
  * points for positions 2 and 3.
  *
- * Irish Points are integers, so simple rounding suffices.
+ * When tied positions span multiple ranks, their points are averaged and rounded
+ * to the nearest integer. This is the standard Irish dancing convention.
  */
 export function averagePointsForTiedRanks(startRank: number, tiedCount: number): number {
   if (tiedCount <= 0 || startRank < 1) return 0

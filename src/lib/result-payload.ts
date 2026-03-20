@@ -40,7 +40,7 @@ interface ScoreEntry {
   flag_reason?: string | null
 }
 
-// ── Precision multiplier (mirrors engine) ─────────────────────────────────────
+// Must match PRECISION in tabulate.ts — used to detect ties via integer comparison.
 
 const PRECISION = 1000
 

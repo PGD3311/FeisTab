@@ -1,6 +1,5 @@
-// src/lib/check-in-sync.ts
-//
-// DB write helper — temporary compatibility bridge.
+// DB write helper — compatibility bridge until registrations.competitor_number
+// is deprecated in favor of event_check_ins as sole source of truth.
 // Separated from check-in.ts to keep that file pure (CLAUDE.md rule 1.4).
 //
 // This is the ONLY path that writes registrations.competitor_number

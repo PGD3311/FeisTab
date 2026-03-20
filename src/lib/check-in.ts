@@ -40,8 +40,9 @@ export function deriveCheckInStats(
   return { checkedIn, awaitingArrival, needsNumber }
 }
 
-// Auto-suggest starts at 100. If an event has numbers 1-50 from CSV,
-// next assigned number will still be 100 (not 51). This is intentional.
+// Auto-suggest starts at 100 to avoid collisions with CSV-imported competitor
+// numbers (which typically start at 1). Walk-up registrations get numbers from
+// a separate range so they never clash with pre-registered dancers.
 export function computeNextNumber(existingNumbers: string[]): number {
   let max = 99
   for (const n of existingNumbers) {
