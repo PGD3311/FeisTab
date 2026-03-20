@@ -1,6 +1,8 @@
 import { type ScoreInput } from './tabulate'
 import { averagePointsForTiedRanks } from './irish-points'
 
+const PRECISION = 1000
+
 export interface JudgeRanking {
   dancer_id: string
   rank: number
@@ -43,7 +45,7 @@ export function rankByJudge(
       const tiedStart = i
       while (
         i < unflagged.length &&
-        unflagged[i].raw_score === unflagged[tiedStart].raw_score
+        Math.round(unflagged[i].raw_score * PRECISION) === Math.round(unflagged[tiedStart].raw_score * PRECISION)
       ) {
         i++
       }

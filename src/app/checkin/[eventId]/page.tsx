@@ -596,8 +596,9 @@ export default function RosterConfirmationPage({
 
     const now = new Date().toISOString()
 
-    // Auto-advance to ready_for_day_of if still in an earlier status
-    const needsAdvance = comp.status === 'draft' || comp.status === 'imported'
+    // Auto-advance to ready_for_day_of if the state machine allows it
+    const needsAdvance = (comp.status === 'draft' || comp.status === 'imported')
+      && canTransition(comp.status, 'ready_for_day_of')
     const updateFields: Record<string, unknown> = {
       roster_confirmed_at: now,
       roster_confirmed_by: 'Side-Stage',

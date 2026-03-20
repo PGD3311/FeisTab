@@ -7,7 +7,7 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { showSuccess, showError } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
-import { ACTIVE_STATUSES } from '@/lib/competition-states'
+import { ACTIVE_STATUSES, canTransition } from '@/lib/competition-states'
 import { type CompetitionStatus } from '@/lib/competition-states'
 import {
   groupBySchedule,
@@ -247,7 +247,12 @@ export default function EventOverviewPage() {
             <Button
               size="sm"
               onClick={async () => {
-                const ids = importedComps.map((c) => c.id)
+                const validComps = importedComps.filter((c) => canTransition(c.status, 'ready_for_day_of'))
+                if (validComps.length === 0) {
+                  showError('No competitions can be advanced')
+                  return
+                }
+                const ids = validComps.map((c) => c.id)
                 const { error } = await supabase
                   .from('competitions')
                   .update({ status: 'ready_for_day_of' })

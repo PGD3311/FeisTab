@@ -40,11 +40,11 @@ export default function CompetitionDetailPage({
   const { eventId, compId } = use(params)
   const supabase = useSupabase()
   const { reload } = useEvent()
-  const [comp, setComp] = useState<any>(null)
-  const [registrations, setRegistrations] = useState<any[]>([])
-  const [rounds, setRounds] = useState<any[]>([])
-  const [scores, setScores] = useState<any[]>([])
-  const [results, setResults] = useState<any[]>([])
+  const [comp, setComp] = useState<any>(null) // TODO: type when Supabase types generated
+  const [registrations, setRegistrations] = useState<any[]>([]) // TODO: type when Supabase types generated
+  const [rounds, setRounds] = useState<any[]>([]) // TODO: type when Supabase types generated
+  const [scores, setScores] = useState<any[]>([]) // TODO: type when Supabase types generated
+  const [results, setResults] = useState<any[]>([]) // TODO: type when Supabase types generated
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
   const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const [assignedJudgeIds, setAssignedJudgeIds] = useState<string[]>([])
@@ -790,17 +790,6 @@ export default function CompetitionDetailPage({
       r.dancer_id,
       r.dancers ? `${r.dancers.first_name} ${r.dancers.last_name} (#${r.competitor_number})` : r.dancer_id,
     ])),
-  }
-
-  function relativeTime(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins} min ago`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    return `${days}d ago`
   }
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>

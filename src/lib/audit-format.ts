@@ -1,3 +1,5 @@
+import { UNPUBLISH_REASONS } from '@/lib/unpublish-reasons'
+
 export interface AuditEntry {
   id: string
   user_id: string | null
@@ -67,9 +69,7 @@ export function matchesFilter(action: string, filter: string): boolean {
   return getBadge(action).filterGroup === filter
 }
 
-import { UNPUBLISH_REASONS } from '@/lib/unpublish-reasons'
-
-// --- Formatter helpers (not exported) ---
+// --- Formatter helpers ---
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
