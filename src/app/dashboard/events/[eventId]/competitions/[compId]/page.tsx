@@ -374,27 +374,22 @@ export default function CompetitionDetailPage({
         flag_reason: s.flag_reason ?? null,
       }))
 
-      for (const r of previewResults) {
-        const enrichedPayload = buildCalculatedPayload(
-          r,
-          judges,
-          mappedScores,
-          previewResults,
-          ruleset
-        )
+      // Batch upsert all results at once (avoids N sequential round trips)
+      const resultRows = previewResults.map((r) => ({
+        competition_id: compId,
+        dancer_id: r.dancer_id,
+        final_rank: r.final_rank,
+        display_place: String(r.final_rank),
+        calculated_payload: buildCalculatedPayload(
+          r, judges, mappedScores, previewResults, ruleset
+        ),
+      }))
 
-        const { error } = await supabase.from('results').upsert(
-          {
-            competition_id: compId,
-            dancer_id: r.dancer_id,
-            final_rank: r.final_rank,
-            display_place: String(r.final_rank),
-            calculated_payload: enrichedPayload,
-          },
-          { onConflict: 'competition_id,dancer_id' }
-        )
-        if (error) throw new Error(`Failed to save result for dancer: ${error.message}`)
-      }
+      const { error } = await supabase.from('results').upsert(
+        resultRows,
+        { onConflict: 'competition_id,dancer_id' }
+      )
+      if (error) throw new Error(`Failed to save results: ${error.message}`)
 
       const { error: statusErr } = await supabase
         .from('competitions')
@@ -526,17 +521,20 @@ export default function CompetitionDetailPage({
       const tabulationResults = tabulate(roundScores, ruleset)
       const recalled = generateRecalls(tabulationResults, ruleset.recall_top_percent)
 
-      for (const r of recalled) {
+      // Batch upsert all recalls at once (avoids N sequential round trips)
+      const recallRows = recalled.map((r) => ({
+        competition_id: compId,
+        source_round_id: latestRound.id,
+        dancer_id: r.dancer_id,
+        recall_status: 'recalled',
+      }))
+
+      if (recallRows.length > 0) {
         const { error } = await supabase.from('recalls').upsert(
-          {
-            competition_id: compId,
-            source_round_id: latestRound.id,
-            dancer_id: r.dancer_id,
-            recall_status: 'recalled',
-          },
+          recallRows,
           { onConflict: 'competition_id,source_round_id,dancer_id' }
         )
-        if (error) throw new Error(`Failed to save recall: ${error.message}`)
+        if (error) throw new Error(`Failed to save recalls: ${error.message}`)
       }
 
       const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
