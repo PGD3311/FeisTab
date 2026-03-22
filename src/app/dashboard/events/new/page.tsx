@@ -72,23 +72,21 @@ export default function NewEventPage() {
       return
     }
 
-    {
-      // Auto-authorize the creator
-      localStorage.setItem(`feistab_access_${data.id}`, accessCode)
+    // Auto-authorize the creator
+    localStorage.setItem(`feistab_access_${data.id}`, accessCode)
 
-      // Auto-create Stage 1 so the event is immediately usable
-      const { error: stageErr } = await supabase.from('stages').insert({
-        event_id: data.id,
-        name: 'Stage 1',
-        display_order: 1,
-      })
+    // Auto-create Stage 1 so the event is immediately usable
+    const { error: stageErr } = await supabase.from('stages').insert({
+      event_id: data.id,
+      name: 'Stage 1',
+      display_order: 1,
+    })
 
-      if (stageErr) {
-        console.error('Failed to create default stage:', stageErr.message)
-      }
-
-      router.push(`/dashboard/events/${data.id}`)
+    if (stageErr) {
+      console.error('Failed to create default stage:', stageErr.message)
     }
+
+    router.push(`/dashboard/events/${data.id}`)
   }
 
   return (

@@ -500,6 +500,12 @@ export default function RegistrationDeskPage({
                               .eq('dancer_id', dancer.dancer_id)
 
                             if (regErr) {
+                              // Check-in was already deleted — reflect that in the UI
+                              setCheckInMap((prev) => {
+                                const next = new Map(prev)
+                                next.delete(dancer.dancer_id)
+                                return next
+                              })
                               showCritical('Check-in removed but registration update failed', { description: regErr.message })
                               return
                             }
