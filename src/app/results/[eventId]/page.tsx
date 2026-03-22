@@ -16,23 +16,27 @@ export default async function PublicResultsPage({
   const { q } = await searchParams
   const supabase = await createClient()
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name, start_date, location')
-    .eq('id', eventId)
-    .single()
+  const [eventRes, compsRes] = await Promise.all([
+    supabase
+      .from('events')
+      .select('id, name, start_date, location')
+      .eq('id', eventId)
+      .single(),
+    supabase
+      .from('competitions')
+      .select(`
+        id, code, name, age_group, level,
+        results(final_rank, calculated_payload, published_at, dancer_id, dancers(id, first_name, last_name))
+      `)
+      .eq('event_id', eventId)
+      .eq('status', 'published')
+      .order('code'),
+  ])
 
+  const event = eventRes.data
   if (!event) notFound()
 
-  const { data: competitions } = await supabase
-    .from('competitions')
-    .select(`
-      id, code, name, age_group, level,
-      results(final_rank, calculated_payload, published_at, dancer_id, dancers(id, first_name, last_name))
-    `)
-    .eq('event_id', eventId)
-    .eq('status', 'published')
-    .order('code')
+  const competitions = compsRes.data
 
   interface NormalizedResult {
     final_rank: number

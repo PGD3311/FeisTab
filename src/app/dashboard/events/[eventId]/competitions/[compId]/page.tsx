@@ -286,20 +286,21 @@ export default function CompetitionDetailPage({
       setAnomalies([])
     }
 
-    // Fetch audit entries for this competition
-    const { data: auditByEntity } = await supabase
-      .from('audit_log')
-      .select('*')
-      .eq('entity_id', compId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    const { data: auditByPayload } = await supabase
-      .from('audit_log')
-      .select('*')
-      .contains('after_data', { competition_id: compId })
-      .order('created_at', { ascending: false })
-      .limit(20)
+    // Fetch audit entries for this competition (parallel — independent queries)
+    const [{ data: auditByEntity }, { data: auditByPayload }] = await Promise.all([
+      supabase
+        .from('audit_log')
+        .select('*')
+        .eq('entity_id', compId)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('audit_log')
+        .select('*')
+        .contains('after_data', { competition_id: compId })
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ])
 
     // Deduplicate by id
     const auditMap = new Map<string, AuditEntry>()

@@ -68,19 +68,22 @@ export default async function PublicFeedbackPage({
     )
   }
 
-  // Load score entries with comments for this dancer
-  const { data: scores } = await supabase
-    .from('score_entries')
-    .select('competition_id, judge_id, round_id, comment_data, comments')
-    .eq('dancer_id', dancerId)
-    .in('competition_id', compIds)
+  // Load score entries and results in parallel (independent queries)
+  const [scoresRes, resultsRes] = await Promise.all([
+    supabase
+      .from('score_entries')
+      .select('competition_id, judge_id, round_id, comment_data, comments')
+      .eq('dancer_id', dancerId)
+      .in('competition_id', compIds),
+    supabase
+      .from('results')
+      .select('competition_id, final_rank, calculated_payload')
+      .eq('dancer_id', dancerId)
+      .in('competition_id', compIds),
+  ])
 
-  // Load results for this dancer
-  const { data: results } = await supabase
-    .from('results')
-    .select('competition_id, final_rank, calculated_payload')
-    .eq('dancer_id', dancerId)
-    .in('competition_id', compIds)
+  const scores = scoresRes.data
+  const results = resultsRes.data
 
   // Load judges and rounds
   const judgeIds = [...new Set((scores ?? []).map((s) => s.judge_id))]
