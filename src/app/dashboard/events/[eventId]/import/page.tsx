@@ -93,21 +93,28 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
         dancerLookup.set(key, d.id)
       }
 
-      for (const [key, row] of uniqueDancers) {
-        if (!dancerLookup.has(key)) {
-          const { data: newDancer, error: insertErr } = await supabase
-            .from('dancers')
-            .insert({
-              first_name: row.first_name,
-              last_name: row.last_name,
-              school_name: row.school_name || null,
-              teacher_name: row.teacher_name || null,
-              date_of_birth: row.date_of_birth || null,
-            })
-            .select()
-            .single()
-          if (insertErr) throw new Error(`Failed to insert dancer ${row.first_name} ${row.last_name}: ${insertErr.message}`)
-          if (newDancer) dancerLookup.set(key, newDancer.id)
+      // Batch insert any dancers not found after upsert (avoids N+1 sequential inserts)
+      const missingDancers = [...uniqueDancers.entries()]
+        .filter(([key]) => !dancerLookup.has(key))
+        .map(([, row]) => ({
+          first_name: row.first_name,
+          last_name: row.last_name,
+          school_name: row.school_name || null,
+          teacher_name: row.teacher_name || null,
+          date_of_birth: row.date_of_birth || null,
+        }))
+
+      if (missingDancers.length > 0) {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('dancers')
+          .insert(missingDancers)
+          .select('id, first_name, last_name, school_name')
+
+        if (insertErr) throw new Error(`Failed to insert dancers: ${insertErr.message}`)
+
+        for (const d of inserted ?? []) {
+          const key = `${d.first_name}|${d.last_name}|${d.school_name ?? ''}`.toLowerCase()
+          dancerLookup.set(key, d.id)
         }
       }
 

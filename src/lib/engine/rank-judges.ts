@@ -1,7 +1,6 @@
 import { type ScoreInput } from './tabulate'
 import { averagePointsForTiedRanks } from './irish-points'
-
-const PRECISION = 1000
+import { PRECISION } from './constants'
 
 export interface JudgeRanking {
   dancer_id: string
@@ -37,16 +36,17 @@ export function rankByJudge(
     // Sort unflagged by raw_score descending
     unflagged.sort((a, b) => b.raw_score - a.raw_score)
 
+    // Pre-compute integer scores for safe comparison
+    const intScores = unflagged.map(s => Math.round(s.raw_score * PRECISION))
+
     const rankings: JudgeRanking[] = []
 
     // Assign ranks with tie handling
     let i = 0
     while (i < unflagged.length) {
       const tiedStart = i
-      while (
-        i < unflagged.length &&
-        Math.round(unflagged[i].raw_score * PRECISION) === Math.round(unflagged[tiedStart].raw_score * PRECISION)
-      ) {
+      const tiedScore = intScores[tiedStart]
+      while (i < unflagged.length && intScores[i] === tiedScore) {
         i++
       }
       const tiedCount = i - tiedStart

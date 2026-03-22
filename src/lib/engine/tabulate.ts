@@ -1,5 +1,6 @@
 import { type RuleSetConfig } from './rules'
 import { rankByJudge } from './rank-judges'
+import { PRECISION } from './constants'
 
 export interface ScoreInput {
   dancer_id: string
@@ -15,9 +16,7 @@ export interface TabulationResult {
   individual_ranks: { judge_id: string; rank: number; irish_points: number }[]
 }
 
-// Defensive integer comparison: multiply totals by 1000 before comparing,
-// in case future scoring changes introduce fractional points.
-const PRECISION = 1000
+// PRECISION imported from constants.ts
 
 /**
  * Tabulate competition results using Irish Points.

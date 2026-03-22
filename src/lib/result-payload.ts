@@ -1,5 +1,6 @@
 import { type TabulationResult } from '@/lib/engine/tabulate'
 import { type RuleSetConfig } from '@/lib/engine/rules'
+import { PRECISION } from '@/lib/engine/constants'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,9 +41,7 @@ interface ScoreEntry {
   flag_reason?: string | null
 }
 
-// Must match PRECISION in tabulate.ts — used to detect ties via integer comparison.
-
-const PRECISION = 1000
+// PRECISION imported from engine/constants.ts
 
 // ── buildJudgeScores ──────────────────────────────────────────────────────────
 
