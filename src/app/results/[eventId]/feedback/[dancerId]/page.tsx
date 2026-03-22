@@ -86,7 +86,7 @@ export default async function PublicFeedbackPage({
   const judgeIds = [...new Set((scores ?? []).map((s) => s.judge_id))]
   const roundIds = [...new Set((scores ?? []).map((s) => s.round_id))]
 
-  const [judgesRes, roundsRes] = await Promise.all([
+  const [judgesRes] = await Promise.all([
     judgeIds.length > 0
       ? supabase.from('judges').select('id, first_name, last_name').in('id', judgeIds)
       : { data: [] },
@@ -100,11 +100,6 @@ export default async function PublicFeedbackPage({
       (j) => [j.id, `${j.first_name} ${j.last_name}`]
     )
   )
-  const roundMap = new Map(
-    ((roundsRes.data ?? []) as Array<{ id: string; round_number: number }>).map(
-      (r) => [r.id, r.round_number]
-    )
-  )
   const resultMap = new Map(
     (results ?? []).map((r) => [
       r.competition_id,
@@ -113,8 +108,6 @@ export default async function PublicFeedbackPage({
   )
 
   // Build sections by competition
-  const compMap = new Map(compList.map((c) => [c.id, c]))
-
   interface FeedbackEntry {
     judgeName: string
     codes: string[]

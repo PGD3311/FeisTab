@@ -58,7 +58,7 @@ export default function CompetitionDetailPage({
   const [unlocking, setUnlocking] = useState(false)
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [loadWarning, setLoadWarning] = useState(false)
-  const [stages, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
+  const [, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [showUnpublishDialog, setShowUnpublishDialog] = useState(false)
 
@@ -316,7 +316,7 @@ export default function CompetitionDetailPage({
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps -- loadData depends on supabase/params which are stable
 
   async function handlePreviewTabulation() {
     if (!ruleset || !comp) {
@@ -685,7 +685,8 @@ export default function CompetitionDetailPage({
     try {
       // 1. Remove judge's sign-off
       const currentSignOffs = latestRnd.judge_sign_offs ?? {}
-      const { [unlockJudgeId]: _, ...remainingSignOffs } = currentSignOffs
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest destructuring to remove key
+      const { [unlockJudgeId]: _removed, ...remainingSignOffs } = currentSignOffs
       const { error: signOffErr } = await supabase
         .from('rounds')
         .update({ judge_sign_offs: remainingSignOffs })
@@ -1082,7 +1083,7 @@ export default function CompetitionDetailPage({
             {anomalies.filter(a => a.blocking).length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-destructive">Blockers — must resolve before tabulation</p>
-                {anomalies.filter(a => a.blocking).map((a, i) => (
+                {anomalies.filter(a => a.blocking).map((a) => (
                   <div key={a.dedupe_key} className="text-sm p-2 rounded bg-destructive/10 border border-destructive/20 text-destructive">
                     {resolveAnomalyMessage(a)}
                   </div>
@@ -1092,7 +1093,7 @@ export default function CompetitionDetailPage({
             {anomalies.filter(a => a.severity === 'warning').length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-feis-orange">Warnings — review recommended</p>
-                {anomalies.filter(a => a.severity === 'warning').map((a, i) => (
+                {anomalies.filter(a => a.severity === 'warning').map((a) => (
                   <div key={a.dedupe_key} className="text-sm p-2 rounded bg-feis-orange-light border border-feis-orange/20 text-feis-orange">
                     {resolveAnomalyMessage(a)}
                   </div>
@@ -1105,7 +1106,7 @@ export default function CompetitionDetailPage({
                   Review signals ({anomalies.filter(a => a.severity === 'info').length})
                 </summary>
                 <div className="mt-2 space-y-2">
-                  {anomalies.filter(a => a.severity === 'info').map((a, i) => (
+                  {anomalies.filter(a => a.severity === 'info').map((a) => (
                     <div key={a.dedupe_key} className="p-2 rounded bg-muted text-muted-foreground">
                       {resolveAnomalyMessage(a)}
                     </div>

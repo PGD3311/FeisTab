@@ -335,12 +335,14 @@ export default function RosterConfirmationPage({
 
   // Initial load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void loadInitialData()
     void loadCheckIns()
   }, [loadInitialData, loadCheckIns])
 
   // Judge filter effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void loadJudgeAssignments(selectedJudgeId)
   }, [selectedJudgeId, loadJudgeAssignments])
 

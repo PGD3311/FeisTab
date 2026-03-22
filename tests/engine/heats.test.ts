@@ -3,8 +3,6 @@ import {
   generateHeats,
   getCurrentHeat,
   type HeatDancer,
-  type HeatSnapshot,
-  type HeatSlot,
 } from '@/lib/engine/heats'
 
 function makeDancers(count: number): HeatDancer[] {

@@ -60,7 +60,7 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
-  useEffect(() => { loadEvents() }, [])
+  useEffect(() => { loadEvents() }, []) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- initial data load
 
   async function handleJoin() {
     if (!joinCode.trim()) return

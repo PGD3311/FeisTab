@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { tabulate, resolveCountback, type ScoreInput, type TabulationResult } from '@/lib/engine/tabulate'
-import { type RuleSetConfig, DEFAULT_RULES } from '@/lib/engine/rules'
+import { DEFAULT_RULES } from '@/lib/engine/rules'
 
 describe('tabulate (Irish Points)', () => {
   it('ranks dancers by Irish Points total across judges', () => {

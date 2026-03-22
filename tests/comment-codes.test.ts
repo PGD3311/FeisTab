@@ -3,7 +3,6 @@ import {
   COMMENT_CODES,
   validateCommentData,
   hasCommentContent,
-  type CommentData,
 } from '@/lib/comment-codes'
 
 describe('COMMENT_CODES', () => {

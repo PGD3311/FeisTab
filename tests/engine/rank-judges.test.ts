@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rankByJudge, type JudgeRanking } from '@/lib/engine/rank-judges'
+import { rankByJudge } from '@/lib/engine/rank-judges'
 import { type ScoreInput } from '@/lib/engine/tabulate'
 
 describe('rankByJudge', () => {

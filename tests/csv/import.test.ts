@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseRegistrationCSV, type ImportRow, type ImportResult } from '@/lib/csv/import'
+import { parseRegistrationCSV } from '@/lib/csv/import'
 
 describe('parseRegistrationCSV', () => {
   it('parses valid CSV rows', () => {

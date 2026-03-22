@@ -455,7 +455,7 @@ async function main() {
   const levelStats = {}
 
   for (const [key, groupComps] of groups) {
-    const [level, ageGroup] = key.split('|||')
+    const [level] = key.split('|||')
 
     // Determine cohort size based on level
     let cohortSize

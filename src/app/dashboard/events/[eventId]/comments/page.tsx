@@ -176,6 +176,7 @@ export default function CommentsIndexPage({
 
   useEffect(() => {
     void loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData depends on supabase/params which are stable
   }, [])
 
   const filtered = search.trim()

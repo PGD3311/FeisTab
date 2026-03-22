@@ -9,7 +9,7 @@ import {
   type CheckInRow,
 } from '@/lib/check-in'
 import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
-import { showSuccess, showError, showCritical } from '@/lib/feedback'
+import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'

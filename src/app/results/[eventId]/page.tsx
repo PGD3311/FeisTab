@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { ResultsTable } from '@/components/results-table'
 import { CopyLinkButton } from '@/components/copy-link-button'
 

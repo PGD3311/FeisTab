@@ -44,7 +44,7 @@ export default function EventLayout({
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [eventId])
+  useEffect(() => { loadData() }, [eventId]) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- initial data load
 
   if (loading) {
     return <p className="text-muted-foreground">Loading...</p>

@@ -74,6 +74,7 @@ export default function ProgramPage({
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData depends on supabase/eventId which are stable
   }, [eventId])
 
   function getCompsForStage(stageId: string): Competition[] {
@@ -121,7 +122,7 @@ export default function ProgramPage({
       for (let i = 0; i < newOrder.length; i++) {
         await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
       }
-    } catch (err) {
+    } catch {
       showError('Failed to save — refresh to retry')
       await loadData()
     }
@@ -159,7 +160,7 @@ export default function ProgramPage({
       for (let i = 0; i < newOrder.length; i++) {
         await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
       }
-    } catch (err) {
+    } catch {
       showError('Failed to save order — refresh to retry')
       await loadData()
     }
@@ -317,7 +318,7 @@ export default function ProgramPage({
                           }
                           await loadData()
                           showSuccess('Sorted by number')
-                        } catch (err) {
+                        } catch {
                           showError('Failed to sort')
                         } finally {
                           setReordering(false)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,17 +23,7 @@ export function EventGate({
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Check localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(getStorageKey(eventId))
-    if (saved) {
-      validateCode(saved, true)
-    } else {
-      setChecking(false)
-    }
-  }, [eventId])
-
-  async function validateCode(inputCode: string, silent?: boolean) {
+  const validateCode = useCallback(async (inputCode: string, silent?: boolean) => {
     if (!silent) setSubmitting(true)
     setError('')
 
@@ -67,7 +57,18 @@ export function EventGate({
 
     if (!silent) setSubmitting(false)
     setChecking(false)
-  }
+  }, [supabase, eventId])
+
+  // Check localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(getStorageKey(eventId))
+    if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+      validateCode(saved, true)
+    } else {
+      setChecking(false)
+    }
+  }, [eventId, validateCode])
 
   if (checking) {
     return <p className="text-muted-foreground p-6">Loading...</p>

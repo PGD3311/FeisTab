@@ -10,7 +10,6 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, CheckCircle2 } from 'lucide-react'
 import {
   groupBySchedule,
   getScheduleBlockReasons,
@@ -137,7 +136,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
       return compData
     },
-    [supabase, eventId]
+    [supabase]
   )
 
   // Poll for status updates
@@ -211,6 +210,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       router.push('/judge')
       return
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     setSession(parsed)
 
     async function load() {
@@ -257,7 +257,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       setLoading(false)
     }
     load()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only effect, deps are stable
 
   // Polling with visibility-aware interval (fallback if Realtime drops)
   useEffect(() => {
@@ -581,7 +581,6 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
           </CardHeader>
           <CardContent className="space-y-2">
             {scoreNowComps.map((comp) => {
-              const isIncoming = comp.status === 'released_to_judge'
               const isActive = SCORING_STATUSES.includes(comp.status)
               return isActive ? (
                 <Link

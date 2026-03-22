@@ -4,7 +4,6 @@ import {
   deriveCheckInStats,
   computeNextNumber,
   type CheckInRow,
-  type CheckInState,
 } from '@/lib/check-in'
 
 describe('getCheckInState', () => {

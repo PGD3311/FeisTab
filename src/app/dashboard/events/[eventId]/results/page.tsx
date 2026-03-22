@@ -100,7 +100,7 @@ export default function ResultsPublishingPage({
     setLoadingResults(false)
   }
 
-  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- initial data load
 
   async function handlePublish(
     compId: string,
@@ -219,10 +219,6 @@ export default function ResultsPublishingPage({
     ['complete_unpublished'].includes(c.status) && (c.results?.[0]?.count ?? 0) > 0
   )
   const published = competitions.filter(c => c.status === 'published')
-  const withResults = competitions.filter(c =>
-    (c.status === 'published' || c.status === 'complete_unpublished') && (c.results?.[0]?.count ?? 0) > 0
-  )
-
   function renderCompRow(c: CompetitionRow, action: React.ReactNode) {
     const isExpanded = expandedCompId === c.id
     const hasResults = (c.results?.[0]?.count ?? 0) > 0

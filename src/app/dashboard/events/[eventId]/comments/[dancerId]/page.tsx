@@ -165,8 +165,8 @@ export default function DancerCommentSheetPage({
     const roundIds = [...new Set(scoreEntries.map((s) => s.round_id))]
 
     // Load judges and rounds
-    let judgeMap = new Map<string, Judge>()
-    let roundMap = new Map<string, Round>()
+    const judgeMap = new Map<string, Judge>()
+    const roundMap = new Map<string, Round>()
 
     if (judgeIds.length > 0) {
       const { data: judges, error: judgeErr } = await supabase
@@ -273,6 +273,7 @@ export default function DancerCommentSheetPage({
 
   useEffect(() => {
     void loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData depends on supabase/params which are stable
   }, [])
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>

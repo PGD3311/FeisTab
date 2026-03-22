@@ -67,7 +67,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [loadError, setLoadError] = useState(false)
 
   // Assignment state
-  const [stages, setStages] = useState<Stage[]>([])
+  const [, setStages] = useState<Stage[]>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [assignmentCounts, setAssignmentCounts] = useState<AssignmentCounts>({})
   const [expandedJudgeId, setExpandedJudgeId] = useState<string | null>(null)
@@ -153,6 +153,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   }, [supabase, eventId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void loadJudges()
     void loadCompetitions()
     void loadAssignmentCounts()

@@ -109,6 +109,7 @@ export default function AuditTrailPage({
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData depends on supabase/params which are stable
   }, [])
 
   function toggleExpanded(id: string) {

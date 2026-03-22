@@ -22,6 +22,9 @@ interface JudgeSession {
   name: string
 }
 
+// Statuses that are normal progression — don't show recall banner for these
+const SCORING_OR_DONE = ['in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked', 'recalled_round_pending']
+
 export default function JudgeScoringPage({
   params,
 }: {
@@ -98,8 +101,6 @@ export default function JudgeScoringPage({
 
   // Track if competition has been recalled/changed by organizer
   const [compRecalled, setCompRecalled] = useState(false)
-  // Statuses that are normal progression — don't show recall banner for these
-  const SCORING_OR_DONE = ['in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked', 'recalled_round_pending']
 
   // Realtime subscriptions for instant updates from organizer actions
   useEffect(() => {
@@ -182,6 +183,7 @@ export default function JudgeScoringPage({
     }
     setSession(parsed)
     loadData(parsed.judge_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only effect, loadData is stable
   }, [])
 
   async function loadData(judgeId: string) {
