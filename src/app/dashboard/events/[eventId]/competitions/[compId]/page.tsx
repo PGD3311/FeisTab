@@ -19,11 +19,13 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
+import { signOffJudge } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
 import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { type JudgeInfo } from '@/types/shared'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
 import { Button } from '@/components/ui/button'
@@ -46,7 +48,7 @@ export default function CompetitionDetailPage({
   const [scores, setScores] = useState<any[]>([]) // TODO: type when Supabase types generated
   const [results, setResults] = useState<any[]>([]) // TODO: type when Supabase types generated
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
-  const [judges, setJudges] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [judges, setJudges] = useState<JudgeInfo[]>([])
   const [assignedJudgeIds, setAssignedJudgeIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
@@ -682,15 +684,8 @@ export default function CompetitionDetailPage({
     setUnlocking(true)
 
     try {
-      // 1. Remove judge's sign-off
-      const currentSignOffs = latestRnd.judge_sign_offs ?? {}
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest destructuring to remove key
-      const { [unlockJudgeId]: _removed, ...remainingSignOffs } = currentSignOffs
-      const { error: signOffErr } = await supabase
-        .from('rounds')
-        .update({ judge_sign_offs: remainingSignOffs })
-        .eq('id', latestRnd.id)
-      if (signOffErr) throw new Error(`Failed to remove sign-off: ${signOffErr.message}`)
+      // 1. Atomically remove judge's sign-off
+      await signOffJudge(supabase, latestRnd.id, unlockJudgeId, compId, 'remove')
 
       // 2. Unlock judge's scores (clear locked_at)
       const { error: unlockErr } = await supabase

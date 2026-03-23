@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { logAudit } from '@/lib/audit'
+import { signOffJudge } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
@@ -310,17 +311,8 @@ export default function JudgeScoringPage({
         .eq('judge_id', session.judge_id)
       if (lockErr) throw new Error(`Failed to lock scores: ${lockErr.message}`)
 
-      // Record sign-off in round's judge_sign_offs jsonb
-      const currentSignOffs = round.judge_sign_offs || {}
-      const updatedSignOffs = {
-        ...currentSignOffs,
-        [session.judge_id]: new Date().toISOString(),
-      }
-      const { error: signOffErr } = await supabase
-        .from('rounds')
-        .update({ judge_sign_offs: updatedSignOffs })
-        .eq('id', round.id)
-      if (signOffErr) throw new Error(`Failed to record sign-off: ${signOffErr.message}`)
+      // Atomically record sign-off in round's judge_sign_offs jsonb
+      const updatedSignOffs = await signOffJudge(supabase, round.id, session.judge_id, compId)
 
       // Check if all ASSIGNED judges (not all event judges) have signed off
       const { data: assignments, error: assignErr } = await supabase
@@ -334,12 +326,9 @@ export default function JudgeScoringPage({
       if (assignments && assignments.length > 0) {
         assignedJudgeIds = assignments.map((a: { judge_id: string }) => a.judge_id)
       } else {
-        const { data: allJudges, error: judgesErr } = await supabase
-          .from('judges')
-          .select('id')
-          .eq('event_id', eventId)
-        if (judgesErr) throw new Error(`Failed to check judges: ${judgesErr.message}`)
-        assignedJudgeIds = allJudges?.map(j => j.id) ?? []
+        // No assignments configured — cannot determine "all done", skip auto-advance
+        // The organizer must manually advance via the dashboard
+        assignedJudgeIds = []
       }
 
       const allDone = assignedJudgeIds.length > 0 && assignedJudgeIds.every(id => updatedSignOffs[id])

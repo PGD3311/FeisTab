@@ -6,7 +6,9 @@ import { ChevronLeft } from 'lucide-react'
 
 import { useSupabase } from '@/hooks/use-supabase'
 import { logAudit } from '@/lib/audit'
+import { signOffJudge } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
+import { type FlagReason } from '@/lib/engine/flag-reasons'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import {
@@ -32,22 +34,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { type RegistrationStatus } from '@/lib/engine/anomalies/types'
+import { type JudgeInfo } from '@/types/shared'
 
 // ---------------------------------------------------------------------------
 // Local types
 // ---------------------------------------------------------------------------
 
-interface Judge {
-  id: string
-  first_name: string
-  last_name: string
-}
-
 interface Registration {
   id: string
   dancer_id: string
   competitor_number: string
-  status: string | null
+  status: RegistrationStatus | null
   dancers: { first_name: string; last_name: string } | null
 }
 
@@ -83,7 +81,7 @@ export default function TabulatorEntryPage({
   const supabase = useSupabase()
 
   // --- Base state (unchanged from original) ---
-  const [judges, setJudges] = useState<Judge[]>([])
+  const [judges, setJudges] = useState<JudgeInfo[]>([])
   const [selectedJudgeId, setSelectedJudgeId] = useState<string>('')
   const [compCode, setCompCode] = useState('')
   const [compStatus, setCompStatus] = useState<CompetitionStatus>('draft')
@@ -244,7 +242,7 @@ export default function TabulatorEntryPage({
       dancerId: e.dancer_id,
       rawScore: e.raw_score,
       flagged: e.flagged,
-      flagReason: e.flag_reason,
+      flagReason: e.flag_reason as FlagReason | null,
       commentData: e.comment_data as CommentData | null,
     }))
 
@@ -500,20 +498,8 @@ export default function TabulatorEntryPage({
       if (lockErr)
         throw new Error(`Failed to lock scores: ${lockErr.message}`)
 
-      // Record sign-off
-      const currentSignOffs = round.judge_sign_offs || {}
-      const updatedSignOffs = {
-        ...currentSignOffs,
-        [selectedJudgeId]: new Date().toISOString(),
-      }
-
-      const { error: signOffErr } = await supabase
-        .from('rounds')
-        .update({ judge_sign_offs: updatedSignOffs })
-        .eq('id', round.id)
-
-      if (signOffErr)
-        throw new Error(`Failed to record sign-off: ${signOffErr.message}`)
+      // Atomically record sign-off
+      const updatedSignOffs = await signOffJudge(supabase, round.id, selectedJudgeId, compId)
 
       // Auto-advance status if all judges done
       const allDone =
@@ -769,7 +755,7 @@ export default function TabulatorEntryPage({
                     type: 'SET_FLAG',
                     dancerId: row.dancerId,
                     flagged: true,
-                    flagReason: e.target.value || null,
+                    flagReason: (e.target.value as FlagReason) || null,
                   })
                 }
                 disabled={signedOff}
