@@ -1,148 +1,204 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { useSupabase } from '@/hooks/use-supabase'
+import { createClient } from '@/lib/supabase/server'
+import { logout, fulfillInvitations } from '@/app/auth/actions'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-interface EventInfo {
+export const dynamic = 'force-dynamic'
+
+type EventRole = 'organizer' | 'registration_desk' | 'side_stage' | 'judge'
+
+interface EventRoleRow {
+  role: EventRole
+  event_id: string
+  events: {
+    id: string
+    name: string
+    start_date: string
+  }
+}
+
+interface EventWithRoles {
   id: string
   name: string
   start_date: string
-  location: string | null
+  roles: EventRole[]
 }
 
-export default function HomePage() {
-  const supabase = useSupabase()
-  const router = useRouter()
-  const [code, setCode] = useState('')
-  const [error, setError] = useState('')
-  const [checking, setChecking] = useState(false)
-  const [event, setEvent] = useState<EventInfo | null>(null)
+const ROLE_LABELS: Record<EventRole, string> = {
+  organizer: 'Organizer',
+  registration_desk: 'Registration Desk',
+  side_stage: 'Side-Stage',
+  judge: 'Judge',
+}
 
-  async function handleCodeSubmit() {
-    if (!code.trim()) return
-    setChecking(true)
-    setError('')
+const ROLE_BADGE_CLASSES: Record<EventRole, string> = {
+  organizer: 'bg-feis-green text-white border-feis-green',
+  registration_desk: 'bg-feis-green-light text-feis-green border-feis-green/30',
+  side_stage: 'bg-feis-orange-light text-feis-orange border-feis-orange/30',
+  judge: 'bg-muted text-feis-charcoal border-border',
+}
 
-    const { data, error: fetchErr } = await supabase
-      .from('events')
-      .select('id, name, start_date, location, registration_code')
-      .eq('registration_code', code.trim().toUpperCase())
-      .maybeSingle()
+function getActionLinks(eventId: string, roles: EventRole[]) {
+  const links: { label: string; href: string }[] = []
+  const hasRole = (r: EventRole) => roles.includes(r)
 
-    if (fetchErr || !data) {
-      setError('No event found with that code')
-      setChecking(false)
-      return
+  if (hasRole('organizer')) {
+    links.push({ label: 'Dashboard', href: `/dashboard/events/${eventId}` })
+    links.push({ label: 'Check-In', href: `/registration/${eventId}` })
+    links.push({ label: 'Side-Stage', href: `/checkin/${eventId}` })
+    links.push({ label: 'Team', href: `/dashboard/events/${eventId}/judges` })
+  } else {
+    if (hasRole('registration_desk')) {
+      links.push({ label: 'Check-In', href: `/registration/${eventId}` })
     }
-
-    // Save access
-    localStorage.setItem(`feistab_access_${data.id}`, code.trim().toUpperCase())
-    setEvent({ id: data.id, name: data.name, start_date: data.start_date, location: data.location })
-    setChecking(false)
+    if (hasRole('side_stage')) {
+      links.push({ label: 'Side-Stage', href: `/checkin/${eventId}` })
+    }
   }
 
-  // Station selector after code validated
-  if (event) {
-    const stations = [
-      {
-        label: "I'm the Organizer",
-        description: 'Dashboard, tabulation, results',
-        href: `/dashboard/events/${event.id}`,
-        color: 'bg-feis-green text-white hover:bg-feis-green/90',
-      },
-      {
-        label: "I'm at Registration",
-        description: 'Check in dancers, assign numbers',
-        href: `/registration/${event.id}`,
-        color: 'bg-white border-2 border-feis-green text-feis-green hover:bg-feis-green-light',
-      },
-      {
-        label: "I'm at Side-Stage",
-        description: 'Confirm roster, send to judge',
-        href: `/checkin/${event.id}`,
-        color: 'bg-white border-2 border-feis-orange text-feis-orange hover:bg-feis-orange/5',
-      },
-      {
-        label: "I'm a Judge",
-        description: 'Score dancers, leave feedback',
-        href: '/judge',
-        color: 'bg-white border-2 border-feis-charcoal/30 text-feis-charcoal hover:bg-muted',
-      },
-    ]
-
-    return (
-      <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
-        <div className="w-full max-w-sm space-y-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-feis-charcoal">{event.name}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {event.start_date}{event.location && ` · ${event.location}`}
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground text-center">Choose your station</p>
-            {stations.map((s) => (
-              <button
-                key={s.href}
-                type="button"
-                onClick={() => router.push(s.href)}
-                className={`w-full p-4 rounded-lg text-left transition-colors ${s.color}`}
-              >
-                <span className="text-lg font-semibold block">{s.label}</span>
-                <span className="text-sm opacity-70">{s.description}</span>
-              </button>
-            ))}
-          </div>
-
-
-          <button
-            type="button"
-            onClick={() => { setEvent(null); setCode('') }}
-            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Different event
-          </button>
-        </div>
-      </div>
-    )
+  if (hasRole('judge')) {
+    links.push({ label: 'My Assignments', href: `/judge/${eventId}` })
   }
 
-  // Code entry
+  return links
+}
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+export default async function HomePage() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  const { data: roleRows, error } = await supabase
+    .from('event_roles')
+    .select('role, event_id, events(id, name, start_date)')
+    .eq('user_id', user.id)
+    .order('event_id')
+
+  if (error) {
+    console.error('Failed to load event roles:', error.message)
+  }
+
+  // Group roles by event
+  const eventMap = new Map<string, EventWithRoles>()
+  for (const row of (roleRows as EventRoleRow[] | null) ?? []) {
+    const ev = row.events
+    if (!ev) continue
+    if (!eventMap.has(ev.id)) {
+      eventMap.set(ev.id, { id: ev.id, name: ev.name, start_date: ev.start_date, roles: [] })
+    }
+    eventMap.get(ev.id)!.roles.push(row.role)
+  }
+
+  const events = Array.from(eventMap.values()).sort(
+    (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+  )
+
   return (
-    <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
-      <div className="w-full max-w-xs space-y-6 text-center">
-        <div>
-          <h1 className="text-3xl font-bold text-feis-charcoal">FeisTab</h1>
-          <p className="text-sm text-muted-foreground mt-2">Enter your event code</p>
+    <div className="min-h-screen bg-feis-cream">
+      <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-feis-green">FeisTab</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
+          </div>
+          <form action={logout}>
+            <Button variant="ghost" size="sm" type="submit" className="text-muted-foreground">
+              Sign out
+            </Button>
+          </form>
         </div>
-        <form
-          onSubmit={(e) => { e.preventDefault(); handleCodeSubmit() }}
-          className="space-y-3"
-        >
-          <Input
-            value={code}
-            onChange={(e) => { setCode(e.target.value.toUpperCase()); setError('') }}
-            placeholder="ACCESS CODE"
-            className="text-center font-mono text-lg tracking-widest h-12"
-            autoFocus
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button
-            type="submit"
-            disabled={!code.trim() || checking}
-            className="w-full"
-          >
-            {checking ? 'Checking...' : 'Enter'}
-          </Button>
-        </form>
-        <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-feis-green transition-colors py-2 text-center">
-          Organizer dashboard →
-        </Link>
+
+        {/* Event cards or empty state */}
+        {events.length === 0 ? (
+          <div className="space-y-4">
+            <Card className="border-border bg-white">
+              <CardContent className="pt-6 pb-6 text-center space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  You haven&apos;t been added to any events yet.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <form action={fulfillInvitations}>
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      className="w-full border-feis-green text-feis-green hover:bg-feis-green-light"
+                    >
+                      Check for pending invitations
+                    </Button>
+                  </form>
+                  <form action={logout}>
+                    <Button type="submit" variant="ghost" className="w-full text-muted-foreground">
+                      Sign out
+                    </Button>
+                  </form>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {events.map((event) => {
+              const links = getActionLinks(event.id, event.roles)
+              return (
+                <Card key={event.id} className="border-border bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-semibold text-feis-charcoal">
+                      {event.name}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">{formatDate(event.start_date)}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Role badges */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {event.roles.map((role) => (
+                        <Badge
+                          key={role}
+                          variant="outline"
+                          className={`text-xs ${ROLE_BADGE_CLASSES[role]}`}
+                        >
+                          {ROLE_LABELS[role]}
+                        </Badge>
+                      ))}
+                    </div>
+                    {/* Action links */}
+                    {links.length > 0 && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {links.map((link, i) => (
+                          <span key={link.href} className="flex items-center gap-3">
+                            <Link
+                              href={link.href}
+                              className="text-sm font-medium text-feis-green hover:text-feis-green/80 transition-colors"
+                            >
+                              {link.label}
+                            </Link>
+                            {i < links.length - 1 && (
+                              <span className="text-border text-sm select-none">·</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
