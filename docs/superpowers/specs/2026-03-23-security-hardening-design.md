@@ -94,13 +94,16 @@ Deny by default. RLS handles row-level reads. RPCs handle all writes.
 ```sql
 CREATE FUNCTION user_event_role(p_event_id uuid)
 RETURNS text[] AS $$
-  SELECT array_agg(role)
+  SELECT COALESCE(array_agg(role), '{}')
   FROM event_roles
   WHERE user_id = auth.uid() AND event_id = p_event_id
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER STABLE
+   SET search_path = public;
 ```
 
-**Note:** This function is `SECURITY DEFINER` by design — it runs as the function owner (migration role), which bypasses RLS on `event_roles`. This is intentional: the function is used inside RLS policies on other tables, and if it were `SECURITY INVOKER`, querying `event_roles` (which itself has RLS) would cause infinite recursion. Do not change this to `SECURITY INVOKER`.
+**Returns `'{}'` (empty array), never NULL.** All callers can safely use `'organizer' = ANY(user_event_role(event_id))` without NULL checks.
+
+**`SECURITY DEFINER` + `search_path`:** This function runs as the function owner (migration role), which bypasses RLS on `event_roles`. This is intentional — the function is used inside RLS policies on other tables, and `SECURITY INVOKER` would cause infinite recursion. `SET search_path = public` prevents search_path hijacking. Do not change either setting.
 
 ### RPC security model
 
@@ -117,7 +120,7 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 | Table | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| events | Any role on event | Authenticated (creates event) | Organizer | Never |
+| events | Any role on event | Authenticated via `create_event` RPC (see note below) | Organizer | Never |
 | dancers | Organizer, reg_desk: via event join (see predicate below). Side_stage, judge: via narrow functions only. Public: name + number via `public_feedback()` for published results. | Via RPC | Via RPC | Never |
 | judges | Any role on event | Organizer | Organizer | Never |
 | competitions | Any role on event | Organizer | Organizer | Never |
@@ -133,6 +136,15 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 | judge_assignments | Organizer, own judge | Organizer | Organizer | Organizer |
 | audit_log | Organizer | Trigger/RPC only | Never | Never |
 | status_changes | Organizer | Trigger only | Never | Never |
+
+### Event creation policy
+
+The policy matrix shows events INSERT as "Authenticated via `create_event` RPC." This is intentionally broader than the rest of the model — any authenticated user can create an event, because that's how a new organizer onboards. The `create_event` RPC:
+1. Creates the event row
+2. Automatically assigns `organizer` role to the creating user in `event_roles`
+3. Both happen in a single transaction — you can never have an orphan event with no organizer
+
+No direct INSERT on `events` is allowed. The RLS INSERT policy is `false` (deny all); only the `SECURITY DEFINER` RPC can insert. This prevents an authenticated user from creating events without the role assignment.
 
 ### `dancers` table RLS predicate
 
@@ -159,7 +171,35 @@ EXISTS (
 
 ### Write RPC contract
 
-Every write RPC must:
+#### Standard boilerplate (every `SECURITY DEFINER` function)
+
+Every RPC must include these three properties — no exceptions:
+
+```sql
+CREATE FUNCTION rpc_name(...)
+RETURNS ... AS $$
+BEGIN
+  -- 1. Validate all arguments are non-NULL and of expected shape
+  IF p_event_id IS NULL THEN RAISE EXCEPTION 'missing event_id'; END IF;
+  -- (repeat for all required params)
+
+  -- 2. Authorization check (role, assignment, lock state — see below)
+
+  -- 3. Business logic
+
+  -- 4. Audit log entry
+  INSERT INTO audit_log (user_id, entity_type, entity_id, action, after_data)
+  VALUES (auth.uid(), 'entity', id, 'action', jsonb_build_object(...));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+   SET search_path = public;  -- REQUIRED: prevents search_path hijacking
+```
+
+**Every `SECURITY DEFINER` function MUST set `search_path = public`.** This is not optional — without it, a malicious `search_path` can redirect table references to attacker-controlled schemas.
+
+**Every RPC MUST write an audit_log entry** for the mutation it performs. This replaces the current client-side `logAudit()` calls.
+
+#### Authorization checks (per-RPC)
 
 1. **Re-check role membership** — call `user_event_role()` and reject if caller lacks the required role
 2. **Re-check assignment** — for judge RPCs, verify `judges.user_id = auth.uid()` AND `judge_assignments` row exists for the target competition
@@ -214,9 +254,15 @@ Each event the user belongs to shows as a card:
 
 ### Auth middleware (`middleware.ts`)
 
-- All routes except `/auth/*` and `/results/*` require authenticated session
 - Middleware only checks "are you authenticated?" — role checks happen at page level
 - No session → redirect to `/auth/login?next={current_path}`
+
+**Public routes (no auth required):**
+- `/auth/*` — login, signup, confirm
+- `/results/*` — published results and feedback pages
+- `/public/*` — reserved namespace for future public-facing pages (feis browsing, pre-reg landing). Nothing here yet, but the middleware allowlist includes it now so we don't need to change middleware when Phase 2 adds public pages.
+
+**Everything else requires authentication.** If pre-registration or public feis browsing later shares this app shell, new public routes go under `/public/*` — no middleware changes needed.
 
 ### Invitation system
 
