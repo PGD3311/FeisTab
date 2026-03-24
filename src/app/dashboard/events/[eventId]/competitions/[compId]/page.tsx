@@ -18,8 +18,18 @@ import {
   type CompetitionStatus,
   type TransitionContext,
 } from '@/lib/competition-states'
-import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults, generateRecall, approveTabulation } from '@/lib/supabase/rpc'
+import {
+  signOffJudge,
+  guardedStatusUpdate,
+  publishResults,
+  unpublishResults,
+  generateRecall,
+  approveTabulation,
+  createRound,
+  transitionCompetitionStatus,
+  confirmRoster,
+  updateHeatSnapshot,
+} from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
@@ -378,7 +388,6 @@ export default function CompetitionDetailPage({
 
       // Batch upsert all results at once (avoids N sequential round trips)
       const resultRows = previewResults.map((r) => ({
-        competition_id: compId,
         dancer_id: r.dancer_id,
         final_rank: r.final_rank,
         display_place: String(r.final_rank),
@@ -388,14 +397,6 @@ export default function CompetitionDetailPage({
       }))
 
       await approveTabulation(supabase, compId, resultRows)
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'tabulate',
-        afterData: { result_count: previewResults.length, round_id: latestRound.id },
-      })
 
       setPreviewResults(null)
       await loadData()
@@ -420,14 +421,6 @@ export default function CompetitionDetailPage({
     try {
       await publishResults(supabase, compId, approvedBy)
 
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'result_publish',
-        afterData: { approved_by: approvedBy, checks },
-      })
-
       showSuccess('Results published')
       void reload()
       loadData()
@@ -443,13 +436,6 @@ export default function CompetitionDetailPage({
     try {
       await unpublishResults(supabase, compId, unpublishedBy)
 
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'result_unpublish',
-        afterData: { unpublished_by: unpublishedBy, reason, note, competition_id: compId },
-      })
       showSuccess('Results unpublished')
       void reload()
       loadData()
@@ -488,15 +474,7 @@ export default function CompetitionDetailPage({
       }))
 
       const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
-      await generateRecall(supabase, compId, recallRows, nextNum)
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'recall_generate',
-        afterData: { recalled_count: recalled.length, source_round_id: latestRound.id, new_round_number: nextNum },
-      })
+      await generateRecall(supabase, compId, recallRows, nextNum, currentStatus)
 
       await loadData()
       showSuccess('Recalls generated')
@@ -519,12 +497,11 @@ export default function CompetitionDetailPage({
     try {
       // Side effect: create Round 1 when opening for scoring
       if (currentStatus === 'in_progress' && targetStatus === 'awaiting_scores' && rounds.length === 0) {
-        const { error: roundErr } = await supabase.from('rounds').insert({
+        await createRound(supabase, {
           competition_id: compId,
           round_number: 1,
           round_type: 'standard',
         })
-        if (roundErr) throw new Error(`Failed to create round: ${roundErr.message}`)
       }
 
       // Side effect: generate heat snapshot when entering in_progress
@@ -540,12 +517,15 @@ export default function CompetitionDetailPage({
 
           let roundId = existingRound?.id ?? null
           if (!roundId) {
-            const { data: newRound, error: roundErr } = await supabase
-              .from('rounds')
-              .insert({ competition_id: compId, round_number: 1, round_type: 'standard' })
-              .select('id')
-              .single()
-            if (!roundErr && newRound) roundId = newRound.id
+            try {
+              roundId = await createRound(supabase, {
+                competition_id: compId,
+                round_number: 1,
+                round_type: 'standard',
+              })
+            } catch {
+              // Non-blocking — round creation may fail if already exists
+            }
           }
 
           // Generate snapshot if round exists and doesn't already have one
@@ -566,7 +546,7 @@ export default function CompetitionDetailPage({
               )
               const groupSize = (comp as Record<string, unknown>).group_size as number ?? 2
               const snapshot = generateHeats(activeDancers, groupSize)
-              await supabase.from('rounds').update({ heat_snapshot: snapshot }).eq('id', roundId)
+              await updateHeatSnapshot(supabase, roundId, snapshot as unknown as Record<string, unknown>)
             }
           }
         } catch (snapshotErr) {
@@ -574,21 +554,7 @@ export default function CompetitionDetailPage({
         }
       }
 
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({ status: targetStatus })
-        .eq('id', compId)
-
-      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'status_change',
-        beforeData: { status: currentStatus },
-        afterData: { status: targetStatus },
-      })
+      await transitionCompetitionStatus(supabase, compId, targetStatus)
 
       await loadData()
       void reload()
@@ -643,24 +609,6 @@ export default function CompetitionDetailPage({
 
       // 4. Transition back to awaiting_scores
       await guardedStatusUpdate(supabase, compId, comp.status as CompetitionStatus, 'awaiting_scores')
-
-      // 5. Audit log
-      const unlockJudge = judges.find(j => j.id === unlockJudgeId)
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'unlock_for_correction',
-        beforeData: { status: currentStatus, judge_id: unlockJudgeId },
-        afterData: {
-          status: 'awaiting_scores',
-          judge_id: unlockJudgeId,
-          judge_name: unlockJudge ? `${unlockJudge.first_name} ${unlockJudge.last_name}` : null,
-          reason: unlockReason,
-          note: unlockNote.trim() || null,
-          results_cleared: currentStatus === 'complete_unpublished',
-        },
-      })
 
       // Reset form
       setUnlockJudgeId(null)
@@ -865,16 +813,13 @@ export default function CompetitionDetailPage({
                 <Button
                   size="sm"
                   onClick={async () => {
-                    const { error } = await supabase
-                      .from('competitions')
-                      .update({ roster_confirmed_at: new Date().toISOString(), roster_confirmed_by: 'Organizer' })
-                      .eq('id', compId)
-                    if (error) {
-                      showError('Failed to confirm roster', { description: error.message })
-                      return
+                    try {
+                      await confirmRoster(supabase, compId)
+                      await loadData()
+                      showSuccess('Roster confirmed')
+                    } catch (err) {
+                      showError('Failed to confirm roster', { description: err instanceof Error ? err.message : 'Unknown error' })
                     }
-                    await loadData()
-                    showSuccess('Roster confirmed')
                   }}
                 >
                   Confirm Roster
@@ -963,14 +908,6 @@ export default function CompetitionDetailPage({
                         .update({ heat_snapshot: { ...snap, heats: updatedHeats } })
                         .eq('id', latestRound.id)
                     }
-                    void logAudit(supabase, {
-                      userId: null,
-                      entityType: 'registration',
-                      entityId: reg.id,
-                      action: 'status_change',
-                      beforeData: { status: reg.status, dancer_id: reg.dancer_id, competition_id: compId },
-                      afterData: { status: newStatus, dancer_id: reg.dancer_id, competition_id: compId },
-                    })
                     await loadData()
                     showSuccess('Dancer status updated')
                   }}

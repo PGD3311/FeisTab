@@ -4,7 +4,6 @@ import { useEffect, useState, use } from 'react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
-import { logAudit } from '@/lib/audit'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
 import { ApprovalDialog, type ApprovalChecks } from '@/components/approval-dialog'
@@ -116,13 +115,6 @@ export default function ResultsPublishingPage({
       }
       await publishResults(supabase, compId, approvedBy)
 
-      await logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'result_publish',
-        afterData: { approved_by: approvedBy, checks: { ...checks }, competition_id: compId },
-      })
       showSuccess('Results published')
       loadData()
       void reload()
@@ -147,13 +139,6 @@ export default function ResultsPublishingPage({
       }
       await unpublishResults(supabase, compId, unpublishedBy)
 
-      await logAudit(supabase, {
-        userId: null,
-        entityType: 'competition',
-        entityId: compId,
-        action: 'result_unpublish',
-        afterData: { unpublished_by: unpublishedBy, reason, note, competition_id: compId },
-      })
       showSuccess('Results unpublished')
       loadData()
       void reload()

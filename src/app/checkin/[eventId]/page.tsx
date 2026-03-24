@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
-import { logAudit } from '@/lib/audit'
+import { transitionCompetitionStatus, confirmRoster } from '@/lib/supabase/rpc'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -609,38 +609,30 @@ export default function RosterConfirmationPage({
     // Auto-advance to ready_for_day_of if the state machine allows it
     const needsAdvance = (comp.status === 'draft' || comp.status === 'imported')
       && canTransition(comp.status, 'ready_for_day_of')
-    const updateFields: Record<string, unknown> = {
-      roster_confirmed_at: now,
-      roster_confirmed_by: 'Side-Stage',
-    }
-    if (needsAdvance) {
-      updateFields.status = 'ready_for_day_of'
-    }
 
-    const { error } = await supabase
-      .from('competitions')
-      .update(updateFields)
-      .eq('id', compId)
+    try {
+      await confirmRoster(supabase, compId)
 
-    if (error) {
-      showError('Failed to confirm roster', { description: error.message })
-      setConfirmingRoster(null)
-      return
-    }
+      if (needsAdvance) {
+        await transitionCompetitionStatus(supabase, compId, 'ready_for_day_of')
+      }
 
-    setCompetitions((prev) =>
-      prev.map((c) =>
-        c.id === compId
-          ? {
-              ...c,
-              roster_confirmed_at: now,
-              roster_confirmed_by: 'Side-Stage',
-              status: needsAdvance ? ('ready_for_day_of' as CompetitionStatus) : c.status,
-            }
-          : c
+      setCompetitions((prev) =>
+        prev.map((c) =>
+          c.id === compId
+            ? {
+                ...c,
+                roster_confirmed_at: now,
+                roster_confirmed_by: 'Side-Stage',
+                status: needsAdvance ? ('ready_for_day_of' as CompetitionStatus) : c.status,
+              }
+            : c
+        )
       )
-    )
-    showSuccess(needsAdvance ? 'Roster confirmed — ready to send to judge' : 'Roster confirmed')
+      showSuccess(needsAdvance ? 'Roster confirmed — ready to send to judge' : 'Roster confirmed')
+    } catch (err) {
+      showError('Failed to confirm roster', { description: err instanceof Error ? err.message : 'Unknown error' })
+    }
     setConfirmingRoster(null)
   }
 
@@ -687,43 +679,23 @@ export default function RosterConfirmationPage({
       }
     }
 
-    // Atomic conditional update: only transitions if still in expected state
-    const { data: updatedComp, error } = await supabase
-      .from('competitions')
-      .update({ status: 'released_to_judge' })
-      .eq('id', compId)
-      .eq('status', 'ready_for_day_of')
-      .select('id')
-      .maybeSingle()
+    try {
+      await transitionCompetitionStatus(supabase, compId, 'released_to_judge')
 
-    if (error) {
-      showError('Failed to send to judge', { description: error.message })
-      return
-    }
-    if (!updatedComp) {
-      showError('Competition status changed — refresh and try again')
-      void pollStatuses()
-      return
-    }
-
-    void logAudit(supabase, {
-      userId: null,
-      entityType: 'competition',
-      entityId: compId,
-      action: 'status_change',
-      beforeData: { status: 'ready_for_day_of' },
-      afterData: {
-        status: 'released_to_judge',
-        released_to_judge_at: new Date().toISOString(),
-      },
-    })
-
-    setCompetitions((prev) =>
-      prev.map((c) =>
-        c.id === compId ? { ...c, status: 'released_to_judge' as CompetitionStatus } : c
+      setCompetitions((prev) =>
+        prev.map((c) =>
+          c.id === compId ? { ...c, status: 'released_to_judge' as CompetitionStatus } : c
+        )
       )
-    )
-    showSuccess('Sent to judge')
+      showSuccess('Sent to judge')
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('status changed')) {
+        showError('Competition status changed — refresh and try again')
+        void pollStatuses()
+      } else {
+        showError('Failed to send to judge', { description: err instanceof Error ? err.message : 'Unknown error' })
+      }
+    }
   }
 
   async function handleRecall(compId: string) {
@@ -735,39 +707,23 @@ export default function RosterConfirmationPage({
       return
     }
 
-    const { data: updatedComp, error } = await supabase
-      .from('competitions')
-      .update({ status: 'ready_for_day_of' })
-      .eq('id', compId)
-      .eq('status', 'released_to_judge')
-      .select('id')
-      .maybeSingle()
+    try {
+      await transitionCompetitionStatus(supabase, compId, 'ready_for_day_of')
 
-    if (error) {
-      showError('Failed to recall', { description: error.message })
-      return
-    }
-    if (!updatedComp) {
-      showError('Competition status changed — refresh and try again')
-      void pollStatuses()
-      return
-    }
-
-    void logAudit(supabase, {
-      userId: null,
-      entityType: 'competition',
-      entityId: compId,
-      action: 'status_change',
-      beforeData: { status: 'released_to_judge' },
-      afterData: { status: 'ready_for_day_of', trigger: 'side_stage_recall' },
-    })
-
-    setCompetitions((prev) =>
-      prev.map((c) =>
-        c.id === compId ? { ...c, status: 'ready_for_day_of' as CompetitionStatus } : c
+      setCompetitions((prev) =>
+        prev.map((c) =>
+          c.id === compId ? { ...c, status: 'ready_for_day_of' as CompetitionStatus } : c
+        )
       )
-    )
-    showSuccess('Recalled to side-stage')
+      showSuccess('Recalled to side-stage')
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('status changed')) {
+        showError('Competition status changed — refresh and try again')
+        void pollStatuses()
+      } else {
+        showError('Failed to recall', { description: err instanceof Error ? err.message : 'Unknown error' })
+      }
+    }
   }
 
   // --- Filtering & Grouping ---

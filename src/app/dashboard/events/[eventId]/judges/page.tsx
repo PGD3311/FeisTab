@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import { showSuccess, showError } from '@/lib/feedback'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
-import { logAudit } from '@/lib/audit'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { Button } from '@/components/ui/button'
@@ -313,18 +312,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
           )
           continue
         }
-
-        await logAudit(supabase, {
-          userId: null,
-          entityType: 'competition',
-          entityId: comp.id,
-          action: 'status_change',
-          beforeData: { status: from },
-          afterData: {
-            status: to,
-            reason: 'Judge assignment changed — sign-offs no longer complete',
-          },
-        })
 
         console.log(
           `Reverted competition ${comp.id} from ${from} to ${to} due to assignment change`

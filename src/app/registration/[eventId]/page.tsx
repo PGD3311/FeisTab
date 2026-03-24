@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef, useCallback, use } from 'react'
-import { logAudit } from '@/lib/audit'
+import { checkInDancer } from '@/lib/supabase/rpc'
 import {
   getCheckInState,
   deriveCheckInStats,
@@ -225,31 +225,25 @@ export default function RegistrationDeskPage({
         }
 
         const existing = (latestRows ?? []).map((r: { competitor_number: string }) => r.competitor_number)
-        const tryNumber = String(computeNextNumber(existing))
+        const tryNumber = computeNextNumber(existing)
 
-        const { error: insertErr } = await supabase
-          .from('event_check_ins')
-          .insert({
+        try {
+          await checkInDancer(supabase, {
             event_id: eventId,
             dancer_id: dancer.dancer_id,
             competitor_number: tryNumber,
-            checked_in_at: new Date().toISOString(),
-            checked_in_by: 'registration_desk',
           })
-
-        if (!insertErr) {
-          assignedNumber = tryNumber
+          assignedNumber = String(tryNumber)
           break
+        } catch (err) {
+          // If it's a unique constraint violation, retry with next number
+          if (err instanceof Error && err.message.includes('23505')) {
+            continue
+          }
+          // Any other error — stop retrying
+          showCritical('Failed to assign number', { description: err instanceof Error ? err.message : 'Unknown error' })
+          return
         }
-
-        // If it's a unique constraint violation, retry with next number
-        if (insertErr.code === '23505') {
-          continue
-        }
-
-        // Any other error — stop retrying
-        showCritical('Failed to assign number', { description: insertErr.message })
-        return
       }
 
       if (!assignedNumber) {
@@ -265,18 +259,6 @@ export default function RegistrationDeskPage({
         showCritical('Number assigned but sync failed — retry', { description: syncResult.error.message })
         return
       }
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'dancer',
-        entityId: dancer.dancer_id,
-        action: 'check_in',
-        afterData: {
-          competitor_number: assignedNumber,
-          event_id: eventId,
-          source: 'desk_assigned',
-        },
-      })
 
       setCheckInMap((prev) => {
         const next = new Map(prev)
@@ -327,18 +309,6 @@ export default function RegistrationDeskPage({
         showCritical('Checked in but sync failed — retry', { description: syncResult.error.message })
         return
       }
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'dancer',
-        entityId: dancer.dancer_id,
-        action: 'check_in',
-        afterData: {
-          competitor_number: checkInRow.competitor_number,
-          event_id: eventId,
-          source: 'pre_assigned',
-        },
-      })
 
       setCheckInMap((prev) => {
         const next = new Map(prev)

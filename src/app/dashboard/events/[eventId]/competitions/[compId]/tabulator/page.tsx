@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 import { useSupabase } from '@/hooks/use-supabase'
-import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate, tabulatorEnterScore } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { type FlagReason } from '@/lib/engine/flag-reasons'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
@@ -296,55 +295,35 @@ export default function TabulatorEntryPage({
     )
       return
 
+    // Block writes after sign-off
+    if (signedOff) return
+
     const num = parseFloat(row.score)
     if (isNaN(num) || num < scoreMin || num > scoreMax) return
 
     const seq = ++saveSeqRef.current
     dispatch({ type: 'MARK_SAVING', dancerId, saveSeq: seq })
 
-    supabase
-      .from('score_entries')
-      .upsert(
-        {
-          round_id: round.id,
-          competition_id: compId,
-          dancer_id: dancerId,
-          judge_id: selectedJudgeId,
-          raw_score: num,
-          flagged: row.flagged,
-          flag_reason: row.flagged ? row.flagReason : null,
-          entry_mode: 'tabulator_transcription' as EntryMode,
-          comment_data: validateCommentData(row.commentData),
-        },
-        { onConflict: 'round_id,dancer_id,judge_id' }
-      )
-      .then(({ error: upsertErr }) => {
-        if (upsertErr) {
-          dispatch({ type: 'MARK_FAILED', dancerId, saveSeq: seq })
-        } else {
-          dispatch({
-            type: 'MARK_SAVED',
-            dancerId,
-            dbScore: num,
-            saveSeq: seq,
-          })
-        }
-      })
-
-    // Audit: fire-and-forget
-    void logAudit(supabase, {
-      userId: null,
-      entityType: 'score_entry',
-      entityId: compId,
-      action: 'score_transcribe',
-      afterData: {
-        dancer_id: dancerId,
-        judge_id: selectedJudgeId,
-        raw_score: num,
-        flagged: row.flagged,
-        entry_mode: 'tabulator_transcription',
-      },
+    tabulatorEnterScore(supabase, {
+      competition_id: compId,
+      round_id: round.id,
+      dancer_id: dancerId,
+      judge_id: selectedJudgeId,
+      raw_score: num,
+      flagged: row.flagged || undefined,
+      flag_reason: (row.flagged ? row.flagReason : null) ?? undefined,
     })
+      .then(() => {
+        dispatch({
+          type: 'MARK_SAVED',
+          dancerId,
+          dbScore: num,
+          saveSeq: seq,
+        })
+      })
+      .catch(() => {
+        dispatch({ type: 'MARK_FAILED', dancerId, saveSeq: seq })
+      })
   }
 
   // ---------------------------------------------------------------------------
@@ -501,9 +480,18 @@ export default function TabulatorEntryPage({
       // Atomically record sign-off
       const updatedSignOffs = await signOffJudge(supabase, round.id, selectedJudgeId, compId)
 
-      // Auto-advance status if all judges done
+      // Check assigned judges (not all event judges) for "all done"
+      const { data: assignments } = await supabase
+        .from('judge_assignments')
+        .select('judge_id')
+        .eq('competition_id', compId)
+
+      const assignedJudgeIds = assignments && assignments.length > 0
+        ? assignments.map((a: { judge_id: string }) => a.judge_id)
+        : [] // No assignments → can't determine "all done", organizer must advance manually
+
       const allDone =
-        judges.length > 0 && judges.every(j => updatedSignOffs[j.id])
+        assignedJudgeIds.length > 0 && assignedJudgeIds.every(id => updatedSignOffs[id])
 
       if (allDone) {
         // Use CompetitionStatus to allow full transition chain
@@ -518,48 +506,13 @@ export default function TabulatorEntryPage({
             !canTransition(status, 'ready_to_tabulate')
           ) {
             await guardedStatusUpdate(supabase, compId, status, 'awaiting_scores')
-            void logAudit(supabase, {
-              userId: null,
-              entityType: 'competition',
-              entityId: compId,
-              action: 'status_change',
-              afterData: {
-                from: status,
-                to: 'awaiting_scores',
-                trigger: 'auto_advance_on_sign_off',
-              },
-            })
             status = 'awaiting_scores' as CompetitionStatus
           }
           if (canTransition(status, 'ready_to_tabulate')) {
             await guardedStatusUpdate(supabase, compId, status, 'ready_to_tabulate')
-            void logAudit(supabase, {
-              userId: null,
-              entityType: 'competition',
-              entityId: compId,
-              action: 'status_change',
-              afterData: {
-                from: status,
-                to: 'ready_to_tabulate',
-                trigger: 'auto_advance_on_sign_off',
-              },
-            })
           }
         }
       }
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'round',
-        entityId: round.id,
-        action: 'sign_off',
-        afterData: {
-          judge_id: selectedJudgeId,
-          competition_id: compId,
-          entry_mode: 'tabulator_transcription',
-          all_judges_done: allDone,
-        },
-      })
 
       setSignedOff(true)
       setRound({ ...round, judge_sign_offs: updatedSignOffs })

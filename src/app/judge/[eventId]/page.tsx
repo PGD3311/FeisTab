@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
-import { logAudit } from '@/lib/audit'
+import { transitionCompetitionStatus, createRound, updateHeatSnapshot } from '@/lib/supabase/rpc'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -362,34 +362,16 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         return
       }
 
-      // Transition to in_progress (atomic conditional update prevents race with concurrent recall)
-      const { error } = await supabase
-        .from('competitions')
-        .update({ status: 'in_progress' })
-        .eq('id', comp.id)
-        .eq('status', comp.status)
-
-      if (error) {
+      // Transition to in_progress via RPC (atomic, validates state machine)
+      try {
+        await transitionCompetitionStatus(supabase, comp.id, 'in_progress')
+      } catch (err) {
         showCritical('Failed to start competition', {
-          description: error.message,
+          description: err instanceof Error ? err.message : 'Unknown error',
         })
         setStarting(null)
         return
       }
-
-      // Audit log
-      await logAudit(supabase, {
-        userId: session.judge_id,
-        entityType: 'competition',
-        entityId: comp.id,
-        action: 'status_change',
-        beforeData: { status: comp.status, trigger: 'judge_start' },
-        afterData: {
-          status: 'in_progress',
-          trigger: 'judge_start',
-          judge_started_at: new Date().toISOString(),
-        },
-      })
 
       // Best-effort: create Round 1 + heat snapshot
       // Don't block scoring if this fails
@@ -406,16 +388,14 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
         // Create Round 1 if it doesn't exist
         if (!roundId) {
-          const { data: newRound, error: roundErr } = await supabase
-            .from('rounds')
-            .insert({ competition_id: comp.id, round_number: 1, round_type: 'standard' })
-            .select('id')
-            .single()
-
-          if (roundErr) {
-            console.error('Failed to create Round 1:', roundErr.message)
-          } else {
-            roundId = newRound.id
+          try {
+            roundId = await createRound(supabase, {
+              competition_id: comp.id,
+              round_number: 1,
+              round_type: 'standard',
+            })
+          } catch (roundErr) {
+            console.error('Failed to create Round 1:', roundErr instanceof Error ? roundErr.message : roundErr)
           }
         }
 
@@ -440,13 +420,10 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
             const snapshot = generateHeats(activeDancers, comp.group_size ?? 2)
 
-            const { error: snapErr } = await supabase
-              .from('rounds')
-              .update({ heat_snapshot: snapshot })
-              .eq('id', roundId)
-
-            if (snapErr) {
-              console.error('Failed to persist heat snapshot:', snapErr.message)
+            try {
+              await updateHeatSnapshot(supabase, roundId, snapshot as unknown as Record<string, unknown>)
+            } catch (snapErr) {
+              console.error('Failed to persist heat snapshot:', snapErr instanceof Error ? snapErr.message : snapErr)
             }
           }
         }

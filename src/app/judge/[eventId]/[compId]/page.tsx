@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate, submitScore, createRound } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
@@ -213,18 +212,31 @@ export default function JudgeScoringPage({
     // Ensure a round exists — create one if the event page's best-effort creation failed
     let round = roundRes.error ? null : roundRes.data
     if (!round) {
-      const { data: newRound, error: createErr } = await supabase
-        .from('rounds')
-        .insert({ competition_id: compId, round_number: 1, round_type: 'standard' })
-        .select()
-        .single()
-      if (createErr) {
-        console.error('Failed to create round:', createErr.message)
+      try {
+        const newRoundId = await createRound(supabase, {
+          competition_id: compId,
+          round_number: 1,
+          round_type: 'standard',
+        })
+        // Re-fetch the round to get full data
+        const { data: newRound, error: fetchErr } = await supabase
+          .from('rounds')
+          .select('*')
+          .eq('id', newRoundId)
+          .single()
+        if (fetchErr || !newRound) {
+          console.error('Failed to fetch created round:', fetchErr?.message)
+          setLoadError(true)
+          setLoading(false)
+          return
+        }
+        round = newRound
+      } catch (err) {
+        console.error('Failed to create round:', err instanceof Error ? err.message : err)
         setLoadError(true)
         setLoading(false)
         return
       }
-      round = newRound
     }
     setRound(round)
 
@@ -266,34 +278,27 @@ export default function JudgeScoringPage({
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null, commentData: CommentData | null) {
     if (!session || !round) return
 
-    const { error } = await supabase.from('score_entries').upsert(
-      {
-        round_id: round.id,
-        competition_id: compId,
-        dancer_id: dancerId,
-        judge_id: session.judge_id,
-        raw_score: score,
-        flagged,
-        flag_reason: flagReason,
-        entry_mode: 'judge_self_service',
-        comment_data: validateCommentData(commentData),
-      },
-      { onConflict: 'round_id,dancer_id,judge_id' }
-    )
-    if (error) throw new Error(`Failed to save score: ${error.message}`)
+    // Prevent writes after sign-off
+    if (submitted) {
+      showCritical('Scores are locked — this round has been signed off')
+      return
+    }
 
-    void logAudit(supabase, {
-      userId: null,
-      entityType: 'score_entry',
-      entityId: compId,
-      action: 'score_submit',
-      afterData: {
-        dancer_id: dancerId,
-        judge_id: session.judge_id,
-        raw_score: score,
-        flagged,
-        entry_mode: 'judge_self_service',
-      },
+    // Verify round isn't signed off server-side (stale tab protection)
+    const signOffs = round.judge_sign_offs ?? {}
+    if (signOffs[session.judge_id]) {
+      showCritical('Scores are locked — this round has been signed off')
+      return
+    }
+
+    await submitScore(supabase, {
+      competition_id: compId,
+      round_id: round.id,
+      dancer_id: dancerId,
+      raw_score: score,
+      flagged,
+      flag_reason: flagReason ?? undefined,
+      comment_data: (validateCommentData(commentData) as Record<string, unknown> | null) ?? undefined,
     })
 
     loadData(session.judge_id)
@@ -348,40 +353,13 @@ export default function JudgeScoringPage({
         } else {
           if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
             await guardedStatusUpdate(supabase, compId, currentStatus, 'awaiting_scores')
-            void logAudit(supabase, {
-              userId: null,
-              entityType: 'competition',
-              entityId: compId,
-              action: 'status_change',
-              afterData: { from: currentStatus, to: 'awaiting_scores', trigger: 'auto_advance_on_sign_off' },
-            })
             currentStatus = 'awaiting_scores' as CompetitionStatus
           }
           if (canTransition(currentStatus, 'ready_to_tabulate')) {
             await guardedStatusUpdate(supabase, compId, currentStatus, 'ready_to_tabulate')
-            void logAudit(supabase, {
-              userId: null,
-              entityType: 'competition',
-              entityId: compId,
-              action: 'status_change',
-              afterData: { from: currentStatus, to: 'ready_to_tabulate', trigger: 'auto_advance_on_sign_off' },
-            })
           }
         }
       }
-
-      void logAudit(supabase, {
-        userId: null,
-        entityType: 'round',
-        entityId: round.id,
-        action: 'sign_off',
-        afterData: {
-          judge_id: session.judge_id,
-          competition_id: compId,
-          entry_mode: 'judge_self_service',
-          all_judges_done: allDone,
-        },
-      })
 
       setSubmitted(true)
       showSuccess('Round signed off')

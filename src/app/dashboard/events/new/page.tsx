@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import { createEvent } from '@/lib/supabase/rpc'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,69 +25,30 @@ export default function NewEventPage() {
     setLoading(true)
     setError('')
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const eventId = await createEvent(supabase, {
+        name,
+        start_date: startDate,
+        end_date: startDate,
+        location: location || undefined,
+      })
 
-    // Generate a unique 6-character access code with collision retry
-    let accessCode = ''
-    let data = null
-    let attempts = 0
-    const MAX_ATTEMPTS = 5
-
-    while (attempts < MAX_ATTEMPTS) {
-      accessCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      const { data: inserted, error: insertError } = await supabase
+      // Auto-authorize the creator: fetch the generated access code
+      const { data: eventRow } = await supabase
         .from('events')
-        .insert({
-          name,
-          start_date: startDate,
-          location: location || null,
-          status: 'active',
-          registration_code: accessCode,
-          created_by: user?.id,
-        })
-        .select()
+        .select('registration_code')
+        .eq('id', eventId)
         .single()
 
-      if (!insertError) {
-        data = inserted
-        break
+      if (eventRow?.registration_code) {
+        localStorage.setItem(`feistab_access_${eventId}`, eventRow.registration_code)
       }
 
-      // If it's a unique constraint violation, retry with a new code
-      if (insertError.code === '23505' && insertError.message.includes('registration_code')) {
-        attempts++
-        continue
-      }
-
-      // Any other error is a real failure
-      setError(insertError.message)
+      router.push(`/dashboard/events/${eventId}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create event')
       setLoading(false)
-      return
     }
-
-    if (!data) {
-      setError('Failed to generate unique access code. Please try again.')
-      setLoading(false)
-      return
-    }
-
-    // Auto-authorize the creator
-    localStorage.setItem(`feistab_access_${data.id}`, accessCode)
-
-    // Auto-create Stage 1 so the event is immediately usable
-    const { error: stageErr } = await supabase.from('stages').insert({
-      event_id: data.id,
-      name: 'Stage 1',
-      display_order: 1,
-    })
-
-    if (stageErr) {
-      console.error('Failed to create default stage:', stageErr.message)
-    }
-
-    router.push(`/dashboard/events/${data.id}`)
   }
 
   return (
