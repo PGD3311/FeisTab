@@ -16,18 +16,14 @@ import {
   getScheduleBlockReasons,
   type ScheduleCompetition,
 } from '@/lib/engine/schedule'
+import { type RegistrationStatus } from '@/lib/engine/anomalies/types'
+import { type JudgeInfo } from '@/types/shared'
 
 // --- Interfaces ---
 
 interface EventInfo {
   id: string
   name: string
-}
-
-interface Judge {
-  id: string
-  first_name: string
-  last_name: string
 }
 
 interface Competition {
@@ -47,7 +43,7 @@ interface Registration {
   id: string
   dancer_id: string
   competitor_number: string | null
-  status: string
+  status: RegistrationStatus
   first_name: string
   last_name: string
 }
@@ -96,7 +92,7 @@ export default function RosterConfirmationPage({
   const supabase = useSupabase()
 
   const [event, setEvent] = useState<EventInfo | null>(null)
-  const [judges, setJudges] = useState<Judge[]>([])
+  const [judges, setJudges] = useState<JudgeInfo[]>([])
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [selectedJudgeId, setSelectedJudgeId] = useState<string>('')
   const [assignedCompIds, setAssignedCompIds] = useState<Set<string> | null>(null)
@@ -177,7 +173,7 @@ export default function RosterConfirmationPage({
     const loadedComps = (compsRes.data as Competition[] | null) ?? []
 
     setEvent(eventRes.data as EventInfo | null)
-    setJudges((judgesRes.data as Judge[] | null) ?? [])
+    setJudges((judgesRes.data as JudgeInfo[] | null) ?? [])
     setCompetitions(loadedComps)
     setStages((stagesRes.data as Array<{ id: string; name: string }> | null) ?? [])
 
@@ -261,9 +257,9 @@ export default function RosterConfirmationPage({
       id: row.id,
       dancer_id: row.dancer_id,
       competitor_number: row.competitor_number,
-      status: row.status,
-      first_name: row.dancers.first_name,
-      last_name: row.dancers.last_name,
+      status: row.status as RegistrationStatus,
+      first_name: row.dancers?.first_name ?? 'Unknown',
+      last_name: row.dancers?.last_name ?? 'Dancer',
     }))
 
     setRegistrations(regs)
@@ -428,6 +424,7 @@ export default function RosterConfirmationPage({
           event: '*',
           schema: 'public',
           table: 'event_check_ins',
+          filter: `event_id=eq.${eventId}`,
         },
         () => {
           // Dancer checked in at registration desk — refresh check-in data + expanded roster
@@ -513,7 +510,7 @@ export default function RosterConfirmationPage({
     }
   }
 
-  async function handleDancerStatusChange(registrationId: string, newStatus: string) {
+  async function handleDancerStatusChange(registrationId: string, newStatus: RegistrationStatus) {
     setUpdatingStatus(registrationId)
 
     const { error } = await supabase
@@ -680,14 +677,21 @@ export default function RosterConfirmationPage({
     }
 
     // Atomic conditional update: only transitions if still in expected state
-    const { error } = await supabase
+    const { data: updatedComp, error } = await supabase
       .from('competitions')
       .update({ status: 'released_to_judge' })
       .eq('id', compId)
       .eq('status', 'ready_for_day_of')
+      .select('id')
+      .maybeSingle()
 
     if (error) {
       showError('Failed to send to judge', { description: error.message })
+      return
+    }
+    if (!updatedComp) {
+      showError('Competition status changed — refresh and try again')
+      void pollStatuses()
       return
     }
 
@@ -720,14 +724,21 @@ export default function RosterConfirmationPage({
       return
     }
 
-    const { error } = await supabase
+    const { data: updatedComp, error } = await supabase
       .from('competitions')
       .update({ status: 'ready_for_day_of' })
       .eq('id', compId)
       .eq('status', 'released_to_judge')
+      .select('id')
+      .maybeSingle()
 
     if (error) {
       showError('Failed to recall', { description: error.message })
+      return
+    }
+    if (!updatedComp) {
+      showError('Competition status changed — refresh and try again')
+      void pollStatuses()
       return
     }
 
@@ -1062,7 +1073,7 @@ export default function RosterConfirmationPage({
                                 : 'registered'
                             }
                             onChange={(e) =>
-                              void handleDancerStatusChange(reg.id, e.target.value)
+                              void handleDancerStatusChange(reg.id, e.target.value as RegistrationStatus)
                             }
                             disabled={updatingStatus === reg.id}
                             className={`min-h-[44px] min-w-[120px] rounded-md border px-3 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${getDancerStatusColor(reg.status)}`}

@@ -158,7 +158,7 @@ export default function RegistrationDeskPage({
     if (loading) return
     const channel = supabase
       .channel('reg-desk-checkins')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_check_ins' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_check_ins', filter: `event_id=eq.${eventId}` }, () => {
         void refreshCheckIns()
       })
       .subscribe()
