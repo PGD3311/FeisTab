@@ -18,6 +18,12 @@ export default function SignupPage() {
     setError(null)
     setSuccess(null)
     const formData = new FormData(e.currentTarget)
+    const password = formData.get('password') as string
+    const confirmPassword = formData.get('confirm_password') as string
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
     startTransition(async () => {
       const result = await signup(formData)
       if (result?.error) {
@@ -95,6 +101,21 @@ export default function SignupPage() {
                   <Input
                     id="password"
                     name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm_password" className="font-medium text-sm text-feis-charcoal">
+                    Confirm password
+                  </Label>
+                  <Input
+                    id="confirm_password"
+                    name="confirm_password"
                     type="password"
                     autoComplete="new-password"
                     required
