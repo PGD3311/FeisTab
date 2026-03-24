@@ -27,12 +27,17 @@ export default function JudgeLoginPage() {
       return
     }
 
-    const { data: judge } = await supabase
+    const { data: judge, error: queryErr } = await supabase
       .from('judges')
       .select('id, event_id, first_name, last_name')
       .eq('access_code', trimmed)
       .single()
 
+    if (queryErr) {
+      setError('Unable to verify access code — please try again')
+      setLoading(false)
+      return
+    }
     if (!judge) {
       setError('Invalid access code. Check with your organizer.')
       setLoading(false)

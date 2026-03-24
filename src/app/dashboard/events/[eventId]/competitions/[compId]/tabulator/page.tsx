@@ -920,6 +920,15 @@ export default function TabulatorEntryPage({
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
 
+  if (error) {
+    return (
+      <div className="p-6">
+        <p className="text-red-600">{error}</p>
+        <Button onClick={() => window.location.reload()} className="mt-2">Retry</Button>
+      </div>
+    )
+  }
+
   const canScore =
     compStatus === 'awaiting_scores' || compStatus === 'in_progress'
 

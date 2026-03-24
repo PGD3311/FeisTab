@@ -9,7 +9,7 @@ import {
   type CheckInRow,
 } from '@/lib/check-in'
 import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
-import { showSuccess, showCritical } from '@/lib/feedback'
+import { showSuccess, showCritical, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,6 +55,7 @@ export default function RegistrationDeskPage({
 
     if (eventRes.error) {
       console.error('Failed to load event:', eventRes.error.message)
+      showError('Failed to load event — check your connection and refresh')
       setLoading(false)
       return
     }
@@ -212,14 +213,19 @@ export default function RegistrationDeskPage({
       let assignedNumber: string | null = null
 
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        // Re-fetch latest check-ins to get the freshest nextNumber
-        if (attempt > 0) {
-          await refreshCheckIns()
+        // Re-fetch latest check-ins directly from DB each attempt to avoid stale state races
+        const { data: latestRows, error: latestErr } = await supabase
+          .from('event_check_ins')
+          .select('competitor_number')
+          .eq('event_id', eventId)
+
+        if (latestErr) {
+          showCritical('Failed to assign number', { description: latestErr.message })
+          return
         }
 
-        // Compute number from current state
-        const existing = [...checkInMap.values()].map((r) => r.competitor_number)
-        const tryNumber = String(computeNextNumber(existing) + attempt)
+        const existing = (latestRows ?? []).map((r: { competitor_number: string }) => r.competitor_number)
+        const tryNumber = String(computeNextNumber(existing))
 
         const { error: insertErr } = await supabase
           .from('event_check_ins')
