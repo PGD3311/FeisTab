@@ -19,7 +19,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
@@ -424,26 +424,14 @@ export default function CompetitionDetailPage({
     if (!canTransition(currentStatus, 'published')) return
 
     try {
-      const now = new Date().toISOString()
-      const { error: pubErr } = await supabase
-        .from('results')
-        .update({ published_at: now })
-        .eq('competition_id', compId)
-      if (pubErr) throw new Error(`Failed to publish results: ${pubErr.message}`)
-
-      await guardedStatusUpdate(supabase, compId, 'complete_unpublished', 'published', {
-        approved_by: approvedBy,
-        approved_at: now,
-        unpublished_by: null,
-        unpublished_at: null,
-      })
+      await publishResults(supabase, compId, approvedBy)
 
       void logAudit(supabase, {
         userId: null,
         entityType: 'competition',
         entityId: compId,
         action: 'result_publish',
-        afterData: { published_at: now, approved_by: approvedBy, checks },
+        afterData: { approved_by: approvedBy, checks },
       })
 
       showSuccess('Results published')
@@ -459,18 +447,8 @@ export default function CompetitionDetailPage({
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'complete_unpublished')) return
     try {
-      const now = new Date().toISOString()
-      await guardedStatusUpdate(supabase, compId, 'published', 'complete_unpublished', {
-        unpublished_by: unpublishedBy,
-        unpublished_at: now,
-        approved_by: null,
-        approved_at: null,
-      })
-      const { error: pubErr } = await supabase
-        .from('results')
-        .update({ published_at: null })
-        .eq('competition_id', compId)
-      if (pubErr) throw pubErr
+      await unpublishResults(supabase, compId, unpublishedBy)
+
       void logAudit(supabase, {
         userId: null,
         entityType: 'competition',

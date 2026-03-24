@@ -36,3 +36,27 @@ export async function guardedStatusUpdate(
   if (error) throw new Error(`Failed to update status: ${error.message}`)
   if (!data) throw new Error(`Competition status changed — refresh and try again`)
 }
+
+export async function publishResults(
+  supabase: SupabaseClient,
+  competitionId: string,
+  approvedBy: string
+): Promise<void> {
+  const { error } = await supabase.rpc('publish_results', {
+    p_competition_id: competitionId,
+    p_approved_by: approvedBy,
+  })
+  if (error) throw new Error(`Publish failed: ${error.message}`)
+}
+
+export async function unpublishResults(
+  supabase: SupabaseClient,
+  competitionId: string,
+  unpublishedBy: string
+): Promise<void> {
+  const { error } = await supabase.rpc('unpublish_results', {
+    p_competition_id: competitionId,
+    p_unpublished_by: unpublishedBy,
+  })
+  if (error) throw new Error(`Unpublish failed: ${error.message}`)
+}

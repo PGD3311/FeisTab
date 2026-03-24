@@ -9,6 +9,7 @@ import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
 import { ApprovalDialog, type ApprovalChecks } from '@/components/approval-dialog'
 import { UnpublishDialog } from '@/components/unpublish-dialog'
+import { publishResults, unpublishResults } from '@/lib/supabase/rpc'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { CopyLinkButton } from '@/components/copy-link-button'
 import { Button } from '@/components/ui/button'
@@ -113,29 +114,8 @@ export default function ResultsPublishingPage({
         showError('Cannot publish from current status')
         return
       }
-      const now = new Date().toISOString()
-      const { error: pubErr } = await supabase
-        .from('results')
-        .update({ published_at: now })
-        .eq('competition_id', compId)
-      if (pubErr) {
-        showCritical('Failed to publish results', { description: pubErr.message })
-        return
-      }
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({
-          status: 'published',
-          approved_by: approvedBy,
-          approved_at: now,
-          unpublished_by: null,
-          unpublished_at: null,
-        })
-        .eq('id', compId)
-      if (statusErr) {
-        showCritical('Failed to publish results', { description: statusErr.message })
-        return
-      }
+      await publishResults(supabase, compId, approvedBy)
+
       await logAudit(supabase, {
         userId: null,
         entityType: 'competition',
@@ -165,29 +145,8 @@ export default function ResultsPublishingPage({
         showError('Cannot unpublish from current status')
         return
       }
-      const now = new Date().toISOString()
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({
-          status: 'complete_unpublished',
-          unpublished_by: unpublishedBy,
-          unpublished_at: now,
-          approved_by: null,
-          approved_at: null,
-        })
-        .eq('id', compId)
-      if (statusErr) {
-        showCritical('Failed to unpublish results', { description: statusErr.message })
-        return
-      }
-      const { error: pubErr } = await supabase
-        .from('results')
-        .update({ published_at: null })
-        .eq('competition_id', compId)
-      if (pubErr) {
-        showCritical('Failed to unpublish results', { description: pubErr.message })
-        return
-      }
+      await unpublishResults(supabase, compId, unpublishedBy)
+
       await logAudit(supabase, {
         userId: null,
         entityType: 'competition',
