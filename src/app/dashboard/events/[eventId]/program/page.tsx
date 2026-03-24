@@ -23,7 +23,7 @@ interface Competition {
   name: string
   age_group: string | null
   level: string | null
-  status: string
+  status: CompetitionStatus
   stage_id: string | null
   schedule_position: number | null
   dance_type: string | null
@@ -93,6 +93,18 @@ export default function ProgramPage({
       })
   }
 
+  async function applyPositions(
+    updates: { id: string; position: number | null }[]
+  ): Promise<void> {
+    for (const u of updates) {
+      const { error } = await supabase
+        .from('competitions')
+        .update({ schedule_position: u.position })
+        .eq('id', u.id)
+      if (error) throw new Error(`Failed to update position for ${u.id}: ${error.message}`)
+    }
+  }
+
   async function handleReorder(stageId: string, compId: string, direction: 'up' | 'down') {
     const stageComps = getCompsForStage(stageId)
     const idx = stageComps.findIndex(c => c.id === compId)
@@ -116,14 +128,13 @@ export default function ProgramPage({
 
     // Save in background
     try {
-      for (const c of newOrder) {
-        await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
-      }
-      for (let i = 0; i < newOrder.length; i++) {
-        await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
-      }
-    } catch {
-      showError('Failed to save — refresh to retry')
+      await applyPositions(newOrder.map(c => ({ id: c.id, position: null })))
+      await applyPositions(newOrder.map((c, i) => ({ id: c.id, position: i + 1 })))
+      showSuccess('Schedule updated')
+    } catch (err) {
+      showError('Schedule update failed — some positions may need manual correction', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
       await loadData()
     }
   }
@@ -153,15 +164,13 @@ export default function ProgramPage({
 
     // Save in background
     try {
-      // Clear then set — sequential but non-blocking
-      for (const c of newOrder) {
-        await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
-      }
-      for (let i = 0; i < newOrder.length; i++) {
-        await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', newOrder[i].id)
-      }
-    } catch {
-      showError('Failed to save order — refresh to retry')
+      await applyPositions(newOrder.map(c => ({ id: c.id, position: null })))
+      await applyPositions(newOrder.map((c, i) => ({ id: c.id, position: i + 1 })))
+      showSuccess('Schedule updated')
+    } catch (err) {
+      showError('Schedule update failed — some positions may need manual correction', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
       await loadData()
     }
   }
@@ -310,16 +319,14 @@ export default function ProgramPage({
                             // Both non-numeric — sort by name
                             return (a.name ?? '').localeCompare(b.name ?? '')
                           })
-                          for (const c of sorted) {
-                            await supabase.from('competitions').update({ schedule_position: null }).eq('id', c.id)
-                          }
-                          for (let i = 0; i < sorted.length; i++) {
-                            await supabase.from('competitions').update({ schedule_position: i + 1 }).eq('id', sorted[i].id)
-                          }
+                          await applyPositions(sorted.map(c => ({ id: c.id, position: null })))
+                          await applyPositions(sorted.map((c, i) => ({ id: c.id, position: i + 1 })))
                           await loadData()
-                          showSuccess('Sorted by number')
-                        } catch {
-                          showError('Failed to sort')
+                          showSuccess('Schedule updated')
+                        } catch (err) {
+                          showError('Schedule update failed — some positions may need manual correction', {
+                            description: err instanceof Error ? err.message : 'Unknown error',
+                          })
                         } finally {
                           setReordering(false)
                         }
