@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, use } from 'react'
+import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signOffJudge, guardedStatusUpdate, submitScore, createRound } from '@/lib/supabase/rpc'
@@ -46,11 +46,7 @@ export default function JudgeScoringPage({
   const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
   const [expandedHeats, setCollapsedHeats] = useState<Set<number>>(new Set())
 
-  // Polling
-  const POLL_INTERVAL_MS = 5000
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Lightweight poll: fetch registration statuses and round heat_snapshot
+  // Lightweight fetch: registration statuses and round heat_snapshot (called by realtime handler)
   const pollData = useCallback(async () => {
     const [regRes, roundRes] = await Promise.all([
       supabase
@@ -125,42 +121,6 @@ export default function JudgeScoringPage({
       supabase.removeChannel(channel)
     }
   }, [loading, submitted, supabase, compId, pollData])
-
-  // Visibility-aware polling (fallback)
-  useEffect(() => {
-    if (loading || submitted) return
-
-    function startPolling() {
-      if (pollTimerRef.current) return
-      pollTimerRef.current = setInterval(() => {
-        void pollData()
-      }, POLL_INTERVAL_MS)
-    }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    function handleVisibilityChange() {
-      if (document.hidden) {
-        stopPolling()
-      } else {
-        void pollData()
-        startPolling()
-      }
-    }
-
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [loading, submitted, pollData])
 
   // Initial load — derive judge_id from authenticated user
   useEffect(() => {

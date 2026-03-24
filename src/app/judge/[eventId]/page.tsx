@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, use } from 'react'
+import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
@@ -45,8 +45,6 @@ const DONE_STATUSES: CompetitionStatus[] = [
   'locked',
   'recalled_round_pending',
 ]
-const POLL_INTERVAL_MS = 5000
-
 export default function JudgeEventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
@@ -58,7 +56,6 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   const [starting, setStarting] = useState<string | null>(null)
   const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Sort helper: schedule_position first (nulls last), then code
   function sortBySchedule(comps: Competition[]): Competition[] {
@@ -134,58 +131,6 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       }
 
       return compData
-    },
-    [supabase]
-  )
-
-  // Poll for status updates
-  const pollStatuses = useCallback(
-    async (comps: Competition[]) => {
-      if (comps.length === 0) return comps
-
-      const ids = comps.map((c) => c.id)
-      const { data, error } = await supabase
-        .from('competitions')
-        .select('id, status, roster_confirmed_at, roster_confirmed_by')
-        .in('id', ids)
-
-      if (error) {
-        console.error('Poll failed:', error.message)
-        return comps
-      }
-
-      if (!data) return comps
-
-      const updates = new Map(
-        data.map(
-          (d: {
-            id: string
-            status: CompetitionStatus
-            roster_confirmed_at: string | null
-            roster_confirmed_by: string | null
-          }) => [
-            d.id,
-            {
-              status: d.status,
-              roster_confirmed_at: d.roster_confirmed_at,
-              roster_confirmed_by: d.roster_confirmed_by,
-            },
-          ]
-        )
-      )
-
-      return comps.map((c) => {
-        const update = updates.get(c.id)
-        if (update) {
-          return {
-            ...c,
-            status: update.status,
-            roster_confirmed_at: update.roster_confirmed_at,
-            roster_confirmed_by: update.roster_confirmed_by,
-          }
-        }
-        return c
-      })
     },
     [supabase]
   )
@@ -268,45 +213,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     load()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only effect, deps are stable
 
-  // Polling with visibility-aware interval (fallback if Realtime drops)
-  useEffect(() => {
-    if (loading || competitions.length === 0) return
-
-    function startPolling() {
-      if (pollTimerRef.current) return
-      pollTimerRef.current = setInterval(async () => {
-        const updated = await pollStatuses(competitions)
-        setCompetitions(updated)
-      }, POLL_INTERVAL_MS)
-    }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    function handleVisibilityChange() {
-      if (document.hidden) {
-        stopPolling()
-      } else {
-        // Poll immediately on re-focus, then resume interval
-        pollStatuses(competitions).then((updated) => setCompetitions(updated))
-        startPolling()
-      }
-    }
-
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [loading, competitions, pollStatuses])
-
-  // Supabase Realtime subscription for near-instant competition status updates.
+  // Supabase Realtime subscription for near-instant competition status updates (hot page — no polling).
   useEffect(() => {
     if (loading || competitions.length === 0) return
 

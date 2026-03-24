@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, use } from 'react'
+import { useEffect, useState, useCallback, use } from 'react'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { transitionCompetitionStatus, confirmRoster } from '@/lib/supabase/rpc'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
@@ -87,8 +87,6 @@ const DANCER_STATUS_LABELS: Record<DancerStatus, string> = {
   scratched: 'Scratched',
 }
 
-const POLL_INTERVAL_MS = 5000
-
 export default function RosterConfirmationPage({
   params,
 }: {
@@ -129,14 +127,6 @@ export default function RosterConfirmationPage({
     Map<string, { competitor_number: string; checked_in_at: string | null }>
   >(new Map())
 
-  // Polling
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const competitionsRef = useRef<Competition[]>([])
-
-  // Keep ref in sync
-  useEffect(() => {
-    competitionsRef.current = competitions
-  }, [competitions])
 
   // --- Data Loading ---
 
@@ -303,46 +293,6 @@ export default function RosterConfirmationPage({
     setCheckInMap(map)
   }, [supabase, eventId])
 
-  // --- Polling ---
-
-  const pollStatuses = useCallback(async () => {
-    const comps = competitionsRef.current
-    if (comps.length === 0) return
-
-    const ids = comps.map((c) => c.id)
-    const { data, error } = await supabase
-      .from('competitions')
-      .select('id, status, roster_confirmed_at')
-      .in('id', ids)
-
-    if (error) {
-      console.error('Poll failed:', error.message)
-      return
-    }
-
-    if (!data) return
-
-    const updates = new Map(
-      (
-        data as Array<{
-          id: string
-          status: CompetitionStatus
-          roster_confirmed_at: string | null
-        }>
-      ).map((d) => [d.id, { status: d.status, roster_confirmed_at: d.roster_confirmed_at }])
-    )
-
-    setCompetitions((prev) =>
-      prev.map((c) => {
-        const update = updates.get(c.id)
-        if (update) {
-          return { ...c, status: update.status, roster_confirmed_at: update.roster_confirmed_at }
-        }
-        return c
-      })
-    )
-  }, [supabase])
-
   // Initial load
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
@@ -356,45 +306,7 @@ export default function RosterConfirmationPage({
     void loadJudgeAssignments(selectedJudgeId)
   }, [selectedJudgeId, loadJudgeAssignments])
 
-  // Polling with visibility-aware interval (fallback if Realtime drops)
-  useEffect(() => {
-    if (loading || competitions.length === 0) return
-
-    function startPolling() {
-      if (pollTimerRef.current) return
-      pollTimerRef.current = setInterval(() => {
-        void pollStatuses()
-        void loadCheckIns()
-      }, POLL_INTERVAL_MS)
-    }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    function handleVisibilityChange() {
-      if (document.hidden) {
-        stopPolling()
-      } else {
-        void pollStatuses()
-        void loadCheckIns()
-        startPolling()
-      }
-    }
-
-    startPolling()
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      stopPolling()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [loading, competitions.length, pollStatuses, loadCheckIns])
-
-  // Supabase Realtime for instant updates: competition statuses + check-ins
+  // Supabase Realtime for instant updates: competition statuses + check-ins (hot page — no polling)
   useEffect(() => {
     if (loading || competitions.length === 0) return
 
@@ -699,7 +611,7 @@ export default function RosterConfirmationPage({
     } catch (err) {
       if (err instanceof Error && err.message.includes('status changed')) {
         showError('Competition status changed — refresh and try again')
-        void pollStatuses()
+        void loadInitialData()
       } else {
         showError('Failed to send to judge', { description: err instanceof Error ? err.message : 'Unknown error' })
       }
@@ -727,7 +639,7 @@ export default function RosterConfirmationPage({
     } catch (err) {
       if (err instanceof Error && err.message.includes('status changed')) {
         showError('Competition status changed — refresh and try again')
-        void pollStatuses()
+        void loadInitialData()
       } else {
         showError('Failed to recall', { description: err instanceof Error ? err.message : 'Unknown error' })
       }
