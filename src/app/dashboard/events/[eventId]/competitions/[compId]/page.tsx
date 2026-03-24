@@ -19,7 +19,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults, generateRecall } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
@@ -487,35 +487,14 @@ export default function CompetitionDetailPage({
       const tabulationResults = tabulate(roundScores, ruleset)
       const recalled = generateRecalls(tabulationResults, ruleset.recall_top_percent)
 
-      // Batch upsert all recalls at once (avoids N sequential round trips)
+      // Atomic RPC: upsert recalls + create round + update status in one transaction
       const recallRows = recalled.map((r) => ({
-        competition_id: compId,
-        source_round_id: latestRound.id,
         dancer_id: r.dancer_id,
-        recall_status: 'recalled',
+        source_round_id: latestRound.id,
       }))
 
-      if (recallRows.length > 0) {
-        const { error } = await supabase.from('recalls').upsert(
-          recallRows,
-          { onConflict: 'competition_id,source_round_id,dancer_id' }
-        )
-        if (error) throw new Error(`Failed to save recalls: ${error.message}`)
-      }
-
       const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
-      const { error: roundErr } = await supabase.from('rounds').insert({
-        competition_id: compId,
-        round_number: nextNum,
-        round_type: 'recall',
-      })
-      if (roundErr) throw new Error(`Failed to create recall round: ${roundErr.message}`)
-
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({ status: 'recalled_round_pending' })
-        .eq('id', compId)
-      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+      await generateRecall(supabase, compId, recallRows, nextNum)
 
       void logAudit(supabase, {
         userId: null,

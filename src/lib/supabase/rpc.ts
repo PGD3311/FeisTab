@@ -60,3 +60,18 @@ export async function unpublishResults(
   })
   if (error) throw new Error(`Unpublish failed: ${error.message}`)
 }
+
+export async function generateRecall(
+  supabase: SupabaseClient,
+  competitionId: string,
+  recallRows: { dancer_id: string; source_round_id: string }[],
+  nextRoundNumber: number
+): Promise<string> {
+  const { data, error } = await supabase.rpc('generate_recall', {
+    p_competition_id: competitionId,
+    p_recall_rows: JSON.stringify(recallRows),
+    p_next_round_number: nextRoundNumber,
+  })
+  if (error) throw new Error(`Recall generation failed: ${error.message}`)
+  return data as string
+}
