@@ -15,6 +15,13 @@ interface CommentData {
   note: string | null
 }
 
+interface FeedbackRow {
+  comp_name: string
+  final_rank: number | null
+  judge_name: string
+  comment_data: CommentData | null
+}
+
 export default async function PublicFeedbackPage({
   params,
 }: {
@@ -23,36 +30,20 @@ export default async function PublicFeedbackPage({
   const { eventId, dancerId } = await params
   const supabase = await createClient()
 
-  // Load dancer, event, and competitor number
-  const [dancerRes, eventRes, checkInRes] = await Promise.all([
+  // Load dancer + event header info and feedback via narrow read function
+  const [dancerRes, eventRes, feedbackRes] = await Promise.all([
     supabase.from('dancers').select('first_name, last_name').eq('id', dancerId).single(),
     supabase.from('events').select('id, name, start_date').eq('id', eventId).single(),
-    supabase
-      .from('event_check_ins')
-      .select('competitor_number')
-      .eq('event_id', eventId)
-      .eq('dancer_id', dancerId)
-      .maybeSingle(),
+    supabase.rpc('public_feedback', { p_dancer_id: dancerId, p_event_id: eventId }),
   ])
 
   if (!dancerRes.data || !eventRes.data) notFound()
 
   const dancer = dancerRes.data
   const event = eventRes.data
-  const competitorNumber = (checkInRes.data as { competitor_number: string } | null)?.competitor_number ?? null
+  const feedbackRows = (feedbackRes.data ?? []) as FeedbackRow[]
 
-  // Load published competitions and this dancer's score entries with comments
-  const { data: competitions } = await supabase
-    .from('competitions')
-    .select('id, code, name')
-    .eq('event_id', eventId)
-    .eq('status', 'published')
-    .order('code')
-
-  const compList = competitions ?? []
-  const compIds = compList.map((c) => c.id)
-
-  if (compIds.length === 0) {
+  if (feedbackRows.length === 0) {
     return (
       <div className="min-h-screen bg-feis-cream">
         <header className="bg-feis-green">
@@ -68,49 +59,7 @@ export default async function PublicFeedbackPage({
     )
   }
 
-  // Load score entries and results in parallel (independent queries)
-  const [scoresRes, resultsRes] = await Promise.all([
-    supabase
-      .from('score_entries')
-      .select('competition_id, judge_id, round_id, comment_data, comments')
-      .eq('dancer_id', dancerId)
-      .in('competition_id', compIds),
-    supabase
-      .from('results')
-      .select('competition_id, final_rank, calculated_payload')
-      .eq('dancer_id', dancerId)
-      .in('competition_id', compIds),
-  ])
-
-  const scores = scoresRes.data
-  const results = resultsRes.data
-
-  // Load judges and rounds
-  const judgeIds = [...new Set((scores ?? []).map((s) => s.judge_id))]
-  const roundIds = [...new Set((scores ?? []).map((s) => s.round_id))]
-
-  const [judgesRes] = await Promise.all([
-    judgeIds.length > 0
-      ? supabase.from('judges').select('id, first_name, last_name').in('id', judgeIds)
-      : { data: [] },
-    roundIds.length > 0
-      ? supabase.from('rounds').select('id, round_number').in('id', roundIds)
-      : { data: [] },
-  ])
-
-  const judgeMap = new Map(
-    ((judgesRes.data ?? []) as Array<{ id: string; first_name: string; last_name: string }>).map(
-      (j) => [j.id, `${j.first_name} ${j.last_name}`]
-    )
-  )
-  const resultMap = new Map(
-    (results ?? []).map((r) => [
-      r.competition_id,
-      { final_rank: r.final_rank, total_points: (r.calculated_payload as Record<string, unknown>)?.total_points as number | undefined },
-    ])
-  )
-
-  // Build sections by competition
+  // Build sections by competition from the flat feedback rows
   interface FeedbackEntry {
     judgeName: string
     codes: string[]
@@ -125,35 +74,33 @@ export default async function PublicFeedbackPage({
     entries: FeedbackEntry[]
   }
 
-  const sections: CompSection[] = []
+  const sectionMap = new Map<string, CompSection>()
 
-  for (const comp of compList) {
-    const compScores = (scores ?? []).filter((s) => s.competition_id === comp.id)
-    const result = resultMap.get(comp.id)
+  for (const row of feedbackRows) {
+    let section = sectionMap.get(row.comp_name)
+    if (!section) {
+      section = {
+        comp: { code: null, name: row.comp_name },
+        rank: row.final_rank,
+        points: null,
+        entries: [],
+      }
+      sectionMap.set(row.comp_name, section)
+    }
 
-    const entries: FeedbackEntry[] = compScores
-      .map((s) => {
-        const cd = s.comment_data as CommentData | null
-        const hasContent =
-          (cd && (cd.codes.length > 0 || cd.note)) ||
-          (s.comments && s.comments.trim().length > 0)
-        if (!hasContent) return null
-        return {
-          judgeName: judgeMap.get(s.judge_id) ?? 'Judge',
-          codes: cd?.codes ?? [],
-          note: cd?.note ?? null,
-          legacyComments: !cd ? s.comments : null,
-        }
+    const cd = row.comment_data
+    const hasContent = cd && (cd.codes.length > 0 || cd.note)
+    if (hasContent) {
+      section.entries.push({
+        judgeName: row.judge_name ?? 'Judge',
+        codes: cd?.codes ?? [],
+        note: cd?.note ?? null,
+        legacyComments: null,
       })
-      .filter((e): e is FeedbackEntry => e !== null)
-
-    sections.push({
-      comp: { code: comp.code, name: comp.name },
-      rank: result?.final_rank ?? null,
-      points: result?.total_points ?? null,
-      entries,
-    })
+    }
   }
+
+  const sections = [...sectionMap.values()]
 
   function ordinal(n: number): string {
     const s = ['th', 'st', 'nd', 'rd']
@@ -167,9 +114,6 @@ export default async function PublicFeedbackPage({
         <div className="max-w-2xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-white">
             {dancer.first_name} {dancer.last_name}
-            {competitorNumber && (
-              <span className="ml-2 text-white/50 font-mono">#{competitorNumber}</span>
-            )}
           </h1>
           <p className="text-white/60 text-sm mt-1">{event.name} · {event.start_date}</p>
         </div>

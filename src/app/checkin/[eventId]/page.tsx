@@ -234,39 +234,47 @@ export default function RosterConfirmationPage({
     [supabase]
   )
 
-  // Load registrations for expanded competition
+  // Load registrations for expanded competition via narrow read function + lightweight ID query
   async function loadRegistrations(competitionId: string) {
     setLoadingRegistrations(true)
-    const { data, error } = await supabase
-      .from('registrations')
-      .select('id, dancer_id, competitor_number, status, dancers(first_name, last_name)')
-      .eq('competition_id', competitionId)
-      .order('competitor_number')
 
-    if (error) {
-      console.error('Failed to load registrations:', error.message)
-      showError('Failed to load roster', { description: error.message })
+    const [rosterRes, idRes] = await Promise.all([
+      supabase.rpc('side_stage_roster', { p_comp_id: competitionId }),
+      supabase.from('registrations').select('id, dancer_id').eq('competition_id', competitionId),
+    ])
+
+    if (rosterRes.error) {
+      console.error('Failed to load roster:', rosterRes.error.message)
+      showError('Failed to load roster', { description: rosterRes.error.message })
       setLoadingRegistrations(false)
       return
     }
 
-    // Transform joined data
-    const rawRows = (data ?? []) as unknown as Array<{
-      id: string
+    const rosterRows = (rosterRes.data ?? []) as Array<{
       dancer_id: string
-      competitor_number: string | null
-      status: string
-      dancers: { first_name: string; last_name: string }
+      first_name: string
+      last_name: string
+      competitor_number: number | null
+      registration_status: string
     }>
+    const idRows = (idRes.data ?? []) as Array<{ id: string; dancer_id: string }>
+    const idMap = new Map(idRows.map(r => [r.dancer_id, r.id]))
 
-    const regs: Registration[] = rawRows.map((row) => ({
-      id: row.id,
+    const regs: Registration[] = rosterRows.map((row) => ({
+      id: idMap.get(row.dancer_id) ?? row.dancer_id,
       dancer_id: row.dancer_id,
-      competitor_number: row.competitor_number,
-      status: row.status as RegistrationStatus,
-      first_name: row.dancers?.first_name ?? 'Unknown',
-      last_name: row.dancers?.last_name ?? 'Dancer',
+      competitor_number: row.competitor_number != null ? String(row.competitor_number) : null,
+      status: row.registration_status as RegistrationStatus,
+      first_name: row.first_name ?? 'Unknown',
+      last_name: row.last_name ?? 'Dancer',
     }))
+
+    // Sort by competitor_number
+    regs.sort((a, b) => {
+      const na = a.competitor_number != null ? Number(a.competitor_number) : Infinity
+      const nb = b.competitor_number != null ? Number(b.competitor_number) : Infinity
+      return na - nb
+    })
 
     setRegistrations(regs)
     setLoadingRegistrations(false)

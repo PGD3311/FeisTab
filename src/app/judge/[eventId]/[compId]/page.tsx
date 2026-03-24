@@ -200,9 +200,10 @@ export default function JudgeScoringPage({
   }, [])
 
   async function loadData(judgeId: string) {
-    const [compRes, regRes, roundRes] = await Promise.all([
+    const [compRes, rosterRes, statusRes, roundRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
-      supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId).order('competitor_number'),
+      supabase.rpc('judge_roster', { p_comp_id: compId }),
+      supabase.from('registrations').select('id, dancer_id, status').eq('competition_id', compId),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number', { ascending: false }).limit(1).single(),
     ])
 
@@ -211,15 +212,33 @@ export default function JudgeScoringPage({
       setLoading(false)
       return
     }
-    if (regRes.error) {
-      console.error('Failed to load registrations:', regRes.error.message)
+    if (rosterRes.error || statusRes.error) {
+      console.error('Failed to load registrations:', rosterRes.error?.message ?? statusRes.error?.message)
       setLoadError(true)
       setLoading(false)
       return
     }
 
+    // Merge roster (names/numbers from RPC) with statuses (from registrations table)
+    const rosterRows = (rosterRes.data ?? []) as Array<{ dancer_id: string; first_name: string; last_name: string; competitor_number: number | null }>
+    const statusRows = (statusRes.data ?? []) as Array<{ id: string; dancer_id: string; status: string }>
+    const statusMap = new Map(statusRows.map(s => [s.dancer_id, { id: s.id, status: s.status }]))
+
+    const merged = rosterRows.map(r => {
+      const st = statusMap.get(r.dancer_id)
+      return {
+        id: st?.id ?? r.dancer_id,
+        dancer_id: r.dancer_id,
+        competitor_number: r.competitor_number,
+        status: st?.status ?? 'registered',
+        dancers: { first_name: r.first_name, last_name: r.last_name },
+      }
+    })
+    // Sort by competitor_number like the old query
+    merged.sort((a, b) => (a.competitor_number ?? 0) - (b.competitor_number ?? 0))
+
     setComp(compRes.data)
-    setRegistrations(regRes.data ?? [])
+    setRegistrations(merged)
     setRuleConfig(compRes.data?.rule_sets?.config)
 
     // Ensure a round exists — create one if the event page's best-effort creation failed
