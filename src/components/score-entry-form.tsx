@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -8,7 +8,7 @@ import {
   hasCommentContent,
   type CommentData,
 } from '@/lib/comment-codes'
-import { FLAG_REASONS } from '@/lib/engine/flag-reasons'
+import { FLAG_REASONS, type FlagReason } from '@/lib/engine/flag-reasons'
 
 interface ScoreEntryFormProps {
   dancerId: string
@@ -16,7 +16,7 @@ interface ScoreEntryFormProps {
   competitorNumber: string
   existingScore?: number | null
   existingFlagged?: boolean
-  existingFlagReason?: string | null
+  existingFlagReason?: FlagReason | null
   existingCommentData?: CommentData | null
   existingLegacyComments?: string | null
   scoreMin: number
@@ -25,7 +25,7 @@ interface ScoreEntryFormProps {
     dancerId: string,
     score: number,
     flagged: boolean,
-    flagReason: string | null,
+    flagReason: FlagReason | null,
     commentData: CommentData | null
   ) => Promise<void>
   locked?: boolean
@@ -53,6 +53,14 @@ export function ScoreEntryForm({
   onToggleExpand,
   onSaved,
 }: ScoreEntryFormProps) {
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
+
   const [score, setScore] = useState(existingScore?.toString() ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -100,15 +108,15 @@ export function ScoreEntryForm({
         : null
 
     try {
-      await onSubmit(dancerId, num, flagged, flagged ? flagReason || null : null, commentData)
+      await onSubmit(dancerId, num, flagged, flagged ? (flagReason as FlagReason) || null : null, commentData)
       setSaved(true)
       if (onSaved) {
-        setTimeout(() => {
+        savedTimerRef.current = setTimeout(() => {
           setSaved(false)
           onSaved()
         }, 800)
       } else {
-        setTimeout(() => setSaved(false), 2000)
+        savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save score')

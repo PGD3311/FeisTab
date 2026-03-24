@@ -1,16 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export function CopyLinkButton({ url, className }: { url?: string; className?: string }) {
   const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    }
+  }, [])
 
   async function handleCopy() {
     const textToCopy = url || window.location.href
     try {
       await navigator.clipboard.writeText(textToCopy)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       const input = document.createElement('input')
       input.value = textToCopy
@@ -20,7 +27,7 @@ export function CopyLinkButton({ url, className }: { url?: string; className?: s
       document.body.removeChild(input)
       if (success) {
         setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
       }
     }
   }
