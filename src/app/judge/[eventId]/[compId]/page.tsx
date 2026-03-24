@@ -283,17 +283,51 @@ export default function JudgeScoringPage({
       return
     }
 
-    await submitScore(supabase, {
-      competition_id: compId,
-      round_id: round.id,
-      dancer_id: dancerId,
-      raw_score: score,
-      flagged,
-      flag_reason: flagReason ?? undefined,
-      comment_data: (validateCommentData(commentData) as Record<string, unknown> | null) ?? undefined,
-    })
+    const validatedComment = validateCommentData(commentData) as Record<string, unknown> | null
 
-    loadData(judgeIdentity.judge_id)
+    try {
+      const scoreEntryId = await submitScore(supabase, {
+        competition_id: compId,
+        round_id: round.id,
+        dancer_id: dancerId,
+        raw_score: score,
+        flagged,
+        flag_reason: flagReason ?? undefined,
+        comment_data: validatedComment ?? undefined,
+      })
+
+      // Optimistic local state patch — use the submitted values directly
+      setScores((prev) => {
+        const idx = prev.findIndex(
+          (s: { dancer_id: string }) => s.dancer_id === dancerId
+        )
+        const patch = {
+          id: scoreEntryId,
+          round_id: round.id,
+          judge_id: judgeIdentity.judge_id,
+          dancer_id: dancerId,
+          raw_score: score,
+          flagged,
+          flag_reason: flagReason ?? null,
+          comment_data: validatedComment ?? null,
+          entry_mode: 'judge_self_service',
+        }
+        if (idx >= 0) {
+          // Update existing score entry
+          const next = [...prev]
+          next[idx] = { ...prev[idx], ...patch }
+          return next
+        }
+        // Insert new score entry
+        return [...prev, patch]
+      })
+    } catch (err) {
+      showCritical('Score submission failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+      // Resync from server on error to ensure consistent state
+      loadData(judgeIdentity.judge_id)
+    }
   }
 
   async function handleSignOff() {
