@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
@@ -347,11 +347,7 @@ export default function JudgeScoringPage({
           // Already there — idempotent
         } else {
           if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
-            const { error: midErr } = await supabase
-              .from('competitions')
-              .update({ status: 'awaiting_scores' })
-              .eq('id', compId)
-            if (midErr) throw new Error(`Failed to update status: ${midErr.message}`)
+            await guardedStatusUpdate(supabase, compId, currentStatus, 'awaiting_scores')
             void logAudit(supabase, {
               userId: null,
               entityType: 'competition',
@@ -362,11 +358,7 @@ export default function JudgeScoringPage({
             currentStatus = 'awaiting_scores' as CompetitionStatus
           }
           if (canTransition(currentStatus, 'ready_to_tabulate')) {
-            const { error: statusErr } = await supabase
-              .from('competitions')
-              .update({ status: 'ready_to_tabulate' })
-              .eq('id', compId)
-            if (statusErr) throw new Error(`Failed to update competition status: ${statusErr.message}`)
+            await guardedStatusUpdate(supabase, compId, currentStatus, 'ready_to_tabulate')
             void logAudit(supabase, {
               userId: null,
               entityType: 'competition',

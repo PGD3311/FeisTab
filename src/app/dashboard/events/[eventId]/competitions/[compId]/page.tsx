@@ -19,7 +19,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
@@ -393,11 +393,7 @@ export default function CompetitionDetailPage({
       )
       if (error) throw new Error(`Failed to save results: ${error.message}`)
 
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({ status: 'complete_unpublished' })
-        .eq('id', compId)
-      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+      await guardedStatusUpdate(supabase, compId, 'ready_to_tabulate', 'complete_unpublished')
 
       void logAudit(supabase, {
         userId: null,
@@ -435,17 +431,12 @@ export default function CompetitionDetailPage({
         .eq('competition_id', compId)
       if (pubErr) throw new Error(`Failed to publish results: ${pubErr.message}`)
 
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({
-          status: 'published',
-          approved_by: approvedBy,
-          approved_at: now,
-          unpublished_by: null,
-          unpublished_at: null,
-        })
-        .eq('id', compId)
-      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+      await guardedStatusUpdate(supabase, compId, 'complete_unpublished', 'published', {
+        approved_by: approvedBy,
+        approved_at: now,
+        unpublished_by: null,
+        unpublished_at: null,
+      })
 
       void logAudit(supabase, {
         userId: null,
@@ -469,17 +460,12 @@ export default function CompetitionDetailPage({
     if (!canTransition(currentStatus, 'complete_unpublished')) return
     try {
       const now = new Date().toISOString()
-      const { error: compErr } = await supabase
-        .from('competitions')
-        .update({
-          status: 'complete_unpublished',
-          unpublished_by: unpublishedBy,
-          unpublished_at: now,
-          approved_by: null,
-          approved_at: null,
-        })
-        .eq('id', compId)
-      if (compErr) throw compErr
+      await guardedStatusUpdate(supabase, compId, 'published', 'complete_unpublished', {
+        unpublished_by: unpublishedBy,
+        unpublished_at: now,
+        approved_by: null,
+        approved_at: null,
+      })
       const { error: pubErr } = await supabase
         .from('results')
         .update({ published_at: null })
@@ -705,11 +691,7 @@ export default function CompetitionDetailPage({
       }
 
       // 4. Transition back to awaiting_scores
-      const { error: statusErr } = await supabase
-        .from('competitions')
-        .update({ status: 'awaiting_scores' })
-        .eq('id', compId)
-      if (statusErr) throw new Error(`Failed to update status: ${statusErr.message}`)
+      await guardedStatusUpdate(supabase, compId, comp.status as CompetitionStatus, 'awaiting_scores')
 
       // 5. Audit log
       const unlockJudge = judges.find(j => j.id === unlockJudgeId)

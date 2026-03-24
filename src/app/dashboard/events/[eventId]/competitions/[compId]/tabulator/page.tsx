@@ -6,7 +6,7 @@ import { ChevronLeft } from 'lucide-react'
 
 import { useSupabase } from '@/hooks/use-supabase'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { type FlagReason } from '@/lib/engine/flag-reasons'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
@@ -517,12 +517,7 @@ export default function TabulatorEntryPage({
             canTransition(status, 'awaiting_scores') &&
             !canTransition(status, 'ready_to_tabulate')
           ) {
-            const { error: midErr } = await supabase
-              .from('competitions')
-              .update({ status: 'awaiting_scores' })
-              .eq('id', compId)
-            if (midErr)
-              throw new Error(`Failed to update status: ${midErr.message}`)
+            await guardedStatusUpdate(supabase, compId, status, 'awaiting_scores')
             void logAudit(supabase, {
               userId: null,
               entityType: 'competition',
@@ -537,12 +532,7 @@ export default function TabulatorEntryPage({
             status = 'awaiting_scores' as CompetitionStatus
           }
           if (canTransition(status, 'ready_to_tabulate')) {
-            const { error: statusErr } = await supabase
-              .from('competitions')
-              .update({ status: 'ready_to_tabulate' })
-              .eq('id', compId)
-            if (statusErr)
-              throw new Error(`Failed to update status: ${statusErr.message}`)
+            await guardedStatusUpdate(supabase, compId, status, 'ready_to_tabulate')
             void logAudit(supabase, {
               userId: null,
               entityType: 'competition',
