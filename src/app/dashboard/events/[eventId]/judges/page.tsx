@@ -11,11 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { type JudgeInfo } from '@/types/shared'
 
-interface Judge {
-  id: string
-  first_name: string
-  last_name: string
+interface Judge extends JudgeInfo {
   access_code: string | null
 }
 
@@ -80,6 +78,26 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [codeEnd, setCodeEnd] = useState('')
   const [filterLevel, setFilterLevel] = useState('')
   const [filterAgeGroup, setFilterAgeGroup] = useState('')
+
+  // Team management state
+  const [teamMembers, setTeamMembers] = useState<Array<{
+    id: string
+    user_id: string
+    role: string
+    created_at: string
+    user_email?: string
+  }>>([])
+  const [pendingInvites, setPendingInvites] = useState<Array<{
+    id: string
+    email: string
+    role: string
+    created_at: string
+    accepted_at: string | null
+  }>>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('registration_desk')
+  const [inviteJudgeId, setInviteJudgeId] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
 
   const loadJudges = useCallback(async () => {
     const { data, error } = await supabase
@@ -152,13 +170,31 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     setAssignmentCounts(counts)
   }, [supabase, eventId])
 
+  const loadTeamData = useCallback(async () => {
+    const { data: roles } = await supabase
+      .from('event_roles')
+      .select('id, user_id, role, created_at')
+      .eq('event_id', eventId)
+      .order('created_at')
+
+    const { data: invites } = await supabase
+      .from('pending_invitations')
+      .select('id, email, role, created_at, accepted_at')
+      .eq('event_id', eventId)
+      .order('created_at')
+
+    if (roles) setTeamMembers(roles)
+    if (invites) setPendingInvites(invites)
+  }, [supabase, eventId])
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void loadJudges()
     void loadCompetitions()
     void loadAssignmentCounts()
     void loadStages()
-  }, [loadJudges, loadCompetitions, loadAssignmentCounts, loadStages])
+    void loadTeamData()
+  }, [loadJudges, loadCompetitions, loadAssignmentCounts, loadStages, loadTeamData])
 
   async function loadJudgeAssignments(judgeId: string) {
     setLoadingAssignments(true)
@@ -347,6 +383,48 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     void loadJudges()
   }
 
+  async function handleInvite() {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const { error } = await supabase.from('pending_invitations').insert({
+        email: inviteEmail.toLowerCase().trim(),
+        event_id: eventId,
+        role: inviteRole,
+        judge_id: inviteRole === 'judge' ? inviteJudgeId : null,
+        invited_by: (await supabase.auth.getUser()).data.user?.id,
+      })
+      if (error) throw error
+      showSuccess('Invitation sent')
+      setInviteEmail('')
+      setInviteJudgeId(null)
+      await loadTeamData()
+    } catch {
+      showError('Failed to send invitation')
+    }
+    setInviting(false)
+  }
+
+  async function handleRemoveRole(roleId: string) {
+    const { error } = await supabase.from('event_roles').delete().eq('id', roleId)
+    if (error) {
+      showError('Failed to remove role')
+      return
+    }
+    showSuccess('Role removed')
+    await loadTeamData()
+  }
+
+  async function handleRevokeInvite(inviteId: string) {
+    const { error } = await supabase.from('pending_invitations').delete().eq('id', inviteId)
+    if (error) {
+      showError('Failed to revoke invitation')
+      return
+    }
+    showSuccess('Invitation revoked')
+    await loadTeamData()
+  }
+
   async function handleRemove(judgeId: string) {
     const { error } = await supabase.from('judges').delete().eq('id', judgeId)
     if (error) {
@@ -478,6 +556,33 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     void assignCompetitions(judgeId, allIds)
   }
 
+  const ROLE_LABELS: Record<string, string> = {
+    organizer: 'Organizer',
+    registration_desk: 'Registration Desk',
+    side_stage: 'Side Stage',
+    judge: 'Judge',
+  }
+
+  function roleBadgeVariant(role: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+    switch (role) {
+      case 'organizer':
+        return 'default'
+      case 'registration_desk':
+        return 'secondary'
+      case 'side_stage':
+        return 'outline'
+      case 'judge':
+        return 'destructive'
+      default:
+        return 'secondary'
+    }
+  }
+
+  // Judges not yet linked to an invite (for judge role invite dropdown)
+  const unlinkedJudges = judges.filter(
+    (j) => !pendingInvites.some((inv) => inv.role === 'judge' && inv.accepted_at === null)
+  )
+
   // Derive unique levels and age groups for dropdowns
   const uniqueLevels = [...new Set(competitions.map((c) => c.level).filter(Boolean))] as string[]
   const uniqueAgeGroups = [
@@ -498,6 +603,186 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
 
   return (
     <div className="max-w-2xl">
+      {/* Event Team Section */}
+      <Card className="feis-card mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Event Team</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Invite Form */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Invite Team Member</h4>
+            <div className="flex gap-3 items-end flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="inviteEmail" className="text-xs">
+                  Email
+                </Label>
+                <Input
+                  id="inviteEmail"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="team@example.com"
+                />
+              </div>
+              <div className="w-48">
+                <Label htmlFor="inviteRole" className="text-xs">
+                  Role
+                </Label>
+                <select
+                  id="inviteRole"
+                  value={inviteRole}
+                  onChange={(e) => {
+                    setInviteRole(e.target.value)
+                    if (e.target.value !== 'judge') setInviteJudgeId(null)
+                  }}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="registration_desk">Registration Desk</option>
+                  <option value="side_stage">Side Stage</option>
+                  <option value="judge">Judge</option>
+                  <option value="organizer">Organizer</option>
+                </select>
+              </div>
+              {inviteRole === 'judge' && (
+                <div className="w-48">
+                  <Label htmlFor="inviteJudgeId" className="text-xs">
+                    Link to Judge
+                  </Label>
+                  <select
+                    id="inviteJudgeId"
+                    value={inviteJudgeId ?? ''}
+                    onChange={(e) => setInviteJudgeId(e.target.value || null)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Select judge...</option>
+                    {unlinkedJudges.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.first_name} {j.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <Button onClick={() => void handleInvite()} disabled={inviting || !inviteEmail.trim()}>
+                {inviting ? 'Sending...' : 'Invite'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Current Team Members */}
+          {teamMembers.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Current Members</h4>
+              <div className="rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-2 font-medium">Role</th>
+                      <th className="text-left p-2 font-medium">User ID</th>
+                      <th className="text-left p-2 font-medium">Added</th>
+                      <th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMembers.map((member) => (
+                      <tr key={member.id} className="border-b last:border-b-0">
+                        <td className="p-2">
+                          <Badge variant={roleBadgeVariant(member.role)}>
+                            {ROLE_LABELS[member.role] ?? member.role}
+                          </Badge>
+                        </td>
+                        <td className="p-2 font-mono text-xs text-muted-foreground">
+                          {member.user_id.slice(0, 8)}...
+                        </td>
+                        <td className="p-2 text-muted-foreground">
+                          {new Date(member.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-2 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                            onClick={() => void handleRemoveRole(member.id)}
+                          >
+                            Remove
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Invitations */}
+          {pendingInvites.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Pending Invitations</h4>
+              <div className="rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-2 font-medium">Email</th>
+                      <th className="text-left p-2 font-medium">Role</th>
+                      <th className="text-left p-2 font-medium">Status</th>
+                      <th className="text-left p-2 font-medium">Sent</th>
+                      <th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingInvites.map((invite) => (
+                      <tr key={invite.id} className="border-b last:border-b-0">
+                        <td className="p-2">{invite.email}</td>
+                        <td className="p-2">
+                          <Badge variant={roleBadgeVariant(invite.role)}>
+                            {ROLE_LABELS[invite.role] ?? invite.role}
+                          </Badge>
+                        </td>
+                        <td className="p-2">
+                          {invite.accepted_at ? (
+                            <Badge variant="default" className="text-xs">
+                              Accepted
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-2 text-muted-foreground">
+                          {new Date(invite.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-2 text-right">
+                          {!invite.accepted_at && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={() => void handleRevokeInvite(invite.id)}
+                            >
+                              Revoke
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {teamMembers.length === 0 && pendingInvites.length === 0 && (
+            <p className="text-muted-foreground text-sm">
+              No team members or invitations yet. Invite people above to give them access to this
+              event.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="feis-card mb-6">
         <CardHeader>
           <CardTitle className="text-lg">Add Judge</CardTitle>
