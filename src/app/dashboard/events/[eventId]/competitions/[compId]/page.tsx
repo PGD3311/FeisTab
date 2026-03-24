@@ -19,7 +19,7 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import { logAudit } from '@/lib/audit'
-import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults, generateRecall } from '@/lib/supabase/rpc'
+import { signOffJudge, guardedStatusUpdate, publishResults, unpublishResults, generateRecall, approveTabulation } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
@@ -387,13 +387,7 @@ export default function CompetitionDetailPage({
         ),
       }))
 
-      const { error } = await supabase.from('results').upsert(
-        resultRows,
-        { onConflict: 'competition_id,dancer_id' }
-      )
-      if (error) throw new Error(`Failed to save results: ${error.message}`)
-
-      await guardedStatusUpdate(supabase, compId, 'ready_to_tabulate', 'complete_unpublished')
+      await approveTabulation(supabase, compId, resultRows)
 
       void logAudit(supabase, {
         userId: null,

@@ -75,3 +75,20 @@ export async function generateRecall(
   if (error) throw new Error(`Recall generation failed: ${error.message}`)
   return data as string
 }
+
+export async function approveTabulation(
+  supabase: SupabaseClient,
+  competitionId: string,
+  resultRows: {
+    dancer_id: string
+    final_rank: number
+    display_place: string
+    calculated_payload: unknown
+  }[]
+): Promise<void> {
+  const { error } = await supabase.rpc('approve_tabulation', {
+    p_competition_id: competitionId,
+    p_result_rows: JSON.stringify(resultRows),
+  })
+  if (error) throw new Error(`Tabulation approval failed: ${error.message}`)
+}
