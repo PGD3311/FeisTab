@@ -7,7 +7,7 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { showSuccess, showError } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
-import { ACTIVE_STATUSES, canTransition } from '@/lib/competition-states'
+import { ACTIVE_STATUSES, canTransition, getTransitionBlockReason } from '@/lib/competition-states'
 import { type CompetitionStatus } from '@/lib/competition-states'
 import {
   groupBySchedule,
@@ -247,9 +247,18 @@ export default function EventOverviewPage() {
             <Button
               size="sm"
               onClick={async () => {
-                const validComps = importedComps.filter((c) => canTransition(c.status, 'ready_for_day_of'))
+                const validComps = importedComps.filter((c) => {
+                  if (!canTransition(c.status, 'ready_for_day_of')) return false
+                  const blockReason = getTransitionBlockReason(c.status, 'ready_for_day_of', {
+                    registrationCount: c.registrations?.[0]?.count ?? 0,
+                    judgeCount: judgeCounts.get(c.id) ?? 0,
+                    roundCount: 1,
+                    rosterConfirmedAt: null,
+                  })
+                  return blockReason === null
+                })
                 if (validComps.length === 0) {
-                  showError('No competitions can be advanced')
+                  showError('No competitions can be advanced — all are missing dancers')
                   return
                 }
                 const ids = validComps.map((c) => c.id)

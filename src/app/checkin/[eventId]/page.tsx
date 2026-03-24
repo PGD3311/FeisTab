@@ -75,6 +75,12 @@ const UNCONFIRMABLE_STATUSES: CompetitionStatus[] = ['ready_for_day_of']
 const DANCER_STATUSES = ['present', 'no_show', 'scratched'] as const
 type DancerStatus = (typeof DANCER_STATUSES)[number]
 
+const VALID_REG_STATUSES: Set<string> = new Set([
+  'registered', 'checked_in', 'present', 'scratched',
+  'no_show', 'danced', 'recalled', 'disqualified',
+  'finalized', 'did_not_complete', 'medical',
+])
+
 const DANCER_STATUS_LABELS: Record<DancerStatus, string> = {
   present: 'Present',
   no_show: 'No Show',
@@ -511,6 +517,11 @@ export default function RosterConfirmationPage({
   }
 
   async function handleDancerStatusChange(registrationId: string, newStatus: RegistrationStatus) {
+    if (!VALID_REG_STATUSES.has(newStatus)) {
+      showError('Invalid status')
+      return
+    }
+
     setUpdatingStatus(registrationId)
 
     const { error } = await supabase

@@ -81,11 +81,19 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
 
       if (dancerErr) throw new Error(`Failed to upsert dancers: ${dancerErr.message}`)
 
-      const { data: allDancers, error: allDancersErr } = await supabase
-        .from('dancers')
-        .select('id, first_name, last_name, school_name')
+      // Scope dancer lookup to only names present in this import (avoids loading all DB dancers)
+      const importFirstNames = [...new Set([...uniqueDancers.values()].map(r => r.first_name))]
 
-      if (allDancersErr) throw new Error(`Failed to load dancers: ${allDancersErr.message}`)
+      let allDancers: { id: string; first_name: string; last_name: string; school_name: string | null }[] = []
+
+      if (importFirstNames.length > 0) {
+        const { data, error: dancersErr } = await supabase
+          .from('dancers')
+          .select('id, first_name, last_name, school_name')
+          .in('first_name', importFirstNames)
+        if (dancersErr) throw new Error(`Failed to load dancers: ${dancersErr.message}`)
+        allDancers = data ?? []
+      }
 
       const dancerLookup = new Map<string, string>()
       for (const d of allDancers ?? []) {
