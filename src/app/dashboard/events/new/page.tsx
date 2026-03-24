@@ -33,17 +33,6 @@ export default function NewEventPage() {
         location: location || undefined,
       })
 
-      // Auto-authorize the creator: fetch the generated access code
-      const { data: eventRow } = await supabase
-        .from('events')
-        .select('registration_code')
-        .eq('id', eventId)
-        .single()
-
-      if (eventRow?.registration_code) {
-        localStorage.setItem(`feistab_access_${eventId}`, eventRow.registration_code)
-      }
-
       router.push(`/dashboard/events/${eventId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create event')

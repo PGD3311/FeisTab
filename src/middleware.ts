@@ -1,11 +1,9 @@
 import { type NextRequest } from 'next/server'
 import { createMiddlewareClient } from '@/lib/supabase/server'
 
-// PERMISSIVE MODE: During migration, we only refresh the session.
-// We do NOT redirect unauthenticated users.
-// Old auth (EventGate, judge access codes) still works in parallel.
-// Switch to strict mode in Task 15 after old auth is removed.
-const STRICT_MODE = false
+// STRICT MODE: Middleware redirects unauthenticated users to login.
+// Old auth (EventGate, localStorage sessions, access codes) has been removed.
+const STRICT_MODE = true
 
 const PUBLIC_ROUTES = ['/auth', '/results', '/public']
 

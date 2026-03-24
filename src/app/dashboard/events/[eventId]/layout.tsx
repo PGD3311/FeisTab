@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { EventProvider, type EventData, type CompetitionData } from '@/contexts/event-context'
-import { EventGate } from '@/components/event-gate'
 import { EventTabs } from '@/components/event-tabs'
 import { Badge } from '@/components/ui/badge'
 
@@ -55,7 +54,6 @@ export default function EventLayout({
   }
 
   return (
-    <EventGate eventId={eventId}>
     <EventProvider value={{ event, competitions, loading, reload: loadData }}>
       <div className="space-y-5">
         {/* Back nav */}
@@ -109,6 +107,5 @@ export default function EventLayout({
         <div>{children}</div>
       </div>
     </EventProvider>
-    </EventGate>
   )
 }

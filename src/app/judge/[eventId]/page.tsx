@@ -18,9 +18,8 @@ import {
 import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 
-interface JudgeSession {
+interface JudgeIdentity {
   judge_id: string
-  event_id: string
   name: string
 }
 
@@ -52,7 +51,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   const { eventId } = use(params)
   const supabase = useSupabase()
   const router = useRouter()
-  const [session, setSession] = useState<JudgeSession | null>(null)
+  const [judgeIdentity, setJudgeIdentity] = useState<JudgeIdentity | null>(null)
   const [event, setEvent] = useState<Record<string, unknown> | null>(null) // TODO: type when Supabase types generated
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
@@ -191,32 +190,42 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     [supabase]
   )
 
-  // Initial load
+  // Initial load — derive judge_id from authenticated user
   useEffect(() => {
-    const stored = localStorage.getItem('judge_session')
-    if (!stored) {
-      router.push('/judge')
-      return
-    }
-    let parsed: JudgeSession
-    try {
-      parsed = JSON.parse(stored)
-    } catch {
-      localStorage.removeItem('judge_session')
-      router.push('/judge')
-      return
-    }
-    if (parsed.event_id !== eventId) {
-      router.push('/judge')
-      return
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
-    setSession(parsed)
-
     async function load() {
+      // Get authenticated user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/auth/login?next=/judge/' + eventId)
+        return
+      }
+
+      // Derive judge_id from judges.user_id
+      const { data: judge, error: judgeErr } = await supabase
+        .from('judges')
+        .select('id, first_name, last_name')
+        .eq('user_id', user.id)
+        .eq('event_id', eventId)
+        .single()
+
+      if (judgeErr || !judge) {
+        console.error('Judge not found for user:', judgeErr?.message)
+        router.push('/judge')
+        return
+      }
+
+      const identity: JudgeIdentity = {
+        judge_id: judge.id,
+        name: `${judge.first_name} ${judge.last_name}`,
+      }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+      setJudgeIdentity(identity)
+
       const [eventRes, comps, stagesRes] = await Promise.all([
         supabase.from('events').select('*').eq('id', eventId).single(),
-        loadCompetitions(parsed.judge_id),
+        loadCompetitions(identity.judge_id),
         supabase
           .from('stages')
           .select('id, name')
@@ -343,7 +352,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   }, [loading, competitions.length, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStart(comp: Competition) {
-    if (!session) return
+    if (!judgeIdentity) return
     setStarting(comp.id)
 
     try {
@@ -441,9 +450,9 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('judge_session')
-    router.push('/judge')
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/auth/login')
   }
 
   // Render helper for schedule position badge
@@ -472,10 +481,10 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
           </h1>
           <p className="text-sm text-muted-foreground">
             Signed in as{' '}
-            <span className="font-medium text-feis-green">{session?.name}</span>
+            <span className="font-medium text-feis-green">{judgeIdentity?.name}</span>
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
+        <Button variant="outline" size="sm" onClick={handleSignOut}>
           Sign Out
         </Button>
       </div>

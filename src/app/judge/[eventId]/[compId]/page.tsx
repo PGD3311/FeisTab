@@ -16,9 +16,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-interface JudgeSession {
+interface JudgeIdentity {
   judge_id: string
-  event_id: string
   name: string
 }
 
@@ -33,7 +32,7 @@ export default function JudgeScoringPage({
   const { eventId, compId } = use(params)
   const supabase = useSupabase()
   const router = useRouter()
-  const [session, setSession] = useState<JudgeSession | null>(null)
+  const [judgeIdentity, setJudgeIdentity] = useState<JudgeIdentity | null>(null)
   // TODO: type when Supabase types generated
   const [comp, setComp] = useState<any>(null)
   const [registrations, setRegistrations] = useState<any[]>([])
@@ -163,26 +162,40 @@ export default function JudgeScoringPage({
     }
   }, [loading, submitted, pollData])
 
+  // Initial load — derive judge_id from authenticated user
   useEffect(() => {
-    const stored = localStorage.getItem('judge_session')
-    if (!stored) {
-      router.push('/judge')
-      return
+    async function init() {
+      // Get authenticated user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push(`/auth/login?next=/judge/${eventId}/${compId}`)
+        return
+      }
+
+      // Derive judge_id from judges.user_id
+      const { data: judge, error: judgeErr } = await supabase
+        .from('judges')
+        .select('id, first_name, last_name')
+        .eq('user_id', user.id)
+        .eq('event_id', eventId)
+        .single()
+
+      if (judgeErr || !judge) {
+        console.error('Judge not found for user:', judgeErr?.message)
+        router.push('/judge')
+        return
+      }
+
+      const identity: JudgeIdentity = {
+        judge_id: judge.id,
+        name: `${judge.first_name} ${judge.last_name}`,
+      }
+      setJudgeIdentity(identity)
+      await loadData(identity.judge_id)
     }
-    let parsed: JudgeSession
-    try {
-      parsed = JSON.parse(stored)
-    } catch {
-      localStorage.removeItem('judge_session')
-      router.push('/judge')
-      return
-    }
-    if (parsed.event_id !== eventId) {
-      router.push('/judge')
-      return
-    }
-    setSession(parsed)
-    loadData(parsed.judge_id)
+    init()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only effect, loadData is stable
   }, [])
 
@@ -276,7 +289,7 @@ export default function JudgeScoringPage({
   }
 
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null, commentData: CommentData | null) {
-    if (!session || !round) return
+    if (!judgeIdentity || !round) return
 
     // Prevent writes after sign-off
     if (submitted) {
@@ -286,7 +299,7 @@ export default function JudgeScoringPage({
 
     // Verify round isn't signed off server-side (stale tab protection)
     const signOffs = round.judge_sign_offs ?? {}
-    if (signOffs[session.judge_id]) {
+    if (signOffs[judgeIdentity.judge_id]) {
       showCritical('Scores are locked — this round has been signed off')
       return
     }
@@ -301,11 +314,11 @@ export default function JudgeScoringPage({
       comment_data: (validateCommentData(commentData) as Record<string, unknown> | null) ?? undefined,
     })
 
-    loadData(session.judge_id)
+    loadData(judgeIdentity.judge_id)
   }
 
   async function handleSignOff() {
-    if (!session || !round) return
+    if (!judgeIdentity || !round) return
 
     try {
       // Lock all scores for this judge/round
@@ -313,11 +326,11 @@ export default function JudgeScoringPage({
         .from('score_entries')
         .update({ locked_at: new Date().toISOString() })
         .eq('round_id', round.id)
-        .eq('judge_id', session.judge_id)
+        .eq('judge_id', judgeIdentity.judge_id)
       if (lockErr) throw new Error(`Failed to lock scores: ${lockErr.message}`)
 
       // Atomically record sign-off in round's judge_sign_offs jsonb
-      const updatedSignOffs = await signOffJudge(supabase, round.id, session.judge_id, compId)
+      const updatedSignOffs = await signOffJudge(supabase, round.id, judgeIdentity.judge_id, compId)
 
       // Check if all ASSIGNED judges (not all event judges) have signed off
       const { data: assignments, error: assignErr } = await supabase
@@ -382,7 +395,7 @@ export default function JudgeScoringPage({
           onClick={() => {
             setLoadError(false)
             setLoading(true)
-            if (session) loadData(session.judge_id)
+            if (judgeIdentity) loadData(judgeIdentity.judge_id)
           }}
           size="lg"
           className="w-full text-lg py-6"

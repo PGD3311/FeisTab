@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
-import { showSuccess, showError, showCritical } from '@/lib/feedback'
+import { showSuccess, showCritical } from '@/lib/feedback'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 
 interface Event {
   id: string
@@ -18,29 +18,40 @@ interface Event {
   registration_code: string | null
 }
 
-function getAuthorizedEventIds(): string[] {
-  const ids: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith('feistab_access_')) {
-      ids.push(key.replace('feistab_access_', ''))
-    }
-  }
-  return ids
-}
-
 export default function DashboardPage() {
   const supabase = useSupabase()
+  const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
-  const [joinCode, setJoinCode] = useState('')
-  const [joining, setJoining] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
 
   async function loadEvents() {
-    const authorizedIds = getAuthorizedEventIds()
+    // Get authenticated user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/auth/login?next=/dashboard')
+      return
+    }
 
-    if (authorizedIds.length === 0) {
+    // Query event_roles for organizer events
+    const { data: roleRows, error: roleErr } = await supabase
+      .from('event_roles')
+      .select('event_id')
+      .eq('user_id', user.id)
+      .eq('role', 'organizer')
+
+    if (roleErr) {
+      console.error('Failed to load event roles:', roleErr.message)
+      setEvents([])
+      setLoading(false)
+      return
+    }
+
+    const eventIds = (roleRows ?? []).map((r: { event_id: string }) => r.event_id)
+
+    if (eventIds.length === 0) {
       setEvents([])
       setLoading(false)
       return
@@ -49,7 +60,7 @@ export default function DashboardPage() {
     const { data, error } = await supabase
       .from('events')
       .select('id, name, start_date, location, status, registration_code')
-      .in('id', authorizedIds)
+      .in('id', eventIds)
       .order('start_date', { ascending: false })
 
     if (error) {
@@ -61,29 +72,6 @@ export default function DashboardPage() {
   }
 
   useEffect(() => { loadEvents() }, []) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- initial data load
-
-  async function handleJoin() {
-    if (!joinCode.trim()) return
-    setJoining(true)
-
-    const { data, error } = await supabase
-      .from('events')
-      .select('id, registration_code')
-      .eq('registration_code', joinCode.trim().toUpperCase())
-      .maybeSingle()
-
-    if (error || !data) {
-      showError('No event found with that code')
-      setJoining(false)
-      return
-    }
-
-    localStorage.setItem(`feistab_access_${data.id}`, joinCode.trim().toUpperCase())
-    setJoinCode('')
-    showSuccess('Event added to your dashboard')
-    await loadEvents()
-    setJoining(false)
-  }
 
   async function handleDelete(eventId: string, eventName: string) {
     if (!confirm(`Delete "${eventName}"? This removes all competitions, scores, and results. This cannot be undone.`)) {
@@ -102,7 +90,6 @@ export default function DashboardPage() {
       return
     }
 
-    localStorage.removeItem(`feistab_access_${eventId}`)
     showSuccess('Event deleted')
     await loadEvents()
     setDeleting(null)
@@ -119,28 +106,10 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Join existing event */}
-      <div className="flex gap-2 mb-6">
-        <Input
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleJoin() }}
-          placeholder="Enter event access code..."
-          className="font-mono tracking-widest max-w-xs"
-        />
-        <Button
-          variant="outline"
-          onClick={handleJoin}
-          disabled={!joinCode.trim() || joining}
-        >
-          {joining ? 'Joining...' : 'Join Event'}
-        </Button>
-      </div>
-
       {events.length === 0 ? (
         <Card className="feis-card">
           <CardContent className="py-12 text-center text-muted-foreground">
-            No events yet. Create a new event or enter an access code to join one.
+            No events yet. Create a new event to get started.
           </CardContent>
         </Card>
       ) : (

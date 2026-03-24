@@ -1,90 +1,105 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSupabase } from '@/hooks/use-supabase'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function JudgeLoginPage() {
-  const supabase = useSupabase()
-  const router = useRouter()
-  const [code, setCode] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+export const dynamic = 'force-dynamic'
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+interface JudgeEvent {
+  event_id: string
+  event_name: string
+  judge_name: string
+}
 
-    const trimmed = code.trim().toUpperCase()
-    if (!trimmed) {
-      setError('Enter your access code')
-      setLoading(false)
-      return
-    }
+export default async function JudgePage() {
+  const supabase = await createClient()
 
-    const { data: judge, error: queryErr } = await supabase
-      .from('judges')
-      .select('id, event_id, first_name, last_name')
-      .eq('access_code', trimmed)
-      .single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    if (queryErr) {
-      setError('Unable to verify access code — please try again')
-      setLoading(false)
-      return
-    }
-    if (!judge) {
-      setError('Invalid access code. Check with your organizer.')
-      setLoading(false)
-      return
-    }
+  if (!user) {
+    redirect('/auth/login?next=/judge')
+  }
 
-    // Store judge session in localStorage
-    localStorage.setItem('judge_session', JSON.stringify({
-      judge_id: judge.id,
-      event_id: judge.event_id,
-      name: `${judge.first_name} ${judge.last_name}`,
-    }))
+  // Find events where this user has a judge role
+  const { data: roleRows, error: roleErr } = await supabase
+    .from('event_roles')
+    .select('event_id, events(id, name, start_date)')
+    .eq('user_id', user.id)
+    .eq('role', 'judge')
 
-    router.push(`/judge/${judge.event_id}`)
+  if (roleErr) {
+    console.error('Failed to load judge roles:', roleErr.message)
+  }
+
+  // Get judge names for these events
+  const { data: judges, error: judgeErr } = await supabase
+    .from('judges')
+    .select('event_id, first_name, last_name')
+    .eq('user_id', user.id)
+
+  if (judgeErr) {
+    console.error('Failed to load judges:', judgeErr.message)
+  }
+
+  const judgeNameMap = new Map<string, string>()
+  for (const j of judges ?? []) {
+    judgeNameMap.set(j.event_id, `${j.first_name} ${j.last_name}`)
+  }
+
+  const judgeEvents: JudgeEvent[] = []
+  for (const row of (roleRows as unknown as Array<{
+    event_id: string
+    events: { id: string; name: string; start_date: string }
+  }>) ?? []) {
+    const ev = row.events
+    if (!ev) continue
+    judgeEvents.push({
+      event_id: ev.id,
+      event_name: ev.name,
+      judge_name: judgeNameMap.get(ev.id) ?? user.email ?? 'Judge',
+    })
+  }
+
+  // If exactly one event, go straight to it
+  if (judgeEvents.length === 1) {
+    redirect(`/judge/${judgeEvents[0].event_id}`)
   }
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="feis-card w-full max-w-sm">
-        <div className="px-6 pt-4">
+      <div className="w-full max-w-sm space-y-4">
+        <div className="px-2">
           <Link href="/" className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
             &larr; Back
           </Link>
         </div>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl font-semibold">Judge Sign In</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Enter the access code from your organizer
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. MURPHY-7291"
-              className="text-center text-lg tracking-widest font-mono"
-              autoFocus
-              autoComplete="off"
-            />
-            {error && <p className="text-sm text-destructive text-center">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Checking...' : 'Enter'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        <Card className="feis-card">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl font-semibold">Judge Events</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Select an event to score</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {judgeEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                You have not been assigned as a judge to any events.
+              </p>
+            ) : (
+              judgeEvents.map((je) => (
+                <Link
+                  key={je.event_id}
+                  href={`/judge/${je.event_id}`}
+                  className="block p-4 rounded-md border hover:border-feis-green/50 hover:bg-feis-green-light/30 transition-colors"
+                >
+                  <p className="font-medium">{je.event_name}</p>
+                  <p className="text-sm text-muted-foreground">{je.judge_name}</p>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

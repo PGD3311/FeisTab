@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Outfit } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
+import { SessionMonitor } from '@/components/session-monitor'
 import './globals.css'
 
 const outfit = Outfit({
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={outfit.variable}>
       <body className="font-sans">
+        <SessionMonitor />
         {children}
         <Toaster />
       </body>
