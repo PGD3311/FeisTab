@@ -11,12 +11,13 @@
 ## 1. Auth Model
 
 - **Supabase Auth with email + password.** Every person who touches the operational side gets an account.
-- `/auth/login` — email + password form. Supports `?next=` param for deep-link return (validated as relative path).
+- `/auth/login` — email + password form. Supports `?next=` param for deep-link return. Validation: `next` must match `/^\/[^\/]/` (starts with single `/`, second char is not `/`) and must not contain `://` or `@`. Rejects protocol-relative URLs like `//evil.com`.
 - `/auth/signup` — email, password, full name. Supabase sends confirmation email.
 - `/auth/confirm` — Supabase email confirmation callback.
 - After login, invitation fulfillment runs server-side (see Section 4), then redirect to `next` param or `/`.
 - **No more access codes for auth.** Event `registration_code` and judge `access_code` no longer grant access. Organizer must explicitly add users via roles.
 - **Public results remain unauthenticated** — `/results/[eventId]` and `/results/[eventId]/feedback/[dancerId]` stay open.
+- **Session configuration:** JWT expiry set to 1 hour with auto-refresh via `@supabase/ssr`. Refresh token rotation enabled. A feis day runs 8-12 hours — the client auto-refreshes silently. If refresh fails (e.g., network drop), redirect to `/auth/login?next={current_path}` with a toast warning about unsaved work.
 
 ---
 
@@ -26,7 +27,9 @@
 
 Four roles: `organizer`, `registration_desk`, `side_stage`, `judge`.
 
-### `event_roles` table
+### `event_roles` table (replaces existing `user_roles`)
+
+The existing `user_roles` table (migration `00004_operations.sql`, enum: `super_admin/organizer/tabulator/stage_manager/judge/viewer`) is dropped and replaced. It has no production data. The new enum maps as: `organizer` → `organizer`, `tabulator` → `organizer`, `stage_manager` → `side_stage`, `judge` → `judge`, `viewer` → removed (public results handle this), `super_admin` → removed (out of scope).
 
 ```
 event_roles
@@ -53,6 +56,14 @@ A user can hold multiple roles per event. **Judge is mutually exclusive** with a
 - `judges.user_id` → links auth user to a judges row
 - `judge_assignments` → determines which competitions they can score
 - All three must be in place before a judge can submit scores
+
+### `judges.user_id` linkage mechanism
+
+When an organizer invites a judge:
+1. Organizer enters email + selects role `judge` + picks which `judges` row this person maps to (or creates a new one)
+2. `pending_invitations` row stores both `role = 'judge'` and `judge_id` (new column on `pending_invitations`)
+3. On fulfillment: INSERT into `event_roles` AND UPDATE `judges SET user_id = auth.uid() WHERE id = invitation.judge_id`
+4. If the judge already has an account: both happen immediately on invite
 
 ### Permission matrix
 
@@ -89,24 +100,56 @@ RETURNS text[] AS $$
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 ```
 
+**Note:** This function is `SECURITY DEFINER` by design — it runs as the function owner (migration role), which bypasses RLS on `event_roles`. This is intentional: the function is used inside RLS policies on other tables, and if it were `SECURITY INVOKER`, querying `event_roles` (which itself has RLS) would cause infinite recursion. Do not change this to `SECURITY INVOKER`.
+
+### RPC security model
+
+**All write RPCs are `SECURITY DEFINER`.** They bypass RLS and enforce authorization in the function body. This is necessary because:
+- A judge calling `submit_score` needs to INSERT into `score_entries`, but the RLS INSERT policy is "Via RPC" (no direct client inserts)
+- Organizer RPCs like `approve_tabulation` need to UPDATE `competitions` and INSERT into `results`
+- The RPC body re-checks role, assignment, lock state, and allowed fields before executing
+
+**Client-side code uses the `anon` key** for all operations. RPCs bypass RLS internally via `SECURITY DEFINER`.
+
+**Server actions** (invitation fulfillment, invitation check) use a **service-role Supabase client** (not exposed to the browser) for operations that require querying `auth.users` (e.g., checking if an invited email already has an account).
+
 ### Policy matrix
 
 | Table | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
 | events | Any role on event | Authenticated (creates event) | Organizer | Never |
-| dancers | Organizer, reg_desk: full. Side_stage, judge: via narrow functions only. | Via RPC | Via RPC | Never |
+| dancers | Organizer, reg_desk: via event join (see predicate below). Side_stage, judge: via narrow functions only. Public: name + number via `public_feedback()` for published results. | Via RPC | Via RPC | Never |
 | judges | Any role on event | Organizer | Organizer | Never |
 | competitions | Any role on event | Organizer | Organizer | Never |
 | registrations | Organizer: full. Reg_desk: own event. Side_stage, judge: via roster functions only. | Via RPC | Via RPC | Organizer via RPC |
 | event_check_ins | Organizer, reg_desk | Via RPC | Via RPC | Never |
-| rounds | Any role on event | Organizer | Organizer | Never |
-| score_entries | Organizer OR own judge_id | Judge via RPC | Judge via RPC | Never |
+| rounds | Any role on event | Organizer via RPC | Via RPC only (sign-off, heat snapshot) | Never |
+| score_entries | Organizer OR own judge_id | Via RPC (judge or tabulator) | Via RPC (judge or tabulator) | Never |
+| stages | Any role on event | Organizer | Organizer | Organizer |
+| rule_sets | Any role on event | Organizer | Organizer | Never |
 | results | Organizer OR public if published | Via RPC only | Via RPC only | Never |
 | recalls | Organizer | Via RPC only | Never | Never |
 | event_roles | Organizer: all rows for event. All others: own rows only. | Organizer | Organizer | Organizer |
 | judge_assignments | Organizer, own judge | Organizer | Organizer | Organizer |
 | audit_log | Organizer | Trigger/RPC only | Never | Never |
 | status_changes | Organizer | Trigger only | Never | Never |
+
+### `dancers` table RLS predicate
+
+`dancers` has no `event_id` column — it's a shared table across events. The SELECT policy for organizer/reg_desk joins through registrations:
+
+```sql
+-- Policy: organizer or registration_desk can see dancers registered for their events
+EXISTS (
+  SELECT 1 FROM registrations r
+  JOIN event_roles er ON er.event_id = r.event_id
+  WHERE r.dancer_id = dancers.id
+    AND er.user_id = auth.uid()
+    AND er.role IN ('organizer', 'registration_desk')
+)
+```
+
+**Performance note:** Requires index on `registrations(dancer_id)` (already exists from migration 018). Also requires index on `event_roles(user_id, event_id)` (add in auth migration).
 
 ### Narrow read functions (not raw table access)
 
@@ -122,6 +165,13 @@ Every write RPC must:
 2. **Re-check assignment** — for judge RPCs, verify `judges.user_id = auth.uid()` AND `judge_assignments` row exists for the target competition
 3. **Re-check lock state** — for score RPCs, verify `locked_at IS NULL` before allowing writes
 4. **Restrict field mutations** — each RPC accepts only the fields that role is allowed to set. The RPC function body defines the exact column list, not the caller.
+5. **Check competition status** — score submission RPCs must verify the competition is in a status that allows scoring (e.g., `in_progress` or `released_to_judge`). Roster read functions similarly only return data for competitions in active statuses.
+
+### Tabulator entry flow
+
+The existing tabulator data entry mode (organizer types scores on behalf of judges) is preserved via a dedicated RPC:
+
+- `tabulator_enter_score(p_comp_id, p_round_id, p_dancer_id, p_judge_id, p_raw_score, ...)` — requires `organizer` role. Sets `entry_mode = 'tabulator_entry'` and `entered_by_user_id = auth.uid()`. Same lock-state checks as judge scoring.
 
 ### Public anonymous policies (no auth required)
 
@@ -180,6 +230,7 @@ pending_invitations
 ├── role        (enum)
 ├── invited_by  (uuid, FK → auth.users)
 ├── created_at  (timestamptz)
+├── judge_id    (uuid, FK → judges, nullable — set when role = 'judge')
 ├── accepted_at (timestamptz, nullable)
 └── UNIQUE(email, event_id, role)
 ```
@@ -188,16 +239,17 @@ pending_invitations
 
 1. Runs as a server action from `/auth/confirm` and `/auth/login` post-auth callback. Never exposed as a client-callable endpoint.
 2. Query `pending_invitations WHERE email = lower(user.email) AND accepted_at IS NULL`
-3. For each match: INSERT into `event_roles`, SET `accepted_at = now()`
-4. Multiple pending invitations → all fulfilled at once
+3. For each match: in a single transaction — INSERT into `event_roles` (with `ON CONFLICT DO NOTHING` for idempotency), if `judge_id` is set on invitation then UPDATE `judges SET user_id = auth.uid()`, SET `accepted_at = now()` on the invitation
+4. Multiple pending invitations → all fulfilled at once in the same transaction
 5. Email case: stored lowercase, compared lowercase. No alias handling.
 6. Repeat login with already-accepted invitations → no-op
 
 #### Organizer invite flow
 
 - Dashboard "Team" section: enter email + pick role(s)
-- If email matches existing user → `event_roles` row created immediately
-- If no account yet → `pending_invitations` row created. Fulfilled on their first login after signup.
+- Always creates a `pending_invitations` row first
+- Server action (using service-role client) checks `auth.users` for matching email — if account exists, fulfills the invitation immediately in the same request
+- If no account yet → invitation stays pending, fulfilled on their first login after signup
 
 ### What gets removed
 
@@ -227,7 +279,8 @@ pending_invitations
 
 ### Step 3: Replace direct writes with RPCs
 
-- Build every write RPC (score submission, check-in, registration mutations, sign-off, tabulation, etc.)
+- **Migrate existing RPCs first:** ALTER `sign_off_judge`, `publish_results`, `unpublish_results`, `approve_tabulation`, `generate_recall` to `SECURITY DEFINER` and add role/assignment validation to each function body. Without this, enabling RLS in Step 4 will break scoring and tabulation.
+- Build new write RPCs (score submission, check-in, registration mutations, tabulator entry, etc.)
 - Each RPC validates role + assignment + lock state + allowed fields
 - **Hard rule: once a UI flow is migrated to its RPC, the old direct-write code path is removed from the app immediately.** No dual-write period. DB remains permissive (no RLS yet), but the application only uses RPCs.
 - Audit_log and status_changes triggers replace client inserts at this step.
