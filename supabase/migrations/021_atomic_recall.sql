@@ -2,7 +2,7 @@ create or replace function generate_recall(
   p_competition_id uuid,
   p_recall_rows jsonb,
   p_next_round_number int,
-  p_expected_status text default 'complete_unpublished'
+  p_expected_status text default 'ready_to_tabulate'
 )
 returns uuid
 language plpgsql
