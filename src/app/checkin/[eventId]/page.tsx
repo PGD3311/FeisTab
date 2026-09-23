@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useCallback, use } from 'react'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
-import { transitionCompetitionStatus, confirmRoster } from '@/lib/supabase/rpc'
+import {
+  confirmRoster,
+  setRegistrationStatus,
+  transitionCompetitionStatus,
+  unconfirmRoster,
+} from '@/lib/supabase/rpc'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -444,61 +449,27 @@ export default function RosterConfirmationPage({
 
     setUpdatingStatus(registrationId)
 
-    const { error } = await supabase
-      .from('registrations')
-      .update({ status: newStatus })
-      .eq('id', registrationId)
-
-    if (error) {
-      showError('Failed to update status', { description: error.message })
+    // Saves the status and, if the dancer is in the judge's heat list, marks their slot too
+    try {
+      await setRegistrationStatus(supabase, registrationId, newStatus)
+    } catch (err) {
+      showError('Failed to update status', { description: err instanceof Error ? err.message : 'Unknown error' })
       setUpdatingStatus(null)
       return
     }
 
-    // If competition is in_progress/awaiting_scores, update heat_snapshot slot status
-    const expandedComp = expandedCompId
-      ? competitions.find((c) => c.id === expandedCompId)
-      : null
+    // Mirror the server's heat-snapshot patch locally so the heat view updates at once
     const reg = registrations.find((r) => r.id === registrationId)
-    if (
-      expandedComp &&
-      SCORING_STATUSES.includes(expandedComp.status) &&
-      reg &&
-      (newStatus === 'scratched' || newStatus === 'no_show') &&
-      heatSnapshot
-    ) {
-      // Read snapshot, find slot by dancer_id, update status, write back
-      const updatedHeats = heatSnapshot.heats.map((heat) => ({
-        ...heat,
-        slots: heat.slots.map((slot) =>
-          slot.dancer_id === reg.dancer_id
-            ? { ...slot, status: newStatus as 'scratched' | 'no_show' }
-            : slot
-        ),
-      }))
-      const updatedSnapshot: HeatSnapshot = { ...heatSnapshot, heats: updatedHeats }
-
-      // Persist to database
-      const { data: roundData } = await supabase
-        .from('rounds')
-        .select('id')
-        .eq('competition_id', expandedCompId)
-        .order('round_number', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (roundData) {
-        const { error: snapErr } = await supabase
-          .from('rounds')
-          .update({ heat_snapshot: updatedSnapshot })
-          .eq('id', roundData.id)
-
-        if (snapErr) {
-          console.error('Failed to update heat snapshot slot:', snapErr.message)
-        } else {
-          setHeatSnapshot(updatedSnapshot)
-        }
-      }
+    if (reg && heatSnapshot && (newStatus === 'scratched' || newStatus === 'no_show')) {
+      setHeatSnapshot({
+        ...heatSnapshot,
+        heats: heatSnapshot.heats.map((heat) => ({
+          ...heat,
+          slots: heat.slots.map((slot) =>
+            slot.dancer_id === reg.dancer_id ? { ...slot, status: newStatus } : slot
+          ),
+        })),
+      })
     }
 
     setRegistrations((prev) =>
@@ -559,13 +530,10 @@ export default function RosterConfirmationPage({
   async function handleUnconfirmRoster(compId: string) {
     setConfirmingRoster(compId)
 
-    const { error } = await supabase
-      .from('competitions')
-      .update({ roster_confirmed_at: null, roster_confirmed_by: null })
-      .eq('id', compId)
-
-    if (error) {
-      showError('Failed to un-confirm roster', { description: error.message })
+    try {
+      await unconfirmRoster(supabase, compId)
+    } catch (err) {
+      showError('Failed to un-confirm roster', { description: err instanceof Error ? err.message : 'Unknown error' })
       setConfirmingRoster(null)
       return
     }

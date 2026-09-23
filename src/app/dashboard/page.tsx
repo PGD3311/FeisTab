@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
 import { showSuccess, showCritical } from '@/lib/feedback'
+import { deleteEvent } from '@/lib/supabase/rpc'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -79,13 +80,13 @@ export default function DashboardPage() {
     }
     setDeleting(eventId)
 
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', eventId)
-
-    if (error) {
-      showCritical('Failed to delete event', { description: error.message })
+    try {
+      // Refused by the database if any competition has published results
+      await deleteEvent(supabase, eventId)
+    } catch (err) {
+      showCritical('Failed to delete event', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
       setDeleting(null)
       return
     }

@@ -18,23 +18,35 @@ export async function signOffJudge(
   return data as Record<string, string>
 }
 
+/**
+ * Status change that fails if another device moved the competition first.
+ * The database validates the transition and the caller's role.
+ */
 export async function guardedStatusUpdate(
   supabase: SupabaseClient,
   compId: string,
   expectedStatus: CompetitionStatus,
-  newStatus: CompetitionStatus,
-  extraFields?: Record<string, unknown>
+  newStatus: CompetitionStatus
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('competitions')
-    .update({ status: newStatus, ...extraFields })
-    .eq('id', compId)
-    .eq('status', expectedStatus)
-    .select('id')
-    .maybeSingle()
-
+  const { error } = await supabase.rpc('transition_competition_status', {
+    p_competition_id: compId,
+    p_new_status: newStatus,
+    p_expected_status: expectedStatus,
+  })
   if (error) throw new Error(`Failed to update status: ${error.message}`)
-  if (!data) throw new Error(`Competition status changed — refresh and try again`)
+}
+
+export async function unlockForCorrection(
+  supabase: SupabaseClient,
+  params: { competition_id: string; judge_id: string; reason: string; note?: string }
+): Promise<void> {
+  const { error } = await supabase.rpc('unlock_for_correction', {
+    p_competition_id: params.competition_id,
+    p_judge_id: params.judge_id,
+    p_reason: params.reason,
+    p_note: params.note ?? null,
+  })
+  if (error) throw new Error(`Unlock failed: ${error.message}`)
 }
 
 export async function publishResults(
@@ -70,7 +82,7 @@ export async function generateRecall(
 ): Promise<string> {
   const { data, error } = await supabase.rpc('generate_recall', {
     p_competition_id: competitionId,
-    p_recall_rows: JSON.stringify(recallRows),
+    p_recall_rows: recallRows,
     p_next_round_number: nextRoundNumber,
     p_expected_status: expectedStatus,
   })
@@ -90,13 +102,13 @@ export async function approveTabulation(
 ): Promise<void> {
   const { error } = await supabase.rpc('approve_tabulation', {
     p_competition_id: competitionId,
-    p_result_rows: JSON.stringify(resultRows),
+    p_result_rows: resultRows,
   })
   if (error) throw new Error(`Tabulation approval failed: ${error.message}`)
 }
 
 // ---------------------------------------------------------------------------
-// Write RPCs (026_write_rpcs.sql)
+// Write RPCs (026_write_rpcs.sql, 032_phase1_unbreak_chain.sql)
 // ---------------------------------------------------------------------------
 
 export async function createEvent(
@@ -172,7 +184,8 @@ export async function checkInDancer(
     p_dancer_id: params.dancer_id,
     p_competitor_number: params.competitor_number,
   })
-  if (error) throw new Error(`Check-in failed: ${error.message}`)
+  // Keep the Postgres code in the message: the desk retries the next number on 23505
+  if (error) throw new Error(`Check-in failed (${error.code}): ${error.message}`)
   return data as string
 }
 
@@ -205,7 +218,7 @@ export async function createRound(
   const { data, error } = await supabase.rpc('create_round', {
     p_competition_id: params.competition_id,
     p_round_number: params.round_number,
-    p_round_type: params.round_type ?? 'normal',
+    p_round_type: params.round_type ?? 'standard',
   })
   if (error) throw new Error(`Create round failed: ${error.message}`)
   return data as string
@@ -236,15 +249,81 @@ export async function registerDancer(
   return data as string | null
 }
 
-export async function updateStageStatus(
+export async function setRegistrationStatus(
   supabase: SupabaseClient,
-  params: { event_id: string; dancer_id: string; competition_id: string; status: string }
+  registrationId: string,
+  status: string
 ): Promise<void> {
-  const { error } = await supabase.rpc('update_stage_status', {
-    p_event_id: params.event_id,
-    p_dancer_id: params.dancer_id,
-    p_competition_id: params.competition_id,
-    p_status: params.status,
+  const { error } = await supabase.rpc('set_registration_status', {
+    p_registration_id: registrationId,
+    p_status: status,
   })
-  if (error) throw new Error(`Update stage status failed: ${error.message}`)
+  if (error) throw new Error(`Status update failed: ${error.message}`)
+}
+
+export async function unconfirmRoster(
+  supabase: SupabaseClient,
+  competitionId: string
+): Promise<void> {
+  const { error } = await supabase.rpc('unconfirm_roster', {
+    p_competition_id: competitionId,
+  })
+  if (error) throw new Error(`Un-confirm roster failed: ${error.message}`)
+}
+
+export async function undoCheckIn(
+  supabase: SupabaseClient,
+  eventId: string,
+  dancerId: string
+): Promise<void> {
+  const { error } = await supabase.rpc('undo_check_in', {
+    p_event_id: eventId,
+    p_dancer_id: dancerId,
+  })
+  if (error) throw new Error(`Undo check-in failed: ${error.message}`)
+}
+
+export interface ImportRowInput {
+  first_name: string
+  last_name: string
+  school_name?: string | null
+  teacher_name?: string | null
+  date_of_birth?: string | null
+  competition_code: string
+  competition_name?: string | null
+  age_group?: string | null
+  level?: string | null
+  dance_type?: string | null
+  competitor_number?: string | null
+}
+
+export interface ImportResult {
+  competitions_created: number
+  registrations: number
+  check_ins: number
+  /** Dancer ids whose competitor number conflicted and was not assigned */
+  conflicts: string[]
+}
+
+export async function importEventRows(
+  supabase: SupabaseClient,
+  eventId: string,
+  rows: ImportRowInput[]
+): Promise<ImportResult> {
+  const { data, error } = await supabase.rpc('import_event_rows', {
+    p_event_id: eventId,
+    p_rows: rows,
+  })
+  if (error) throw new Error(`Import failed: ${error.message}`)
+  return data as ImportResult
+}
+
+export async function deleteEvent(supabase: SupabaseClient, eventId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_event', { p_event_id: eventId })
+  if (error) throw new Error(`Delete event failed: ${error.message}`)
+}
+
+export async function removeJudge(supabase: SupabaseClient, judgeId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_judge', { p_judge_id: judgeId })
+  if (error) throw new Error(`Remove judge failed: ${error.message}`)
 }

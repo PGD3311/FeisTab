@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 import { useSupabase } from '@/hooks/use-supabase'
-import { signOffJudge, guardedStatusUpdate, tabulatorEnterScore } from '@/lib/supabase/rpc'
+import { signOffJudge, tabulatorEnterScore } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { type FlagReason } from '@/lib/engine/flag-reasons'
-import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { type CompetitionStatus } from '@/lib/competition-states'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import {
   COMMENT_CODES,
@@ -467,52 +467,9 @@ export default function TabulatorEntryPage({
         return
       }
 
-      // Lock scores
-      const { error: lockErr } = await supabase
-        .from('score_entries')
-        .update({ locked_at: new Date().toISOString() })
-        .eq('round_id', round.id)
-        .eq('judge_id', selectedJudgeId)
-
-      if (lockErr)
-        throw new Error(`Failed to lock scores: ${lockErr.message}`)
-
-      // Atomically record sign-off
+      // One atomic call: locks this judge's scores, records the sign-off, and moves the
+      // competition to ready_to_tabulate when every assigned judge has signed off.
       const updatedSignOffs = await signOffJudge(supabase, round.id, selectedJudgeId, compId)
-
-      // Check assigned judges (not all event judges) for "all done"
-      const { data: assignments } = await supabase
-        .from('judge_assignments')
-        .select('judge_id')
-        .eq('competition_id', compId)
-
-      const assignedJudgeIds = assignments && assignments.length > 0
-        ? assignments.map((a: { judge_id: string }) => a.judge_id)
-        : [] // No assignments → can't determine "all done", organizer must advance manually
-
-      const allDone =
-        assignedJudgeIds.length > 0 && assignedJudgeIds.every(id => updatedSignOffs[id])
-
-      if (allDone) {
-        // Use CompetitionStatus to allow full transition chain
-        // (freshStatus is narrowed to 'awaiting_scores' | 'in_progress' by guard above,
-        // but canTransition may advance it through intermediate states)
-        let status = freshStatus as CompetitionStatus
-        if (status === 'ready_to_tabulate') {
-          // Already there
-        } else {
-          if (
-            canTransition(status, 'awaiting_scores') &&
-            !canTransition(status, 'ready_to_tabulate')
-          ) {
-            await guardedStatusUpdate(supabase, compId, status, 'awaiting_scores')
-            status = 'awaiting_scores' as CompetitionStatus
-          }
-          if (canTransition(status, 'ready_to_tabulate')) {
-            await guardedStatusUpdate(supabase, compId, status, 'ready_to_tabulate')
-          }
-        }
-      }
 
       setSignedOff(true)
       setRound({ ...round, judge_sign_offs: updatedSignOffs })

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import { showSuccess, showError } from '@/lib/feedback'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { removeJudge } from '@/lib/supabase/rpc'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { Button } from '@/components/ui/button'
@@ -413,9 +414,13 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   }
 
   async function handleRemove(judgeId: string) {
-    const { error } = await supabase.from('judges').delete().eq('id', judgeId)
-    if (error) {
-      showError('Failed to remove judge', { description: error.message })
+    try {
+      // Refused by the database if the judge has entered any scores
+      await removeJudge(supabase, judgeId)
+    } catch (err) {
+      showError('Failed to remove judge', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
       return
     }
     showSuccess('Judge removed')

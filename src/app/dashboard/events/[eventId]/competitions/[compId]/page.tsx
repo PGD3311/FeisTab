@@ -19,8 +19,6 @@ import {
   type TransitionContext,
 } from '@/lib/competition-states'
 import {
-  signOffJudge,
-  guardedStatusUpdate,
   publishResults,
   unpublishResults,
   generateRecall,
@@ -28,6 +26,9 @@ import {
   createRound,
   transitionCompetitionStatus,
   confirmRoster,
+  unconfirmRoster,
+  setRegistrationStatus,
+  unlockForCorrection,
   updateHeatSnapshot,
 } from '@/lib/supabase/rpc'
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
@@ -581,34 +582,17 @@ export default function CompetitionDetailPage({
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'awaiting_scores')) return
 
-    const latestRnd = rounds[rounds.length - 1]
-    if (!latestRnd) return
-
     setUnlocking(true)
 
     try {
-      // 1. Atomically remove judge's sign-off
-      await signOffJudge(supabase, latestRnd.id, unlockJudgeId, compId, 'remove')
-
-      // 2. Unlock judge's scores (clear locked_at)
-      const { error: unlockErr } = await supabase
-        .from('score_entries')
-        .update({ locked_at: null })
-        .eq('round_id', latestRnd.id)
-        .eq('judge_id', unlockJudgeId)
-      if (unlockErr) throw new Error(`Failed to unlock scores: ${unlockErr.message}`)
-
-      // 3. If complete_unpublished, clear stale results
-      if (currentStatus === 'complete_unpublished') {
-        const { error: clearErr } = await supabase
-          .from('results')
-          .delete()
-          .eq('competition_id', compId)
-        if (clearErr) throw new Error(`Failed to clear stale results: ${clearErr.message}`)
-      }
-
-      // 4. Transition back to awaiting_scores
-      await guardedStatusUpdate(supabase, compId, comp.status as CompetitionStatus, 'awaiting_scores')
+      // One atomic call: reopens the judge's sign-off and scores, clears the stale
+      // results, returns the competition to awaiting_scores, and records the reason.
+      await unlockForCorrection(supabase, {
+        competition_id: compId,
+        judge_id: unlockJudgeId,
+        reason: unlockReason,
+        note: unlockNote.trim() || undefined,
+      })
 
       // Reset form
       setUnlockJudgeId(null)
@@ -830,12 +814,10 @@ export default function CompetitionDetailPage({
                   size="sm"
                   variant="outline"
                   onClick={async () => {
-                    const { error } = await supabase
-                      .from('competitions')
-                      .update({ roster_confirmed_at: null, roster_confirmed_by: null })
-                      .eq('id', compId)
-                    if (error) {
-                      showError('Failed to un-confirm roster', { description: error.message })
+                    try {
+                      await unconfirmRoster(supabase, compId)
+                    } catch (err) {
+                      showError('Failed to un-confirm roster', { description: err instanceof Error ? err.message : 'Unknown error' })
                       return
                     }
                     await loadData()
@@ -881,32 +863,12 @@ export default function CompetitionDetailPage({
                   value={reg.status}
                   onChange={async (e) => {
                     const newStatus = e.target.value
-                    const { error } = await supabase
-                      .from('registrations')
-                      .update({ status: newStatus })
-                      .eq('id', reg.id)
-                    if (error) {
-                      showError('Failed to update status', { description: error.message })
+                    // Also marks the dancer's slot in the judge's heat list when scratched/no-show
+                    try {
+                      await setRegistrationStatus(supabase, reg.id, newStatus)
+                    } catch (err) {
+                      showError('Failed to update status', { description: err instanceof Error ? err.message : 'Unknown error' })
                       return
-                    }
-                    // Update heat snapshot slot if competition is being scored
-                    if (
-                      (newStatus === 'scratched' || newStatus === 'no_show') &&
-                      latestRound?.heat_snapshot
-                    ) {
-                      const snap = latestRound.heat_snapshot as { heats: Array<{ heat_number: number; slots: Array<{ dancer_id: string; competitor_number: string; status: string }> }>; group_size: number; generated_at: string }
-                      const updatedHeats = snap.heats.map(heat => ({
-                        ...heat,
-                        slots: heat.slots.map(slot =>
-                          slot.dancer_id === reg.dancer_id
-                            ? { ...slot, status: newStatus }
-                            : slot
-                        ),
-                      }))
-                      await supabase
-                        .from('rounds')
-                        .update({ heat_snapshot: { ...snap, heats: updatedHeats } })
-                        .eq('id', latestRound.id)
                     }
                     await loadData()
                     showSuccess('Dancer status updated')

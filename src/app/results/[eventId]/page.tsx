@@ -5,6 +5,24 @@ import { CopyLinkButton } from '@/components/copy-link-button'
 
 export const dynamic = 'force-dynamic'
 
+interface PublicEventResults {
+  event: { id: string; name: string; start_date: string; location: string | null }
+  competitions: {
+    id: string
+    code: string | null
+    name: string
+    age_group: string | null
+    level: string | null
+    results: {
+      final_rank: number
+      calculated_payload: Record<string, unknown> | null
+      published_at: string | null
+      dancer_id: string
+      dancers: { id: string; first_name: string; last_name: string } | null
+    }[]
+  }[]
+}
+
 export default async function PublicResultsPage({
   params,
   searchParams,
@@ -16,46 +34,18 @@ export default async function PublicResultsPage({
   const { q } = await searchParams
   const supabase = await createClient()
 
-  const [eventRes, compsRes] = await Promise.all([
-    supabase
-      .from('events')
-      .select('id, name, start_date, location')
-      .eq('id', eventId)
-      .single(),
-    supabase
-      .from('competitions')
-      .select(`
-        id, code, name, age_group, level,
-        results(final_rank, calculated_payload, published_at, dancer_id, dancers(id, first_name, last_name))
-      `)
-      .eq('event_id', eventId)
-      .eq('status', 'published')
-      .order('code'),
-  ])
+  // Parents are usually not logged in: one narrow read function returns only
+  // published competitions and dancer names (never dates of birth).
+  const { data, error } = await supabase.rpc('public_event_results', { p_event_id: eventId })
+  if (error) throw new Error(`Failed to load results: ${error.message}`)
 
-  const event = eventRes.data
-  if (!event) notFound()
+  const payload = data as PublicEventResults | null
+  if (!payload) notFound()
 
-  const competitions = compsRes.data
+  const event = payload.event
+  const competitions = payload.competitions
 
-  interface NormalizedResult {
-    final_rank: number
-    calculated_payload: Record<string, unknown> | null
-    published_at: string | null
-    dancer_id: string
-    dancers: { id: string; first_name: string; last_name: string } | null
-  }
-
-  const normalized = competitions?.map(c => ({
-    ...c,
-    results: c.results?.map((r): NormalizedResult => ({
-      final_rank: r.final_rank,
-      calculated_payload: r.calculated_payload as NormalizedResult['calculated_payload'],
-      published_at: r.published_at,
-      dancer_id: (r as unknown as { dancer_id: string }).dancer_id,
-      dancers: Array.isArray(r.dancers) ? r.dancers[0] ?? null : r.dancers as NormalizedResult['dancers'],
-    })),
-  }))
+  const normalized = competitions
 
   const filtered = q
     ? normalized?.filter(c => {

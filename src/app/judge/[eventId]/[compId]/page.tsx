@@ -3,9 +3,8 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { signOffJudge, guardedStatusUpdate, submitScore, createRound } from '@/lib/supabase/rpc'
+import { signOffJudge, submitScore, createRound } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
-import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
 import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
@@ -334,58 +333,9 @@ export default function JudgeScoringPage({
     if (!judgeIdentity || !round) return
 
     try {
-      // Lock all scores for this judge/round
-      const { error: lockErr } = await supabase
-        .from('score_entries')
-        .update({ locked_at: new Date().toISOString() })
-        .eq('round_id', round.id)
-        .eq('judge_id', judgeIdentity.judge_id)
-      if (lockErr) throw new Error(`Failed to lock scores: ${lockErr.message}`)
-
-      // Atomically record sign-off in round's judge_sign_offs jsonb
-      const updatedSignOffs = await signOffJudge(supabase, round.id, judgeIdentity.judge_id, compId)
-
-      // Check if all ASSIGNED judges (not all event judges) have signed off
-      const { data: assignments, error: assignErr } = await supabase
-        .from('judge_assignments')
-        .select('judge_id')
-        .eq('competition_id', compId)
-      if (assignErr) throw new Error(`Failed to check judge assignments: ${assignErr.message}`)
-
-      // Fall back to all event judges if no assignments exist
-      let assignedJudgeIds: string[]
-      if (assignments && assignments.length > 0) {
-        assignedJudgeIds = assignments.map((a: { judge_id: string }) => a.judge_id)
-      } else {
-        // No assignments configured — cannot determine "all done", skip auto-advance
-        // The organizer must manually advance via the dashboard
-        assignedJudgeIds = []
-      }
-
-      const allDone = assignedJudgeIds.length > 0 && assignedJudgeIds.every(id => updatedSignOffs[id])
-
-      if (allDone) {
-        const { data: currentComp, error: compErr } = await supabase
-          .from('competitions')
-          .select('status')
-          .eq('id', compId)
-          .single()
-        if (compErr) throw new Error(`Failed to check competition status: ${compErr.message}`)
-
-        // Step through transitions to reach ready_to_tabulate
-        let currentStatus = currentComp?.status as CompetitionStatus
-        if (currentStatus === 'ready_to_tabulate') {
-          // Already there — idempotent
-        } else {
-          if (canTransition(currentStatus, 'awaiting_scores') && !canTransition(currentStatus, 'ready_to_tabulate')) {
-            await guardedStatusUpdate(supabase, compId, currentStatus, 'awaiting_scores')
-            currentStatus = 'awaiting_scores' as CompetitionStatus
-          }
-          if (canTransition(currentStatus, 'ready_to_tabulate')) {
-            await guardedStatusUpdate(supabase, compId, currentStatus, 'ready_to_tabulate')
-          }
-        }
-      }
+      // One atomic call: locks this judge's scores, records the sign-off, and moves the
+      // competition to ready_to_tabulate when every assigned judge has signed off.
+      await signOffJudge(supabase, round.id, judgeIdentity.judge_id, compId)
 
       setSubmitted(true)
       showSuccess('Round signed off')

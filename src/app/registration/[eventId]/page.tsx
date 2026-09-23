@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef, useCallback, use } from 'react'
-import { checkInDancer } from '@/lib/supabase/rpc'
+import { checkInDancer, undoCheckIn } from '@/lib/supabase/rpc'
 import {
   getCheckInState,
   deriveCheckInStats,
   computeNextNumber,
   type CheckInRow,
 } from '@/lib/check-in'
-import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
 import { showSuccess, showCritical, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
@@ -252,14 +251,6 @@ export default function RegistrationDeskPage({
         return
       }
 
-      const syncResult = await syncCompetitorNumberToRegistrations(
-        supabase, eventId, dancer.dancer_id, assignedNumber
-      )
-      if (syncResult.error) {
-        showCritical('Number assigned but sync failed — retry', { description: syncResult.error.message })
-        return
-      }
-
       setCheckInMap((prev) => {
         const next = new Map(prev)
         next.set(dancer.dancer_id, {
@@ -288,27 +279,12 @@ export default function RegistrationDeskPage({
     }
 
     try {
-      const { error: updateErr } = await supabase
-        .from('event_check_ins')
-        .update({
-          checked_in_at: new Date().toISOString(),
-          checked_in_by: 'registration_desk',
-        })
-        .eq('event_id', eventId)
-        .eq('dancer_id', dancer.dancer_id)
-
-      if (updateErr) {
-        showCritical('Failed to check in', { description: updateErr.message })
-        return
-      }
-
-      const syncResult = await syncCompetitorNumberToRegistrations(
-        supabase, eventId, dancer.dancer_id, checkInRow.competitor_number
-      )
-      if (syncResult.error) {
-        showCritical('Checked in but sync failed — retry', { description: syncResult.error.message })
-        return
-      }
+      // Same number, fresh check-in time; the RPC also syncs the number to registrations
+      await checkInDancer(supabase, {
+        event_id: eventId,
+        dancer_id: dancer.dancer_id,
+        competitor_number: Number(checkInRow.competitor_number),
+      })
 
       setCheckInMap((prev) => {
         const next = new Map(prev)
@@ -458,33 +434,7 @@ export default function RegistrationDeskPage({
                           if (!confirm(`Undo check-in for ${dancer.first_name} ${dancer.last_name}?`)) return
                           setActing(dancer.dancer_id)
                           try {
-                            const { error: deleteErr } = await supabase
-                              .from('event_check_ins')
-                              .delete()
-                              .eq('event_id', eventId)
-                              .eq('dancer_id', dancer.dancer_id)
-
-                            if (deleteErr) {
-                              showCritical('Failed to undo check-in', { description: deleteErr.message })
-                              return
-                            }
-
-                            const { error: regErr } = await supabase
-                              .from('registrations')
-                              .update({ competitor_number: null })
-                              .eq('event_id', eventId)
-                              .eq('dancer_id', dancer.dancer_id)
-
-                            if (regErr) {
-                              // Check-in was already deleted — reflect that in the UI
-                              setCheckInMap((prev) => {
-                                const next = new Map(prev)
-                                next.delete(dancer.dancer_id)
-                                return next
-                              })
-                              showCritical('Check-in removed but registration update failed', { description: regErr.message })
-                              return
-                            }
+                            await undoCheckIn(supabase, eventId, dancer.dancer_id)
 
                             setCheckInMap((prev) => {
                               const next = new Map(prev)

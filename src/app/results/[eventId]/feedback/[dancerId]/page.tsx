@@ -15,6 +15,11 @@ interface CommentData {
   note: string | null
 }
 
+interface FeedbackHeader {
+  event: { id: string; name: string; start_date: string }
+  dancer: { first_name: string; last_name: string }
+}
+
 interface FeedbackRow {
   comp_name: string
   final_rank: number | null
@@ -30,17 +35,18 @@ export default async function PublicFeedbackPage({
   const { eventId, dancerId } = await params
   const supabase = await createClient()
 
-  // Load dancer + event header info and feedback via narrow read function
-  const [dancerRes, eventRes, feedbackRes] = await Promise.all([
-    supabase.from('dancers').select('first_name, last_name').eq('id', dancerId).single(),
-    supabase.from('events').select('id, name, start_date').eq('id', eventId).single(),
+  // Narrow read functions: the header only exists for a dancer with published results
+  const [headerRes, feedbackRes] = await Promise.all([
+    supabase.rpc('public_feedback_header', { p_event_id: eventId, p_dancer_id: dancerId }),
     supabase.rpc('public_feedback', { p_dancer_id: dancerId, p_event_id: eventId }),
   ])
+  if (headerRes.error) throw new Error(`Failed to load feedback: ${headerRes.error.message}`)
+  if (feedbackRes.error) throw new Error(`Failed to load feedback: ${feedbackRes.error.message}`)
 
-  if (!dancerRes.data || !eventRes.data) notFound()
+  const header = headerRes.data as FeedbackHeader | null
+  if (!header) notFound()
 
-  const dancer = dancerRes.data
-  const event = eventRes.data
+  const { dancer, event } = header
   const feedbackRows = (feedbackRes.data ?? []) as FeedbackRow[]
 
   if (feedbackRows.length === 0) {

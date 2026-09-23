@@ -4,9 +4,9 @@ import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
-import { parseRegistrationCSV, type ImportRow, type ImportResult } from '@/lib/csv/import'
+import { parseRegistrationCSV, type ImportResult } from '@/lib/csv/import'
+import { importEventRows, type ImportResult as ImportOutcome } from '@/lib/supabase/rpc'
 import { CSVPreviewTable } from '@/components/csv-preview-table'
-import { syncCompetitorNumberToRegistrations } from '@/lib/check-in-sync'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -16,8 +16,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
   const [importing, setImporting] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
-  const [conflicts, setConflicts] = useState<string[]>([])
-  const [syncFailures, setSyncFailures] = useState<number>(0)
+  const [imported, setImported] = useState<ImportOutcome | null>(null)
   const router = useRouter()
   const supabase = useSupabase()
   const { reload } = useEvent()
@@ -43,221 +42,10 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
     setError('')
 
     try {
-      // Group by competition code
-      const compMap = new Map<string, ImportRow[]>()
-      for (const row of preview.valid) {
-        if (!compMap.has(row.competition_code)) compMap.set(row.competition_code, [])
-        compMap.get(row.competition_code)!.push(row)
-      }
-
-      // Get default ruleset
-      const { data: defaultRuleset, error: rulesetErr } = await supabase
-        .from('rule_sets')
-        .select('id')
-        .eq('name', 'Default - Irish Points')
-        .single()
-
-      if (rulesetErr) throw new Error(`Failed to load default ruleset: ${rulesetErr.message}`)
-
-      // --- Step 1: Batch upsert all unique dancers ---
-      const uniqueDancers = new Map<string, ImportRow>()
-      for (const row of preview.valid) {
-        const key = `${row.first_name}|${row.last_name}|${row.school_name ?? ''}`.toLowerCase()
-        if (!uniqueDancers.has(key)) uniqueDancers.set(key, row)
-      }
-
-      const dancerInserts = [...uniqueDancers.values()].map(row => ({
-        first_name: row.first_name,
-        last_name: row.last_name,
-        school_name: row.school_name || null,
-        teacher_name: row.teacher_name || null,
-        date_of_birth: row.date_of_birth || null,
-      }))
-
-      const { error: dancerErr } = await supabase
-        .from('dancers')
-        .upsert(dancerInserts, { onConflict: 'first_name,last_name,coalesce(school_name, \'\')' })
-        .select()
-
-      if (dancerErr) throw new Error(`Failed to upsert dancers: ${dancerErr.message}`)
-
-      // Scope dancer lookup to only names present in this import (avoids loading all DB dancers)
-      const importFirstNames = [...new Set([...uniqueDancers.values()].map(r => r.first_name))]
-
-      let allDancers: { id: string; first_name: string; last_name: string; school_name: string | null }[] = []
-
-      if (importFirstNames.length > 0) {
-        const { data, error: dancersErr } = await supabase
-          .from('dancers')
-          .select('id, first_name, last_name, school_name')
-          .in('first_name', importFirstNames)
-        if (dancersErr) throw new Error(`Failed to load dancers: ${dancersErr.message}`)
-        allDancers = data ?? []
-      }
-
-      const dancerLookup = new Map<string, string>()
-      for (const d of allDancers ?? []) {
-        const key = `${d.first_name}|${d.last_name}|${d.school_name ?? ''}`.toLowerCase()
-        dancerLookup.set(key, d.id)
-      }
-
-      // Batch insert any dancers not found after upsert (avoids N+1 sequential inserts)
-      const missingDancers = [...uniqueDancers.entries()]
-        .filter(([key]) => !dancerLookup.has(key))
-        .map(([, row]) => ({
-          first_name: row.first_name,
-          last_name: row.last_name,
-          school_name: row.school_name || null,
-          teacher_name: row.teacher_name || null,
-          date_of_birth: row.date_of_birth || null,
-        }))
-
-      if (missingDancers.length > 0) {
-        const { data: inserted, error: insertErr } = await supabase
-          .from('dancers')
-          .insert(missingDancers)
-          .select('id, first_name, last_name, school_name')
-
-        if (insertErr) throw new Error(`Failed to insert dancers: ${insertErr.message}`)
-
-        for (const d of inserted ?? []) {
-          const key = `${d.first_name}|${d.last_name}|${d.school_name ?? ''}`.toLowerCase()
-          dancerLookup.set(key, d.id)
-        }
-      }
-
-      // --- Step 2: Create competitions ---
-      for (const [code, rows] of compMap) {
-        const sample = rows[0]
-
-        let { data: comp } = await supabase
-          .from('competitions')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('code', code)
-          .single()
-
-        if (!comp) {
-          const { data: newComp, error: compErr } = await supabase
-            .from('competitions')
-            .insert({
-              event_id: eventId,
-              code,
-              name: sample.competition_name,
-              age_group: sample.age_group,
-              level: sample.level,
-              dance_type: sample.dance_type || null,
-              status: 'imported',
-              ruleset_id: defaultRuleset?.id,
-            })
-            .select()
-            .single()
-
-          if (compErr) throw compErr
-          comp = newComp
-
-          const { error: roundErr } = await supabase.from('rounds').insert({
-            competition_id: comp!.id,
-            round_number: 1,
-            round_type: 'standard',
-          })
-
-          if (roundErr) throw new Error(`Failed to create round for ${code}: ${roundErr.message}`)
-        }
-
-        // --- Step 3: Batch upsert registrations ---
-        const regInserts = rows
-          .map(row => {
-            const dancerKey = `${row.first_name}|${row.last_name}|${row.school_name ?? ''}`.toLowerCase()
-            const dancerId = dancerLookup.get(dancerKey)
-            if (!dancerId) return null
-            return {
-              event_id: eventId,
-              dancer_id: dancerId,
-              competition_id: comp!.id,
-              competitor_number: null, // Written by syncCompetitorNumberToRegistrations via event_check_ins
-              status: 'registered',
-            }
-          })
-          .filter(Boolean)
-
-        if (regInserts.length > 0) {
-          const { error: regErr } = await supabase.from('registrations').upsert(
-            regInserts as any[],
-            { onConflict: 'competition_id,dancer_id' }
-          )
-
-          if (regErr) throw new Error(`Failed to upsert registrations for ${code}: ${regErr.message}`)
-        }
-      }
-
-      // --- Step 4: Create event_check_ins for dancers with competitor numbers ---
-      const dancerNumbers = new Map<string, Set<string>>()
-      for (const row of preview.valid) {
-        if (!row.competitor_number) continue
-        const dancerKey = `${row.first_name}|${row.last_name}|${row.school_name ?? ''}`.toLowerCase()
-        const dancerId = dancerLookup.get(dancerKey)
-        if (!dancerId) continue
-
-        if (!dancerNumbers.has(dancerId)) dancerNumbers.set(dancerId, new Set())
-        dancerNumbers.get(dancerId)!.add(row.competitor_number)
-      }
-
-      const checkInConflicts: string[] = []
-      let syncFailureCount = 0
-      for (const [dancerId, numbers] of dancerNumbers) {
-        if (numbers.size > 1) {
-          checkInConflicts.push(dancerId)
-          continue
-        }
-
-        const competitorNumber = [...numbers][0]
-
-        const { data: existing, error: checkInLookupErr } = await supabase
-          .from('event_check_ins')
-          .select('id, competitor_number')
-          .eq('event_id', eventId)
-          .eq('dancer_id', dancerId)
-          .maybeSingle()
-
-        if (checkInLookupErr) {
-          checkInConflicts.push(dancerId)
-          continue
-        }
-
-        if (existing) {
-          if (existing.competitor_number !== competitorNumber) {
-            checkInConflicts.push(dancerId)
-          }
-          continue
-        }
-
-        const { error: checkInErr } = await supabase
-          .from('event_check_ins')
-          .insert({
-            event_id: eventId,
-            dancer_id: dancerId,
-            competitor_number: competitorNumber,
-            checked_in_by: 'import',
-          })
-
-        if (checkInErr) {
-          checkInConflicts.push(dancerId)
-          continue
-        }
-
-        const syncResult = await syncCompetitorNumberToRegistrations(
-          supabase, eventId, dancerId, competitorNumber
-        )
-        if (syncResult.error) {
-          console.error('Sync failed for dancer:', dancerId, syncResult.error.message)
-          syncFailureCount++
-        }
-      }
-
-      setConflicts(checkInConflicts)
-      setSyncFailures(syncFailureCount)
-
+      // One atomic database call: dancers, competitions (+ round 1), registrations,
+      // and competitor numbers. Nothing is half-imported if it fails.
+      const result = await importEventRows(supabase, eventId, preview.valid)
+      setImported(result)
       setDone(true)
       void reload()
     } catch (err: unknown) {
@@ -315,16 +103,17 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
       {done && (
         <div className="border border-feis-green/30 rounded-md p-4 bg-feis-green-light">
           <p className="text-feis-green font-medium">Import complete.</p>
-          {conflicts.length > 0 && (
-            <p className="text-sm text-feis-orange mt-2">
-              {conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
-              Review and assign numbers at the registration desk.
+          {imported && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {imported.registrations} new registration{imported.registrations !== 1 ? 's' : ''},{' '}
+              {imported.competitions_created} new competition{imported.competitions_created !== 1 ? 's' : ''},{' '}
+              {imported.check_ins} competitor number{imported.check_ins !== 1 ? 's' : ''} assigned.
             </p>
           )}
-          {syncFailures > 0 && (
+          {imported && imported.conflicts.length > 0 && (
             <p className="text-sm text-feis-orange mt-2">
-              {syncFailures} dancer(s) had competitor number sync failures.
-              Their check-in numbers were saved but may not appear on registrations until the next sync.
+              {imported.conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
+              Review and assign numbers at the registration desk.
             </p>
           )}
           <Button

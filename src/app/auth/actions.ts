@@ -55,19 +55,22 @@ export async function fulfillInvitations() {
 
   const normalizedEmail = user.email.toLowerCase().trim()
 
-  const { data: invitations } = await admin
+  const { data: invitations, error: invErr } = await admin
     .from('pending_invitations')
     .select('*')
     .eq('email', normalizedEmail)
     .is('accepted_at', null)
+  if (invErr) {
+    console.error('Failed to load invitations:', invErr.message)
+    return
+  }
 
   if (!invitations?.length) return
 
-  // Fulfill via RPC for transactional safety
-  // The fulfill_invitation RPC will be created in migration 026
-  // For now, do sequential writes with idempotency
+  // Sequential, idempotent writes. Each invitation is only marked accepted once its
+  // role (and judge link) are in place, so a failure is retried on the next login.
   for (const inv of invitations) {
-    await admin
+    const { error: roleErr } = await admin
       .from('event_roles')
       .upsert(
         {
@@ -78,17 +81,31 @@ export async function fulfillInvitations() {
         },
         { onConflict: 'user_id,event_id,role' }
       )
+    if (roleErr) {
+      console.error(`Failed to grant role for invitation ${inv.id}:`, roleErr.message)
+      continue
+    }
 
     if (inv.judge_id) {
-      await admin
+      // Only link a judge from the invitation's own event
+      const { error: judgeErr } = await admin
         .from('judges')
         .update({ user_id: user.id })
         .eq('id', inv.judge_id)
+        .eq('event_id', inv.event_id)
+      if (judgeErr) {
+        console.error(`Failed to link judge for invitation ${inv.id}:`, judgeErr.message)
+        continue
+      }
     }
 
-    await admin
+    const { error: acceptErr } = await admin
       .from('pending_invitations')
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', inv.id)
+    if (acceptErr) {
+      console.error(`Failed to mark invitation ${inv.id} accepted:`, acceptErr.message)
+    }
   }
 }
+
