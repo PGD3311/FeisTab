@@ -4,29 +4,14 @@ import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 
-interface JudgeScoreData {
-  judge_id: string
-  judge_name: string
-  raw_score: number | null
-  rank: number
-  irish_points: number
-  flagged?: boolean
-  flag_reason?: string
-}
+import { type JudgeScore } from '@/lib/result-payload'
+import { type RuleSetConfig } from '@/lib/engine/rules'
 
 interface CalculatedPayloadData {
   total_points?: number
   individual_ranks?: { judge_id: string; rank: number; irish_points: number }[]
-  judge_scores?: JudgeScoreData[]
-  rules_snapshot?: {
-    score_min: number
-    score_max: number
-    scoring_method: string
-    tie_breaker: string
-    recall_top_percent: number
-    drop_high: boolean
-    drop_low: boolean
-  }
+  judge_scores?: JudgeScore[]
+  rules_snapshot?: RuleSetConfig
   tie_break_applied?: boolean
   tie_break_note?: string | null
   drop_applied?: boolean

@@ -1,4 +1,9 @@
 import { type CommentData, hasCommentContent } from '@/lib/comment-codes'
+import { type FlagReason } from '@/lib/engine/flag-reasons'
+import {
+  NON_ACTIVE_STATUSES,
+  type RegistrationStatus,
+} from '@/lib/engine/anomalies/types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,10 +15,10 @@ export interface ScoreRow {
   dancerId: string
   dancerName: string
   competitorNumber: string
-  registrationStatus: string
+  registrationStatus: RegistrationStatus
   score: string
   flagged: boolean
-  flagReason: string | null
+  flagReason: FlagReason | null
   commentData: CommentData | null
   status: RowStatus
   dbScore: number | null
@@ -22,7 +27,7 @@ export interface ScoreRow {
 
 export type ScoreAction =
   | { type: 'SET_SCORE'; dancerId: string; score: string }
-  | { type: 'SET_FLAG'; dancerId: string; flagged: boolean; flagReason: string | null }
+  | { type: 'SET_FLAG'; dancerId: string; flagged: boolean; flagReason: FlagReason | null }
   | { type: 'SET_COMMENT'; dancerId: string; commentData: CommentData | null }
   | { type: 'MARK_SAVING'; dancerId: string; saveSeq: number }
   | { type: 'MARK_SAVED'; dancerId: string; dbScore: number; saveSeq: number }
@@ -33,9 +38,7 @@ export type ScoreAction =
 // Derived selectors (compute from rows, never store)
 // ---------------------------------------------------------------------------
 
-// Keep in sync with NON_ACTIVE_STATUSES in anomalies/types.ts.
-// Defined separately because this module must stay pure (no anomaly dependency).
-const NON_ACTIVE = new Set(['scratched', 'no_show', 'disqualified', 'did_not_complete', 'medical'])
+const NON_ACTIVE = new Set<string>(NON_ACTIVE_STATUSES)
 
 export function isEditable(row: ScoreRow): boolean {
   return !NON_ACTIVE.has(row.registrationStatus)
@@ -172,14 +175,14 @@ interface RegistrationInput {
   dancerId: string
   dancerName: string
   competitorNumber: string
-  registrationStatus: string
+  registrationStatus: RegistrationStatus
 }
 
 interface ExistingScore {
   dancerId: string
   rawScore: number
   flagged: boolean
-  flagReason: string | null
+  flagReason: FlagReason | null
   commentData: CommentData | null
 }
 

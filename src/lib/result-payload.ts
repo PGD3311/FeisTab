@@ -1,6 +1,7 @@
 import { type TabulationResult } from '@/lib/engine/tabulate'
 import { type RuleSetConfig } from '@/lib/engine/rules'
 import { PRECISION } from '@/lib/engine/constants'
+import { type JudgeInfo } from '@/types/shared'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,14 +26,6 @@ export interface CalculatedPayload {
   drop_note: null
 }
 
-// ── Internal types for function parameters ────────────────────────────────────
-
-interface Judge {
-  id: string
-  first_name: string
-  last_name: string
-}
-
 interface ScoreEntry {
   dancer_id: string
   judge_id: string
@@ -52,7 +45,7 @@ interface ScoreEntry {
  */
 export function buildJudgeScores(
   result: TabulationResult,
-  judges: Judge[],
+  judges: JudgeInfo[],
   scores: ScoreEntry[]
 ): JudgeScore[] {
   return result.individual_ranks.map(ir => {
@@ -186,7 +179,7 @@ function ordinalLabel(rank: number): string {
  */
 export function buildCalculatedPayload(
   result: TabulationResult,
-  judges: Judge[],
+  judges: JudgeInfo[],
   scores: ScoreEntry[],
   allResults: TabulationResult[],
   rules: RuleSetConfig

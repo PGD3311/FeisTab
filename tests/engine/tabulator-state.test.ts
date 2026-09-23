@@ -197,8 +197,8 @@ describe('scoreReducer', () => {
 describe('buildInitialRows', () => {
   it('marks rows with existing scores as saved', () => {
     const registrations = [
-      { dancerId: 'd1', dancerName: 'A', competitorNumber: '101', registrationStatus: 'present' },
-      { dancerId: 'd2', dancerName: 'B', competitorNumber: '102', registrationStatus: 'present' },
+      { dancerId: 'd1', dancerName: 'A', competitorNumber: '101', registrationStatus: 'present' as const },
+      { dancerId: 'd2', dancerName: 'B', competitorNumber: '102', registrationStatus: 'present' as const },
     ]
     const existingScores = [
       { dancerId: 'd1', rawScore: 75, flagged: false, flagReason: null, commentData: null },
@@ -213,7 +213,7 @@ describe('buildInitialRows', () => {
 
   it('includes non-active registrations with empty status', () => {
     const registrations = [
-      { dancerId: 'd1', dancerName: 'A', competitorNumber: '101', registrationStatus: 'scratched' },
+      { dancerId: 'd1', dancerName: 'A', competitorNumber: '101', registrationStatus: 'scratched' as const },
     ]
     const rows = buildInitialRows(registrations, [])
     expect(rows[0].registrationStatus).toBe('scratched')

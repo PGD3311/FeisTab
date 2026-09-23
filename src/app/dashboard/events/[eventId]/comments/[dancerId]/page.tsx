@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react'
 import { COMMENT_CODES, type CommentData } from '@/lib/comment-codes'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
+import { type JudgeInfo } from '@/types/shared'
 
 interface ScoreEntry {
   id: string
@@ -22,12 +23,6 @@ interface Competition {
   name: string
 }
 
-interface Judge {
-  id: string
-  first_name: string
-  last_name: string
-}
-
 interface Round {
   id: string
   round_number: number
@@ -40,7 +35,7 @@ interface DancerInfo {
 }
 
 interface GroupedEntry {
-  judge: Judge
+  judge: JudgeInfo
   rounds: {
     round: Round
     commentData: CommentData | null
@@ -165,7 +160,7 @@ export default function DancerCommentSheetPage({
     const roundIds = [...new Set(scoreEntries.map((s) => s.round_id))]
 
     // Load judges and rounds
-    const judgeMap = new Map<string, Judge>()
+    const judgeMap = new Map<string, JudgeInfo>()
     const roundMap = new Map<string, Round>()
 
     if (judgeIds.length > 0) {
@@ -178,7 +173,7 @@ export default function DancerCommentSheetPage({
         console.error('Failed to load judges:', judgeErr.message)
         // Supplementary — page falls back to "Unknown Judge"
       }
-      for (const j of (judges as Judge[] | null) ?? []) {
+      for (const j of (judges as JudgeInfo[] | null) ?? []) {
         judgeMap.set(j.id, j)
       }
     }
