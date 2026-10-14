@@ -8,7 +8,7 @@ import {
   transitionCompetitionStatus,
   unconfirmRoster,
 } from '@/lib/supabase/rpc'
-import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
+import { getCurrentHeat, getSnapshotDancerIds, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showError } from '@/lib/feedback'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,13 +63,16 @@ const CALL_TO_STAGE_STATUSES: CompetitionStatus[] = [
   'awaiting_scores',
 ]
 const UPCOMING_STATUSES: CompetitionStatus[] = ['imported', 'draft']
+// Championship recalls announced; the recall round hasn't started yet
+const RECALL_PENDING_STATUSES: CompetitionStatus[] = ['recalled_round_pending']
 const COMPLETE_STATUSES: CompetitionStatus[] = [
   'ready_to_tabulate',
   'complete_unpublished',
   'published',
   'locked',
-  'recalled_round_pending',
 ]
+// Statuses where the expanded row loads the latest round's heat list
+const HEAT_STATUSES: CompetitionStatus[] = [...SCORING_STATUSES, ...RECALL_PENDING_STATUSES]
 
 // Statuses where roster can be confirmed
 const CONFIRMABLE_STATUSES: CompetitionStatus[] = ['draft', 'imported', 'ready_for_day_of']
@@ -123,6 +126,8 @@ export default function RosterConfirmationPage({
   const [heatSnapshot, setHeatSnapshot] = useState<HeatSnapshot | null>(null)
   const [heatScoredDancerIds, setHeatScoredDancerIds] = useState<Set<string>>(new Set())
   const [loadingHeatData, setLoadingHeatData] = useState(false)
+  // Set when the latest round is a recall round: only these dancers dance it
+  const [recallDancerIds, setRecallDancerIds] = useState<Set<string> | null>(null)
 
   // Done section collapsed state
   const [doneExpanded, setDoneExpanded] = useState(false)
@@ -378,11 +383,12 @@ export default function RosterConfirmationPage({
     setLoadingHeatData(true)
     setHeatSnapshot(null)
     setHeatScoredDancerIds(new Set())
+    setRecallDancerIds(null)
 
     // Fetch active round with heat snapshot
     const { data: roundData, error: roundErr } = await supabase
       .from('rounds')
-      .select('id, heat_snapshot')
+      .select('id, round_type, heat_snapshot')
       .eq('competition_id', competitionId)
       .order('round_number', { ascending: false })
       .limit(1)
@@ -401,6 +407,9 @@ export default function RosterConfirmationPage({
 
     const snapshot = roundData.heat_snapshot as HeatSnapshot
     setHeatSnapshot(snapshot)
+    if (roundData.round_type === 'recall') {
+      setRecallDancerIds(getSnapshotDancerIds(snapshot))
+    }
 
     // Fetch scored dancer IDs for this round
     const { data: scoreData, error: scoreErr } = await supabase
@@ -426,18 +435,20 @@ export default function RosterConfirmationPage({
       setRegistrations([])
       setHeatSnapshot(null)
       setHeatScoredDancerIds(new Set())
+      setRecallDancerIds(null)
       return
     }
     setExpandedCompId(compId)
     void loadRegistrations(compId)
 
-    // If competition is scoring, also load heat data
+    // If competition is scoring (or waiting on its recall round), also load heat data
     const comp = competitions.find((c) => c.id === compId)
-    if (comp && SCORING_STATUSES.includes(comp.status)) {
+    if (comp && HEAT_STATUSES.includes(comp.status)) {
       void loadHeatData(compId)
     } else {
       setHeatSnapshot(null)
       setHeatScoredDancerIds(new Set())
+      setRecallDancerIds(null)
     }
   }
 
@@ -650,6 +661,9 @@ export default function RosterConfirmationPage({
         (c.status === 'ready_for_day_of' && !c.roster_confirmed_at)
     )
   )
+  const recallComps = sortBySchedule(
+    filteredCompetitions.filter((c) => RECALL_PENDING_STATUSES.includes(c.status))
+  )
   const completeComps = sortBySchedule(
     filteredCompetitions.filter((c) => COMPLETE_STATUSES.includes(c.status))
   )
@@ -700,8 +714,14 @@ export default function RosterConfirmationPage({
 
   function renderCompetitionRow(comp: Competition) {
     const isExpanded = expandedCompId === comp.id
+    // Recall round: list only the recalled dancers
+    const isRecallRound = isExpanded && recallDancerIds !== null
+    const rosterRegs = isRecallRound
+      ? registrations.filter((r) => recallDancerIds.has(r.dancer_id))
+      : registrations
+    const isRecallPending = RECALL_PENDING_STATUSES.includes(comp.status)
     const presentCount = isExpanded
-      ? registrations.filter(
+      ? rosterRegs.filter(
           (r) =>
             r.status === 'present' ||
             r.status === 'checked_in' ||
@@ -710,7 +730,7 @@ export default function RosterConfirmationPage({
             r.status === 'finalized'
         ).length
       : 0
-    const totalCount = isExpanded ? registrations.length : 0
+    const totalCount = isExpanded ? rosterRegs.length : 0
 
     const canConfirm = CONFIRMABLE_STATUSES.includes(comp.status) && !comp.roster_confirmed_at
     const canUnconfirm =
@@ -847,18 +867,31 @@ export default function RosterConfirmationPage({
               )
             })()}
 
-            {SCORING_STATUSES.includes(comp.status) && loadingHeatData && (
+            {HEAT_STATUSES.includes(comp.status) && loadingHeatData && (
               <p className="text-muted-foreground text-sm py-2">Loading heat data...</p>
+            )}
+
+            {isRecallPending && !loadingHeatData && (
+              <div className="rounded-lg border-2 border-feis-orange/40 bg-feis-orange/5 p-4">
+                <p className="text-sm font-semibold text-feis-orange uppercase tracking-wider">
+                  Recalled
+                </p>
+                <p className="text-base mt-1">
+                  {isRecallRound
+                    ? `${rosterRegs.length} dancers recalled. Line them up for the recall round. Scoring starts when the organizer starts the round.`
+                    : 'Recalls generated. Waiting for the organizer to start the recall round.'}
+                </p>
+              </div>
             )}
 
             {loadingRegistrations ? (
               <p className="text-muted-foreground text-sm py-2">Loading roster...</p>
-            ) : registrations.length === 0 ? (
+            ) : rosterRegs.length === 0 ? (
               <p className="text-muted-foreground text-sm py-2">No dancers registered.</p>
             ) : (
               <>
                 <div className="space-y-2">
-                  {registrations.map((reg) => {
+                  {rosterRegs.map((reg) => {
                     const checkIn = checkInMap.get(reg.dancer_id)
                     const displayNumber = checkIn?.competitor_number ?? reg.competitor_number
                     const isPresent =
@@ -948,7 +981,7 @@ export default function RosterConfirmationPage({
                 </div>
 
                 <div className="text-base text-muted-foreground font-medium pt-1">
-                  {presentCount}/{totalCount} present
+                  {presentCount}/{totalCount} {isRecallRound ? 'recalled dancers present' : 'present'}
                 </div>
               </>
             )}
@@ -1007,6 +1040,7 @@ export default function RosterConfirmationPage({
 
   const hasNoComps =
     scoringComps.length === 0 &&
+    recallComps.length === 0 &&
     sentComps.length === 0 &&
     readyComps.length === 0 &&
     upcomingComps.length === 0 &&
@@ -1152,6 +1186,20 @@ export default function RosterConfirmationPage({
           </CardHeader>
           <CardContent className="space-y-3">
             {scoringComps.map(renderCompetitionRow)}
+          </CardContent>
+        </Card>
+      )}
+
+      {recallComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-feis-orange" />
+              Recalls ({recallComps.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recallComps.map(renderCompetitionRow)}
           </CardContent>
         </Card>
       )}

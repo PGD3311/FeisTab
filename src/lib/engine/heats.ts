@@ -86,3 +86,15 @@ export function getCurrentHeat(
   }
   return null
 }
+
+// ---------------------------------------------------------------------------
+// getSnapshotDancerIds
+// ---------------------------------------------------------------------------
+
+/**
+ * Every dancer with a slot in the snapshot, whatever the slot status.
+ * For a recall round the snapshot is the round's roster: only recalled dancers.
+ */
+export function getSnapshotDancerIds(snapshot: HeatSnapshot): Set<string> {
+  return new Set(snapshot.heats.flatMap((heat) => heat.slots.map((slot) => slot.dancer_id)))
+}

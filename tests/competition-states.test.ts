@@ -104,6 +104,10 @@ describe('getTransitionLabel', () => {
     expect(getTransitionLabel('released_to_judge', 'ready_for_day_of')).toBe('Recall to Side-Stage')
   })
 
+  it('returns label for recalled_round_pending -> awaiting_scores', () => {
+    expect(getTransitionLabel('recalled_round_pending', 'awaiting_scores')).toBe('Start Recall Round')
+  })
+
   it('returns label for in_progress -> awaiting_scores', () => {
     expect(getTransitionLabel('in_progress', 'awaiting_scores')).toBe('Open for Scoring')
   })

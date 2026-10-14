@@ -54,6 +54,7 @@ const transitionLabels: Partial<Record<string, string>> = {
   'in_progress→awaiting_scores': 'Open for Scoring',
   'ready_to_tabulate→complete_unpublished': 'Run Tabulation',
   'ready_to_tabulate→recalled_round_pending': 'Generate Recalls',
+  'recalled_round_pending→awaiting_scores': 'Start Recall Round',
   'complete_unpublished→published': 'Publish Results',
   'published→complete_unpublished': 'Unpublish',
   'ready_to_tabulate→awaiting_scores': 'Unlock for Correction',

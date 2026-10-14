@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { signOffJudge, submitScore, createRound } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
-import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
+import { getCurrentHeat, getSnapshotDancerIds, type HeatSnapshot } from '@/lib/engine/heats'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { validateCommentData, type CommentData } from '@/lib/comment-codes'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -371,14 +371,20 @@ export default function JudgeScoringPage({
 
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
-  const activeDancers = registrations.filter(
+  const heatSnapshot = (round?.heat_snapshot as HeatSnapshot) ?? null
+  // A recall round is danced only by the recalled dancers on its heat list
+  const recalledDancerIds =
+    round?.round_type === 'recall' && heatSnapshot ? getSnapshotDancerIds(heatSnapshot) : null
+  const roundRegistrations = recalledDancerIds
+    ? registrations.filter((r: { dancer_id: string }) => recalledDancerIds.has(r.dancer_id))
+    : registrations
+  const activeDancers = roundRegistrations.filter(
     r => !NON_ACTIVE_STATUSES.includes(r.status ?? 'registered')
   )
   const scoredCount = scores.length
   const totalDancers = activeDancers.length
 
   // Heat grouping
-  const heatSnapshot = (round?.heat_snapshot as HeatSnapshot) ?? null
   const scoredDancerIds = new Set(scores.map((s: { dancer_id: string }) => s.dancer_id))
   const currentHeat = heatSnapshot ? getCurrentHeat(heatSnapshot, scoredDancerIds) : null
   const totalHeats = heatSnapshot?.heats.length ?? 0
@@ -440,7 +446,7 @@ export default function JudgeScoringPage({
         {/* Absent dancers not in heats */}
         {(() => {
           const allHeatDancerIds = new Set(heatSnapshot.heats.flatMap(h => h.slots.map(s => s.dancer_id)))
-          const absentRegs = registrations.filter(
+          const absentRegs = roundRegistrations.filter(
             (r: { dancer_id: string; status: string }) =>
               !allHeatDancerIds.has(r.dancer_id) && NON_ACTIVE_STATUSES.includes((r.status ?? 'registered') as RegistrationStatus)
           )
@@ -557,7 +563,7 @@ export default function JudgeScoringPage({
   function renderFlatList() {
     return (
       <div className="space-y-1 mb-6">
-        {registrations.map((reg: (typeof registrations)[number]) => {
+        {roundRegistrations.map((reg: (typeof registrations)[number]) => {
           const isAbsent = NON_ACTIVE_STATUSES.includes((reg.status ?? 'registered') as RegistrationStatus)
           return isAbsent ? renderAbsentDancer(reg) : renderScoreEntry(reg)
         })}
@@ -580,6 +586,9 @@ export default function JudgeScoringPage({
             <span className="font-mono text-sm text-feis-green/50">{comp.code}</span>
           )}
           <span className="text-base font-semibold ml-1">{comp.name}</span>
+          {recalledDancerIds && (
+            <Badge variant="outline" className="ml-2 text-xs">Recall round</Badge>
+          )}
         </div>
         <span className="text-sm text-muted-foreground font-mono">
           {heatSnapshot && totalHeats > 0 ? `Heat ${currentHeatNumber} \u00B7 ` : ''}{scoredCount} of {totalDancers} scored

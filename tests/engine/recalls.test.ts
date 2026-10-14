@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { generateRecalls, type TabulationResult } from '@/lib/engine/recalls'
+import {
+  generateRecalls,
+  getRoundRoster,
+  roundNeedsRecalls,
+  type TabulationResult,
+} from '@/lib/engine/recalls'
 
 describe('generateRecalls (percentage-based)', () => {
   const results: TabulationResult[] = [
@@ -48,5 +53,42 @@ describe('generateRecalls (percentage-based)', () => {
 
   it('handles empty results', () => {
     expect(generateRecalls([], 50)).toEqual([])
+  })
+})
+
+describe('roundNeedsRecalls', () => {
+  it('is false for a grade competition (recalls off)', () => {
+    expect(roundNeedsRecalls(0, 'standard')).toBe(false)
+  })
+
+  it('is true for the first round of a championship', () => {
+    expect(roundNeedsRecalls(50, 'standard')).toBe(true)
+  })
+
+  it('is false for the recall round itself', () => {
+    expect(roundNeedsRecalls(50, 'recall')).toBe(false)
+  })
+})
+
+describe('getRoundRoster', () => {
+  const regs = [{ dancer_id: 'a' }, { dancer_id: 'b' }, { dancer_id: 'c' }]
+  const recalls = [
+    { dancer_id: 'a', round_id: 'r1' },
+    { dancer_id: 'c', round_id: 'r1' },
+  ]
+
+  it('returns everyone for a standard round', () => {
+    expect(getRoundRoster(regs, { id: 'r1', round_type: 'standard' }, recalls)).toEqual(regs)
+  })
+
+  it('returns only recalled dancers for a recall round', () => {
+    expect(getRoundRoster(regs, { id: 'r2', round_type: 'recall' }, recalls)).toEqual([
+      { dancer_id: 'a' },
+      { dancer_id: 'c' },
+    ])
+  })
+
+  it('falls back to everyone when a recall round has no recalls loaded', () => {
+    expect(getRoundRoster(regs, { id: 'r2', round_type: 'recall' }, [])).toEqual(regs)
   })
 })

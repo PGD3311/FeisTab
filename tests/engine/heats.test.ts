@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   generateHeats,
   getCurrentHeat,
+  getSnapshotDancerIds,
   type HeatDancer,
 } from '@/lib/engine/heats'
 
@@ -153,5 +154,17 @@ describe('getCurrentHeat', () => {
 
     expect(current).not.toBeNull()
     expect(current!.heat_number).toBe(2)
+  })
+})
+
+describe('getSnapshotDancerIds', () => {
+  it('returns every dancer with a slot, whatever the slot status', () => {
+    const snapshot = generateHeats(makeDancers(3), 2)
+    snapshot.heats[1].slots[0].status = 'scratched'
+    expect(getSnapshotDancerIds(snapshot)).toEqual(new Set(['d1', 'd2', 'd3']))
+  })
+
+  it('returns an empty set for a snapshot with no heats', () => {
+    expect(getSnapshotDancerIds(generateHeats([], 2)).size).toBe(0)
   })
 })

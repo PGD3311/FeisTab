@@ -14,6 +14,7 @@ import { detectLargeScoreSpread } from './detect-score-spread'
 import { detectJudgeFlaggedAll } from './detect-judge-flagged-all'
 import { detectJudgeFlatScores } from './detect-judge-flat-scores'
 import { detectUnresolvedTies } from './detect-unresolved-ties'
+import { getRoundRoster, roundNeedsRecalls } from '../recalls'
 
 const SCORE_SPREAD_THRESHOLD = 30
 
@@ -29,22 +30,35 @@ export function detectAnomalies(input: AnomalyInput): Anomaly[] {
 
   // === ROUND-SCOPED CHECKS (run per round) ===
   for (const round of rounds) {
-    const activeDancerCount = registrations.filter(
+    // A recall round is danced only by the recalled dancers
+    const roundRegistrations = getRoundRoster(registrations, round, recalls)
+    const activeDancerCount = roundRegistrations.filter(
       r => !NON_ACTIVE_STATUSES.includes(r.status)
     ).length
     const roundRecalls = recalls.filter(rc => rc.round_id === round.id)
 
     // Integrity blockers
-    anomalies.push(...detectMissingRequiredScores(scores, registrations, judge_ids, round.id, competition_id))
-    anomalies.push(...detectIncompleteJudgePackets(scores, registrations, judge_ids, round.id, competition_id))
+    if (roundRegistrations !== registrations) {
+      const roundScores = scores.filter(s => s.round_id === round.id)
+      anomalies.push(
+        ...detectScoresForNonRosterDancers(roundScores, roundRegistrations, competition_id).map(a => ({
+          ...a,
+          message: `Score exists for dancer ${a.entity_ids.dancer_id} who was not recalled for this round`,
+        }))
+      )
+    }
+    anomalies.push(...detectMissingRequiredScores(scores, roundRegistrations, judge_ids, round.id, competition_id))
+    anomalies.push(...detectIncompleteJudgePackets(scores, roundRegistrations, judge_ids, round.id, competition_id))
 
-    // Rules blockers
-    anomalies.push(...detectRecallMismatch(roundRecalls, activeDancerCount, rules.recall_top_percent, round.id, competition_id))
+    // Rules blockers — only championship rounds that feed a recall round
+    if (roundNeedsRecalls(rules.recall_top_percent, round.round_type)) {
+      anomalies.push(...detectRecallMismatch(roundRecalls, activeDancerCount, rules.recall_top_percent, round.id, competition_id))
+    }
 
     // Warnings
-    anomalies.push(...detectUnexplainedNoScores(scores, registrations, round.id, competition_id))
-    anomalies.push(...detectStatusScoreMismatch(scores, registrations, round.id, competition_id))
-    anomalies.push(...detectUnresolvedTies(scores, registrations, rules, round.id, competition_id))
+    anomalies.push(...detectUnexplainedNoScores(scores, roundRegistrations, round.id, competition_id))
+    anomalies.push(...detectStatusScoreMismatch(scores, roundRegistrations, round.id, competition_id))
+    anomalies.push(...detectUnresolvedTies(scores, roundRegistrations, rules, round.id, competition_id))
 
     // Review signals
     anomalies.push(...detectLargeScoreSpread(scores, round.id, competition_id, SCORE_SPREAD_THRESHOLD))

@@ -6,7 +6,7 @@ import { ChevronLeft } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { tabulate, type ScoreInput, type TabulationResult } from '@/lib/engine/tabulate'
-import { generateRecalls } from '@/lib/engine/recalls'
+import { generateRecalls, roundNeedsRecalls } from '@/lib/engine/recalls'
 import { type RuleSetConfig } from '@/lib/engine/rules'
 import { detectAnomalies, type Anomaly, type AnomalyInput } from '@/lib/engine/anomalies'
 import { DEFAULT_RULES } from '@/lib/engine/rules'
@@ -23,6 +23,7 @@ import {
   unpublishResults,
   generateRecall,
   approveTabulation,
+  guardedStatusUpdate,
   createRound,
   transitionCompetitionStatus,
   confirmRoster,
@@ -34,7 +35,7 @@ import {
 import { showSuccess, showError, showCritical } from '@/lib/feedback'
 import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
 import { buildCalculatedPayload } from '@/lib/result-payload'
-import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
+import { generateHeats, type HeatDancer, type HeatSnapshot } from '@/lib/engine/heats'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 import { type JudgeInfo } from '@/types/shared'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
@@ -58,6 +59,7 @@ export default function CompetitionDetailPage({
   const [rounds, setRounds] = useState<any[]>([]) // TODO: type when Supabase types generated
   const [scores, setScores] = useState<any[]>([]) // TODO: type when Supabase types generated
   const [results, setResults] = useState<any[]>([]) // TODO: type when Supabase types generated
+  const [recalls, setRecalls] = useState<{ dancer_id: string; source_round_id: string }[]>([])
   const [ruleset, setRuleset] = useState<RuleSetConfig | null>(null)
   const [judges, setJudges] = useState<JudgeInfo[]>([])
   const [assignedJudgeIds, setAssignedJudgeIds] = useState<string[]>([])
@@ -89,7 +91,7 @@ export default function CompetitionDetailPage({
         .eq('competition_id', compId),
       supabase
         .from('rounds')
-        .select('id, judge_sign_offs, status')
+        .select('id, round_number, round_type, judge_sign_offs, status')
         .eq('competition_id', compId)
         .order('round_number'),
       supabase
@@ -213,7 +215,7 @@ export default function CompetitionDetailPage({
   }, [loading, pollData])
 
   async function loadData() {
-    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes, stagesRes] = await Promise.all([
+    const [compRes, regRes, roundRes, scoreRes, resultRes, judgesRes, assignRes, stagesRes, recallRes] = await Promise.all([
       supabase.from('competitions').select('*, rule_sets(*)').eq('id', compId).single(),
       supabase.from('registrations').select('*, dancers(*)').eq('competition_id', compId),
       supabase.from('rounds').select('*').eq('competition_id', compId).order('round_number'),
@@ -222,6 +224,7 @@ export default function CompetitionDetailPage({
       supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
       supabase.from('judge_assignments').select('judge_id').eq('competition_id', compId),
       supabase.from('stages').select('id, name, display_order').eq('event_id', eventId).order('display_order'),
+      supabase.from('recalls').select('dancer_id, source_round_id').eq('competition_id', compId),
     ])
 
     if (compRes.error) {
@@ -236,8 +239,9 @@ export default function CompetitionDetailPage({
     if (judgesRes.error) console.error('Failed to load judges:', judgesRes.error.message)
     if (assignRes.error) console.error('Failed to load judge assignments:', assignRes.error.message)
     if (stagesRes.error) console.error('Failed to load stages:', stagesRes.error.message)
+    if (recallRes.error) console.error('Failed to load recalls:', recallRes.error.message)
 
-    if (regRes.error || roundRes.error || scoreRes.error || resultRes.error || judgesRes.error) {
+    if (regRes.error || roundRes.error || scoreRes.error || resultRes.error || judgesRes.error || recallRes.error) {
       setLoadWarning(true)
     } else {
       setLoadWarning(false)
@@ -252,6 +256,7 @@ export default function CompetitionDetailPage({
     setJudges(judgesRes.data ?? [])
     setAssignedJudgeIds((assignRes.data ?? []).map((a: { judge_id: string }) => a.judge_id))
     setStages(stagesRes.data ?? [])
+    setRecalls(recallRes.data ?? [])
 
     const latestRound = roundRes.data?.[roundRes.data.length - 1]
     if (latestRound && judgesRes.data) {
@@ -285,7 +290,11 @@ export default function CompetitionDetailPage({
           calculated_payload: r.calculated_payload ?? { total_points: 0, individual_ranks: [] },
         })),
         rules: compRes.data?.rule_sets?.config as RuleSetConfig ?? DEFAULT_RULES,
-        recalls: [],
+        // Recalls point at the round they were generated from
+        recalls: (recallRes.data ?? []).map((rc: { dancer_id: string; source_round_id: string }) => ({
+          dancer_id: rc.dancer_id,
+          round_id: rc.source_round_id,
+        })),
       }
       const detected = detectAnomalies(anomalyInput)
       const status = compRes.data.status as string
@@ -380,7 +389,8 @@ export default function CompetitionDetailPage({
     if (!latestRound) return
 
     try {
-      const mappedScores = scores.map(s => ({
+      // Only the tabulated round: a recalled dancer also has scores from the earlier round
+      const mappedScores = scores.filter(s => s.round_id === latestRound.id).map(s => ({
         dancer_id: s.dancer_id,
         judge_id: s.judge_id,
         raw_score: Number(s.raw_score),
@@ -446,16 +456,33 @@ export default function CompetitionDetailPage({
     }
   }
 
+  // Heat list for the recall round: only the recalled dancers, in competitor-number order.
+  // Judges and side-stage read the recall round's roster from this list.
+  function buildRecallSnapshot(recalledDancerIds: string[]): HeatSnapshot {
+    const recalledSet = new Set(recalledDancerIds)
+    const dancers: HeatDancer[] = registrations
+      .filter((r: { dancer_id: string }) => recalledSet.has(r.dancer_id))
+      .map(
+        (r: { dancer_id: string; competitor_number: string | null; display_order: number | null }, idx: number) => ({
+          dancer_id: r.dancer_id,
+          competitor_number: r.competitor_number ?? String(idx + 1),
+          display_order: r.display_order ?? (parseInt(r.competitor_number ?? '0', 10) || idx),
+        })
+      )
+    const groupSize = ((comp as Record<string, unknown>).group_size as number) ?? 2
+    return generateHeats(dancers, groupSize)
+  }
+
   async function handleGenerateRecalls() {
     if (!ruleset || !comp) return
-    if (!ruleset.recall_top_percent) return
 
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'recalled_round_pending')) return
 
     const latestRound = rounds[rounds.length - 1]
-    if (!latestRound) return
+    if (!latestRound || !roundNeedsRecalls(ruleset.recall_top_percent, latestRound.round_type)) return
 
+    setAdvancing(true)
     try {
       const roundScores: ScoreInput[] = scores
         .filter(s => s.round_id === latestRound.id)
@@ -476,12 +503,66 @@ export default function CompetitionDetailPage({
       }))
 
       const nextNum = (rounds[rounds.length - 1]?.round_number ?? 0) + 1
-      await generateRecall(supabase, compId, recallRows, nextNum, currentStatus)
+      const recallRoundId = await generateRecall(supabase, compId, recallRows, nextNum, currentStatus)
+
+      // Publish the recall list to side-stage now. If this fails, Start Recall Round retries it.
+      try {
+        const snapshot = buildRecallSnapshot(recalled.map(r => r.dancer_id))
+        await updateHeatSnapshot(supabase, recallRoundId, snapshot as unknown as Record<string, unknown>)
+      } catch (snapshotErr) {
+        console.error('Recall heat list failed (retried on Start Recall Round):', snapshotErr)
+      }
 
       await loadData()
-      showSuccess('Recalls generated')
+      void reload()
+      showSuccess(`${recalled.length} dancers recalled`)
     } catch (err) {
       showCritical('Recall generation failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setAdvancing(false)
+    }
+  }
+
+  async function handleStartRecallRound() {
+    if (!comp) return
+
+    const currentStatus = comp.status as CompetitionStatus
+    if (currentStatus !== 'recalled_round_pending' || !canTransition(currentStatus, 'awaiting_scores')) {
+      showCritical('Cannot start the recall round', { description: `Status is "${currentStatus}"` })
+      return
+    }
+
+    setAdvancing(true)
+    try {
+      const { data: recallRound, error: roundErr } = await supabase
+        .from('rounds')
+        .select('id, round_type, heat_snapshot')
+        .eq('competition_id', compId)
+        .order('round_number', { ascending: false })
+        .limit(1)
+        .single()
+      if (roundErr) throw new Error(roundErr.message)
+      if (recallRound.round_type !== 'recall') throw new Error('No recall round found — refresh and try again')
+
+      // Judges score only the dancers on the recall round's heat list
+      if (!recallRound.heat_snapshot) {
+        const recalledIds = recalls
+          .filter(rc => rc.source_round_id !== recallRound.id)
+          .map(rc => rc.dancer_id)
+        if (recalledIds.length === 0) throw new Error('No recalled dancers found — refresh and try again')
+        const snapshot = buildRecallSnapshot(recalledIds)
+        await updateHeatSnapshot(supabase, recallRound.id, snapshot as unknown as Record<string, unknown>)
+      }
+
+      await guardedStatusUpdate(supabase, compId, currentStatus, 'awaiting_scores')
+
+      await loadData()
+      void reload()
+      showSuccess('Recall round started — judges can score it now')
+    } catch (err) {
+      showCritical('Could not start the recall round', { description: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setAdvancing(false)
     }
   }
 
@@ -688,11 +769,24 @@ export default function CompetitionDetailPage({
           rosterConfirmedAt: comp.roster_confirmed_at ?? null,
         }
 
-        // Determine if tabulation/publish actions should show here
-        const showTabulate = currentStatus === 'ready_to_tabulate' && !previewResults
-        const showRecalls = currentStatus === 'ready_to_tabulate' && ruleset && ruleset.recall_top_percent > 0
+        // Championship first round: recalls come before tabulation. Grade competitions
+        // (recall_top_percent 0) and the recall round itself go straight to tabulation.
+        const recallsDue =
+          currentStatus === 'ready_to_tabulate' &&
+          !!ruleset &&
+          !!latestRound &&
+          roundNeedsRecalls(ruleset.recall_top_percent, latestRound.round_type)
+        const showTabulate = currentStatus === 'ready_to_tabulate' && !previewResults && !recallsDue
+        const showRecalls = recallsDue
+        const showStartRecall = currentStatus === 'recalled_round_pending'
         const showPublish = results.length > 0 && currentStatus === 'complete_unpublished'
-        const hasActions = operatorTransitions.length > 0 || showTabulate || showPublish
+        const hasActions =
+          operatorTransitions.length > 0 || showTabulate || showRecalls || showStartRecall || showPublish
+        const recallBlockers = anomalies.some(a => a.blocking && a.type !== 'recall_mismatch')
+        const recalledNumbers = recalls
+          .filter(rc => rc.source_round_id !== latestRound?.id)
+          .map(rc => registrations.find(r => r.dancer_id === rc.dancer_id)?.competitor_number ?? '?')
+          .sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }))
 
         if (!hasActions && currentStatus !== 'published' && currentStatus !== 'locked') return null
 
@@ -738,9 +832,41 @@ export default function CompetitionDetailPage({
                 </Button>
               )}
               {showRecalls && (
-                <Button onClick={handleGenerateRecalls} variant="outline" className="w-full justify-start text-left" size="lg">
-                  Generate Recalls (Top {ruleset!.recall_top_percent}%)
-                </Button>
+                <div>
+                  <Button
+                    onClick={handleGenerateRecalls}
+                    disabled={!allSignedOff || recallBlockers || advancing}
+                    className="w-full justify-start text-left"
+                    size="lg"
+                  >
+                    {recallBlockers
+                      ? 'Resolve blockers before generating recalls'
+                      : !allSignedOff
+                        ? 'Waiting for judge sign-offs...'
+                        : `Generate Recalls (Top ${ruleset!.recall_top_percent}%)`}
+                  </Button>
+                  <p className="text-sm text-muted-foreground mt-1 ml-1">
+                    Championship: the top {ruleset!.recall_top_percent}% dance the recall round. Results are tabulated after it.
+                  </p>
+                </div>
+              )}
+              {showStartRecall && (
+                <div>
+                  <Button
+                    onClick={handleStartRecallRound}
+                    disabled={advancing}
+                    className="w-full justify-start text-left"
+                    size="lg"
+                  >
+                    {advancing ? 'Starting...' : getTransitionLabel('recalled_round_pending', 'awaiting_scores')}
+                  </Button>
+                  <p className="text-sm text-muted-foreground mt-1 ml-1">
+                    {recalledNumbers.length > 0
+                      ? `Recalled (${recalledNumbers.length}): ${recalledNumbers.map(n => `#${n}`).join(', ')}. `
+                      : ''}
+                    Side-stage can line them up now. Judges score the recall round once it starts.
+                  </p>
+                </div>
               )}
               {showPublish && (
                 <Button
@@ -835,7 +961,7 @@ export default function CompetitionDetailPage({
 
       {/* Roster */}
       {(() => {
-        const rosterLocked = ['released_to_judge', 'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(comp.status)
+        const rosterLocked = ['released_to_judge', 'in_progress', 'awaiting_scores', 'ready_to_tabulate', 'recalled_round_pending', 'complete_unpublished', 'published', 'locked'].includes(comp.status)
         return (
       <Card className="feis-card">
         <CardHeader>

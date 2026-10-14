@@ -58,3 +58,9 @@ describe('validateScore', () => {
     expect(validateScore(100.1, DEFAULT_RULES)).toBe(false)
   })
 })
+
+describe('DEFAULT_RULES', () => {
+  it('has recalls off — recalls are a championship rule, not a grade rule', () => {
+    expect(DEFAULT_RULES.recall_top_percent).toBe(0)
+  })
+})

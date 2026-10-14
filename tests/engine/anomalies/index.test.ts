@@ -58,3 +58,65 @@ describe('detectAnomalies', () => {
     expect(warnings.length).toBeGreaterThan(0)
   })
 })
+
+describe('detectAnomalies — recalls', () => {
+  const championshipRules = { ...DEFAULT_RULES, recall_top_percent: 50 }
+
+  it('never asks a grade competition for recalls', () => {
+    const input: AnomalyInput = { ...cleanInput, rules: DEFAULT_RULES }
+    expect(detectAnomalies(input).some(a => a.type === 'recall_mismatch')).toBe(false)
+  })
+
+  it('blocks a championship first round until recalls are generated', () => {
+    const input: AnomalyInput = { ...cleanInput, rules: championshipRules }
+    const recallBlockers = detectAnomalies(input).filter(a => a.type === 'recall_mismatch')
+    expect(recallBlockers).toHaveLength(1)
+    expect(recallBlockers[0].blocking).toBe(true)
+  })
+
+  it('clears the blocker once recalls exist for the round', () => {
+    const input: AnomalyInput = {
+      ...cleanInput,
+      rules: championshipRules,
+      recalls: [{ dancer_id: 'd1', round_id: 'r1' }],
+    }
+    expect(detectAnomalies(input)).toEqual([])
+  })
+
+  describe('recall round', () => {
+    const recallRound = { id: 'r2', competition_id: 'c1', round_number: 2, round_type: 'recall', judge_sign_offs: {} }
+    const recallInput: AnomalyInput = {
+      ...cleanInput,
+      rules: championshipRules,
+      rounds: [recallRound],
+      recalls: [{ dancer_id: 'd1', round_id: 'r1' }],
+      scores: [
+        { id: '7', round_id: 'r2', competition_id: 'c1', dancer_id: 'd1', judge_id: 'j1', raw_score: 88, flagged: false, flag_reason: null },
+        { id: '8', round_id: 'r2', competition_id: 'c1', dancer_id: 'd1', judge_id: 'j2', raw_score: 90, flagged: false, flag_reason: null },
+      ],
+    }
+
+    it('is clean when every recalled dancer is scored — no recall demand, no missing scores for others', () => {
+      expect(detectAnomalies(recallInput)).toEqual([])
+    })
+
+    it('still requires scores for recalled dancers', () => {
+      const input: AnomalyInput = { ...recallInput, scores: [recallInput.scores[0]] }
+      const types = detectAnomalies(input).filter(a => a.blocking).map(a => a.type)
+      expect(types).toContain('missing_required_score')
+    })
+
+    it('blocks a score for a dancer who was not recalled', () => {
+      const input: AnomalyInput = {
+        ...recallInput,
+        scores: [
+          ...recallInput.scores,
+          { id: '9', round_id: 'r2', competition_id: 'c1', dancer_id: 'd2', judge_id: 'j1', raw_score: 70, flagged: false, flag_reason: null },
+        ],
+      }
+      const blocker = detectAnomalies(input).find(a => a.type === 'score_for_non_roster_dancer')
+      expect(blocker?.blocking).toBe(true)
+      expect(blocker?.message).toContain('not recalled')
+    })
+  })
+})
