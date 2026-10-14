@@ -22,7 +22,13 @@ const tabs: Tab[] = [
     isActive: (pn, bp) => pn.startsWith(`${bp}/program`),
   },
   {
-    label: 'Side-Stage',
+    label: 'Registration desk',
+    href: (_, id) => `/registration/${id}`,
+    isActive: () => false,
+    external: true,
+  },
+  {
+    label: 'Side-stage',
     href: (_, id) => `/checkin/${id}`,
     isActive: () => false,
     external: true,

@@ -567,15 +567,30 @@ export default function RosterConfirmationPage({
       return
     }
 
-    // Warn if there are already competitions sent/scoring
-    const alreadySent = competitions.filter(
-      (c) => c.id !== compId && (c.status === 'released_to_judge' || c.status === 'in_progress')
-    )
-    if (alreadySent.length > 0) {
-      const names = alreadySent.map((c) => c.code ? `#${c.code}` : c.name).join(', ')
-      if (!confirm(`${alreadySent.length} competition${alreadySent.length !== 1 ? 's' : ''} already sent or scoring (${names}). Send another?`)) {
-        return
-      }
+    // Other competitions being with judges is normal on a busy day, so there's no prompt
+    // for that. A real resend is this same competition already having been sent from
+    // another screen: re-read its status so we say so instead of sending it twice.
+    const { data: fresh, error: freshErr } = await supabase
+      .from('competitions')
+      .select('status')
+      .eq('id', compId)
+      .single()
+    if (freshErr) {
+      showError('Could not check this competition', { description: freshErr.message })
+      return
+    }
+    const freshStatus = fresh.status as CompetitionStatus
+    if (freshStatus !== 'ready_for_day_of') {
+      setCompetitions((prev) =>
+        prev.map((c) => (c.id === compId ? { ...c, status: freshStatus } : c))
+      )
+      const label = comp.code ? `#${comp.code}` : comp.name
+      showError(
+        CALL_TO_STAGE_STATUSES.includes(freshStatus)
+          ? `${label} is already with the judge`
+          : `${label} was changed on another screen and can't be sent right now`
+      )
+      return
     }
 
     try {
@@ -1055,7 +1070,7 @@ export default function RosterConfirmationPage({
         >
           <ArrowLeft className="h-3 w-3" /> Dashboard
         </Link>
-        <h1 className="text-2xl font-bold">Side-Stage</h1>
+        <h1 className="text-2xl font-bold">Side-stage</h1>
         {event && <p className="text-lg text-muted-foreground">{event.name}</p>}
       </div>
 

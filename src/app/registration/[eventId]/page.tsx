@@ -6,6 +6,8 @@ import {
   getCheckInState,
   deriveCheckInStats,
   computeNextNumber,
+  dancerSearchScore,
+  SEARCH_NO_MATCH,
   type CheckInRow,
 } from '@/lib/check-in'
 import { showSuccess, showCritical, showError } from '@/lib/feedback'
@@ -13,6 +15,7 @@ import { useSupabase } from '@/hooks/use-supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -42,6 +45,7 @@ export default function RegistrationDeskPage({
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
+  const [undoTarget, setUndoTarget] = useState<DancerWithRegistrations | null>(null)
 
   async function loadData() {
     const [eventRes, checkInRes] = await Promise.all([
@@ -191,17 +195,41 @@ export default function RegistrationDeskPage({
   const allDancerIds = useMemo(() => dancers.map((d) => d.dancer_id), [dancers])
   const stats = useMemo(() => deriveCheckInStats(allDancerIds, checkInMap), [allDancerIds, checkInMap])
 
+  // Matches competitor number ("104" or "#104") or name/school ignoring case, accents,
+  // apostrophes, hyphens and spaces. Exact number hits come first.
   const filtered = useMemo(() => {
     if (!search.trim()) return dancers
-    const q = search.toLowerCase()
-    return dancers.filter(
-      (d) =>
-        d.first_name.toLowerCase().includes(q) ||
-        d.last_name.toLowerCase().includes(q) ||
-        `${d.first_name} ${d.last_name}`.toLowerCase().includes(q) ||
-        (d.school_name && d.school_name.toLowerCase().includes(q))
-    )
-  }, [dancers, search])
+    return dancers
+      .map((d) => ({
+        dancer: d,
+        score: dancerSearchScore(search, {
+          ...d,
+          competitor_number: checkInMap.get(d.dancer_id)?.competitor_number ?? null
+        })
+      }))
+      .filter((r) => r.score !== SEARCH_NO_MATCH)
+      .sort((a, b) => b.score - a.score)
+      .map((r) => r.dancer)
+  }, [dancers, search, checkInMap])
+
+  async function handleUndoCheckIn(dancer: DancerWithRegistrations) {
+    setActing(dancer.dancer_id)
+    try {
+      await undoCheckIn(supabase, eventId, dancer.dancer_id)
+
+      setCheckInMap((prev) => {
+        const next = new Map(prev)
+        next.delete(dancer.dancer_id)
+        return next
+      })
+      showSuccess(`Undid check-in for ${dancer.first_name} ${dancer.last_name}`)
+      setUndoTarget(null)
+    } catch (err) {
+      showCritical('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setActing(null)
+    }
+  }
 
   async function handleAssignAndCheckIn(dancer: DancerWithRegistrations) {
     setActing(dancer.dancer_id)
@@ -316,14 +344,14 @@ export default function RegistrationDeskPage({
         >
           <ArrowLeft className="h-3 w-3" /> Dashboard
         </Link>
-        <h1 className="text-2xl font-bold">Registration Desk</h1>
+        <h1 className="text-2xl font-bold">Registration desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
       </div>
 
       <div className="flex gap-3 items-center">
         <input
           type="text"
-          placeholder="Search by dancer name or school..."
+          placeholder="Search by name, number or school..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-lg shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -430,24 +458,7 @@ export default function RegistrationDeskPage({
                         size="sm"
                         className="text-xs text-muted-foreground hover:text-destructive"
                         disabled={acting === dancer.dancer_id}
-                        onClick={async () => {
-                          if (!confirm(`Undo check-in for ${dancer.first_name} ${dancer.last_name}?`)) return
-                          setActing(dancer.dancer_id)
-                          try {
-                            await undoCheckIn(supabase, eventId, dancer.dancer_id)
-
-                            setCheckInMap((prev) => {
-                              const next = new Map(prev)
-                              next.delete(dancer.dancer_id)
-                              return next
-                            })
-                            showSuccess(`Undid check-in for ${dancer.first_name} ${dancer.last_name}`)
-                          } catch (err) {
-                            showCritical('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
-                          } finally {
-                            setActing(null)
-                          }
-                        }}
+                        onClick={() => setUndoTarget(dancer)}
                       >
                         Undo
                       </Button>
@@ -500,6 +511,32 @@ export default function RegistrationDeskPage({
           Next: <strong className="font-mono text-foreground">#{nextNumber}</strong>
         </span>
       </div>
+
+      <ConfirmDialog
+        open={undoTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setUndoTarget(null)
+        }}
+        title="Undo this check-in?"
+        description={
+          undoTarget ? (
+            <>
+              {undoTarget.first_name} {undoTarget.last_name} will no longer be checked in
+              {checkInMap.get(undoTarget.dancer_id)
+                ? `, and number #${checkInMap.get(undoTarget.dancer_id)?.competitor_number} will be removed`
+                : ''}
+              .
+            </>
+          ) : null
+        }
+        confirmLabel="Yes, undo"
+        cancelLabel="Keep checked in"
+        destructive
+        busy={undoTarget !== null && acting === undoTarget.dancer_id}
+        onConfirm={() => {
+          if (undoTarget) void handleUndoCheckIn(undoTarget)
+        }}
+      />
     </div>
   )
 }

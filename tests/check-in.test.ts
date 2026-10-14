@@ -3,7 +3,13 @@ import {
   getCheckInState,
   deriveCheckInStats,
   computeNextNumber,
+  normalizeSearchText,
+  dancerSearchScore,
+  SEARCH_EXACT_NUMBER,
+  SEARCH_MATCH,
+  SEARCH_NO_MATCH,
   type CheckInRow,
+  type DancerSearchFields,
 } from '@/lib/check-in'
 
 describe('getCheckInState', () => {
@@ -70,5 +76,61 @@ describe('computeNextNumber', () => {
 
   it('starts from 100 even if all values are non-numeric', () => {
     expect(computeNextNumber(['VIP-1', 'VIP-2'])).toBe(100)
+  })
+})
+
+describe('normalizeSearchText', () => {
+  it('drops apostrophes, hyphens and spaces', () => {
+    expect(normalizeSearchText("O'Brien")).toBe('obrien')
+    expect(normalizeSearchText('O’Brien')).toBe('obrien')
+    expect(normalizeSearchText('Nic Giolla-Phádraig')).toBe('nicgiollaphadraig')
+  })
+
+  it('strips accents (fadas)', () => {
+    expect(normalizeSearchText('Siobhán Ní Dhónaill')).toBe('siobhannidhonaill')
+  })
+})
+
+describe('dancerSearchScore', () => {
+  const dancer: DancerSearchFields = {
+    first_name: 'Siobhán',
+    last_name: "O'Brien",
+    school_name: 'Scoil Rince Ní Bhriain',
+    competitor_number: '104'
+  }
+
+  it('matches names regardless of apostrophes, case and accents', () => {
+    expect(dancerSearchScore('obrien', dancer)).toBe(SEARCH_MATCH)
+    expect(dancerSearchScore("O'BRIEN", dancer)).toBe(SEARCH_MATCH)
+    expect(dancerSearchScore('o brien', dancer)).toBe(SEARCH_MATCH)
+    expect(dancerSearchScore('siobhan', dancer)).toBe(SEARCH_MATCH)
+  })
+
+  it('matches full name in either order', () => {
+    expect(dancerSearchScore('siobhan obrien', dancer)).toBe(SEARCH_MATCH)
+    expect(dancerSearchScore("O'Brien Siobhán", dancer)).toBe(SEARCH_MATCH)
+  })
+
+  it('matches school name', () => {
+    expect(dancerSearchScore('ni bhriain', dancer)).toBe(SEARCH_MATCH)
+  })
+
+  it('finds a dancer by exact competitor number, with or without #', () => {
+    expect(dancerSearchScore('104', dancer)).toBe(SEARCH_EXACT_NUMBER)
+    expect(dancerSearchScore('#104', dancer)).toBe(SEARCH_EXACT_NUMBER)
+    expect(dancerSearchScore(' 104 ', dancer)).toBe(SEARCH_EXACT_NUMBER)
+  })
+
+  it('treats a partial number as a prefix match', () => {
+    expect(dancerSearchScore('10', dancer)).toBe(SEARCH_MATCH)
+    expect(dancerSearchScore('4', dancer)).toBe(SEARCH_NO_MATCH)
+  })
+
+  it('does not match a number when the dancer has none yet', () => {
+    expect(dancerSearchScore('104', { ...dancer, competitor_number: null })).toBe(SEARCH_NO_MATCH)
+  })
+
+  it('returns no match for unrelated text', () => {
+    expect(dancerSearchScore('murphy', dancer)).toBe(SEARCH_NO_MATCH)
   })
 })

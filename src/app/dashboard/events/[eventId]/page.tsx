@@ -207,7 +207,7 @@ export default function EventOverviewPage() {
           target="_blank"
           className="text-sm text-muted-foreground hover:text-feis-green transition-colors py-1"
         >
-          Registration Desk &#8599;
+          Registration desk &#8599;
         </Link>
         <span className="text-muted-foreground">·</span>
         <Link
@@ -215,7 +215,7 @@ export default function EventOverviewPage() {
           target="_blank"
           className="text-sm text-muted-foreground hover:text-feis-green transition-colors py-1"
         >
-          Side-Stage &#8599;
+          Side-stage &#8599;
         </Link>
       </div>
 

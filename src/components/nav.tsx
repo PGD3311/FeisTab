@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { RunFeisLogo } from '@/components/runfeis-logo'
@@ -12,6 +13,7 @@ export function Nav() {
   const supabase = useSupabase()
 
   async function handleLogout() {
+    toast.dismiss()
     await supabase.auth.signOut()
     router.push('/auth/login')
   }

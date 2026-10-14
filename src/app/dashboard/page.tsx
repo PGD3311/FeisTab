@@ -9,6 +9,7 @@ import { deleteEvent } from '@/lib/supabase/rpc'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 interface Event {
   id: string
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Event | null>(null)
 
   async function loadEvents() {
     // Get authenticated user
@@ -74,10 +76,7 @@ export default function DashboardPage() {
 
   useEffect(() => { loadEvents() }, []) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- initial data load
 
-  async function handleDelete(eventId: string, eventName: string) {
-    if (!confirm(`Delete "${eventName}"? This removes all competitions, scores, and results. This cannot be undone.`)) {
-      return
-    }
+  async function handleDelete(eventId: string) {
     setDeleting(eventId)
 
     try {
@@ -92,6 +91,7 @@ export default function DashboardPage() {
     }
 
     showSuccess('Event deleted')
+    setDeleteTarget(null)
     await loadEvents()
     setDeleting(null)
   }
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                       variant="ghost"
                       size="sm"
                       className="text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(event.id, event.name)}
+                      onClick={() => setDeleteTarget(event)}
                       disabled={deleting === event.id}
                     >
                       {deleting === event.id ? '...' : 'Delete'}
@@ -151,6 +151,22 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title={deleteTarget ? `Delete "${deleteTarget.name}"?` : 'Delete event?'}
+        description="This removes all competitions, scores, and results. This cannot be undone."
+        confirmLabel="Yes, delete event"
+        cancelLabel="Keep event"
+        destructive
+        busy={deleteTarget !== null && deleting === deleteTarget.id}
+        onConfirm={() => {
+          if (deleteTarget) void handleDelete(deleteTarget.id)
+        }}
+      />
     </div>
   )
 }

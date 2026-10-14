@@ -30,8 +30,8 @@ interface EventWithRoles {
 
 const ROLE_LABELS: Record<EventRole, string> = {
   organizer: 'Organizer',
-  registration_desk: 'Registration Desk',
-  side_stage: 'Side-Stage',
+  registration_desk: 'Registration desk',
+  side_stage: 'Side-stage',
   judge: 'Judge',
 }
 
@@ -48,15 +48,15 @@ function getActionLinks(eventId: string, roles: EventRole[]) {
 
   if (hasRole('organizer')) {
     links.push({ label: 'Dashboard', href: `/dashboard/events/${eventId}` })
-    links.push({ label: 'Check-In', href: `/registration/${eventId}` })
-    links.push({ label: 'Side-Stage', href: `/checkin/${eventId}` })
+    links.push({ label: 'Registration desk', href: `/registration/${eventId}` })
+    links.push({ label: 'Side-stage', href: `/checkin/${eventId}` })
     links.push({ label: 'Team', href: `/dashboard/events/${eventId}/judges` })
   } else {
     if (hasRole('registration_desk')) {
-      links.push({ label: 'Check-In', href: `/registration/${eventId}` })
+      links.push({ label: 'Registration desk', href: `/registration/${eventId}` })
     }
     if (hasRole('side_stage')) {
-      links.push({ label: 'Side-Stage', href: `/checkin/${eventId}` })
+      links.push({ label: 'Side-stage', href: `/checkin/${eventId}` })
     }
   }
 
