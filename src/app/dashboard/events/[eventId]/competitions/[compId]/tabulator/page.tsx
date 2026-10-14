@@ -2,13 +2,13 @@
 
 import { useEffect, useReducer, useRef, useState, use } from 'react'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronUp } from 'lucide-react'
 
 import { useSupabase } from '@/hooks/use-supabase'
 import { signOffJudge, tabulatorEnterScore } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { type FlagReason } from '@/lib/engine/flag-reasons'
-import { type CompetitionStatus } from '@/lib/competition-states'
+import { isOpenForScoring, type CompetitionStatus } from '@/lib/competition-states'
 import { getCurrentHeat, getSnapshotDancerIds, type HeatSnapshot } from '@/lib/engine/heats'
 import {
   COMMENT_CODES,
@@ -21,16 +21,15 @@ import {
   scoreReducer,
   buildInitialRows,
   isEditable,
-  getEnteredCount,
+  getSavedCount,
   getActiveTotal,
   getFailedCount,
   getFirstEmptyEditableId,
   canSignOff,
-  allSaved,
   type ScoreRow,
 } from '@/lib/engine/tabulator-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { type RegistrationStatus } from '@/lib/engine/anomalies/types'
@@ -65,6 +64,60 @@ interface ScoreEntry {
   entry_mode: EntryMode
   comment_data: Record<string, unknown> | null
   comments: string | null
+}
+
+/** Plain-language reason score entry is closed, and what the organizer does next. */
+function describeScoringClosed(status: CompetitionStatus): { title: string; detail: string } {
+  switch (status) {
+    case 'draft':
+    case 'imported':
+    case 'ready_for_day_of':
+      return {
+        title: 'Scoring hasn\u2019t started yet',
+        detail:
+          'Confirm the roster and start scoring from the competition page. You can enter paper score sheets here once scoring has started.'
+      }
+    case 'released_to_judge':
+      return {
+        title: 'Waiting for scoring to start',
+        detail:
+          'This competition has been sent to the judge, but scoring hasn\u2019t started. Press \u201cStart Scoring\u201d on the competition page, then come back to enter the paper score sheets.'
+      }
+    case 'ready_to_tabulate':
+      return {
+        title: 'Every judge has signed off',
+        detail:
+          'Score entry is closed for this round. Continue from the competition page. If a score needs fixing, unlock it for correction there.'
+      }
+    case 'recalled_round_pending':
+      return {
+        title: 'The recall round hasn\u2019t started',
+        detail:
+          'Recalls are out. Start the recall round on the competition page, then come back to enter the recall score sheets.'
+      }
+    case 'complete_unpublished':
+      return {
+        title: 'Results are already calculated',
+        detail:
+          'Score entry is closed. Any change to a score goes through Corrections on the competition page.'
+      }
+    case 'published':
+      return {
+        title: 'Results are published',
+        detail:
+          'Score entry is closed. To change a score, unpublish the results on the competition page and use Corrections.'
+      }
+    case 'locked':
+      return {
+        title: 'Results are locked',
+        detail: 'This competition is finished and its scores can no longer be changed.'
+      }
+    default:
+      return {
+        title: 'Score entry is closed',
+        detail: 'Open the competition page to see what to do next.'
+      }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +160,8 @@ export default function TabulatorEntryPage({
 
   // --- Flag/comment expand ---
   const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
+  // Finished heats collapse; these heat numbers were reopened to fix a score or comment
+  const [reopenedHeats, setReopenedHeats] = useState<Set<number>>(new Set())
 
   // --- Submission guard ---
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -115,10 +170,11 @@ export default function TabulatorEntryPage({
   // --- Derived values ---
   const scoreMin = ruleConfig?.score_min ?? 0
   const scoreMax = ruleConfig?.score_max ?? 100
-  const enteredCount = getEnteredCount(rows)
+  const savedCount = getSavedCount(rows)
   const activeTotal = getActiveTotal(rows)
+  const remainingCount = activeTotal - savedCount
   const failedCount = getFailedCount(rows)
-  const allAreSaved = allSaved(rows)
+  // Every dancer who danced has a saved score; only then is the sheet complete
   const canDoSignOff = canSignOff(rows)
   const selectedJudge = judges.find(j => j.id === selectedJudgeId)
 
@@ -141,7 +197,7 @@ export default function TabulatorEntryPage({
   // ---------------------------------------------------------------------------
 
   async function loadBase() {
-    const [compRes, judgesRes, regRes, roundRes] = await Promise.all([
+    const [compRes, judgesRes, assignRes, regRes, roundRes] = await Promise.all([
       supabase
         .from('competitions')
         .select('*, rule_sets(*)')
@@ -151,6 +207,7 @@ export default function TabulatorEntryPage({
         .from('judges')
         .select('id, first_name, last_name')
         .eq('event_id', eventId),
+      supabase.from('judge_assignments').select('judge_id').eq('competition_id', compId),
       supabase
         .from('registrations')
         .select(
@@ -177,6 +234,11 @@ export default function TabulatorEntryPage({
       setLoading(false)
       return
     }
+    if (assignRes.error) {
+      setError(`Failed to load judge assignments: ${assignRes.error.message}`)
+      setLoading(false)
+      return
+    }
     if (regRes.error) {
       setError(`Failed to load registrations: ${regRes.error.message}`)
       setLoading(false)
@@ -194,7 +256,11 @@ export default function TabulatorEntryPage({
     setCompCode(compRes.data?.code ?? '')
     setCompStatus(status)
     setRuleConfig(compRes.data?.rule_sets?.config ?? null)
-    setJudges(judgesRes.data ?? [])
+    // Only the judges on this competition's panel have a sheet to enter
+    const assignedJudgeIds = new Set(
+      (assignRes.data ?? []).map((a: { judge_id: string }) => a.judge_id)
+    )
+    setJudges((judgesRes.data ?? []).filter((j: JudgeInfo) => assignedJudgeIds.has(j.id)))
     setRegistrations((regRes.data as unknown as Registration[]) ?? [])
     setRound(roundRes.data as Round | null)
     setLoading(false)
@@ -274,6 +340,7 @@ export default function TabulatorEntryPage({
     setPacketBlocked(null)
     setSignedOff(false)
     setExpandedDancerId(null)
+    setReopenedHeats(new Set())
     setIsSubmitting(false)
     didAutoFocusRef.current = false
 
@@ -484,10 +551,7 @@ export default function TabulatorEntryPage({
       }
 
       const freshStatus = freshComp?.status as CompetitionStatus
-      if (
-        freshStatus !== 'awaiting_scores' &&
-        freshStatus !== 'in_progress'
-      ) {
+      if (!isOpenForScoring(freshStatus)) {
         showCritical('Competition status changed', {
           description: `Status is now "${freshStatus}". Cannot sign off.`,
         })
@@ -768,6 +832,18 @@ export default function TabulatorEntryPage({
   // Heat grouping
   // ---------------------------------------------------------------------------
 
+  function toggleHeat(heatNumber: number) {
+    setReopenedHeats(prev => {
+      const next = new Set(prev)
+      if (next.has(heatNumber)) {
+        next.delete(heatNumber)
+      } else {
+        next.add(heatNumber)
+      }
+      return next
+    })
+  }
+
   function renderHeatGrouped() {
     if (!heatSnapshot) return null
 
@@ -791,11 +867,11 @@ export default function TabulatorEntryPage({
             heatActiveRows.length > 0
           const hasFailed = heatRows.some(r => r.status === 'failed')
 
-          // Collapse rule: only collapse if every active row is saved or empty, and no failed
-          const canCollapse =
-            isHeatComplete &&
-            !isCurrentHeat &&
-            !hasFailed
+          // A finished heat folds away so the tabulator can see what is left, but it can
+          // always be reopened to fix a typo or add a comment before Sign Off.
+          const isFoldable = isHeatComplete && !isCurrentHeat && !hasFailed
+          const isReopened = reopenedHeats.has(heat.heat_number)
+          const isCollapsed = isFoldable && !isReopened
 
           return (
             <div
@@ -803,12 +879,16 @@ export default function TabulatorEntryPage({
               className={`rounded-lg border-2 ${
                 isCurrentHeat
                   ? 'border-feis-green bg-feis-green-light/30'
-                  : isHeatComplete
-                    ? 'border-border/50 bg-muted/30 opacity-60'
+                  : isCollapsed
+                    ? 'border-border/50 bg-muted/30'
                     : 'border-border/30'
               }`}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+              <div
+                className={`flex items-center justify-between gap-3 px-4 py-3 ${
+                  isCollapsed ? '' : 'border-b border-border/30'
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   {isCurrentHeat && (
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-feis-green animate-pulse" />
@@ -822,22 +902,41 @@ export default function TabulatorEntryPage({
                   >
                     Heat {heat.heat_number} of {totalHeats}
                   </span>
+                  <Badge
+                    variant={
+                      isHeatComplete
+                        ? 'secondary'
+                        : isCurrentHeat
+                          ? 'default'
+                          : 'outline'
+                    }
+                  >
+                    {isHeatComplete
+                      ? 'Complete'
+                      : `${heatScoredCount}/${heatActiveRows.length}`}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={
-                    isHeatComplete
-                      ? 'secondary'
-                      : isCurrentHeat
-                        ? 'default'
-                        : 'outline'
-                  }
-                >
-                  {isHeatComplete
-                    ? 'Complete'
-                    : `${heatScoredCount}/${heatActiveRows.length}`}
-                </Badge>
+                {isFoldable && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleHeat(heat.heat_number)}
+                    aria-expanded={isReopened}
+                  >
+                    {isReopened ? (
+                      <>
+                        Hide scores <ChevronUp />
+                      </>
+                    ) : (
+                      <>
+                        Show &amp; edit scores <ChevronDown />
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
-              {!canCollapse && (
+              {!isCollapsed && (
                 <div className="p-2 space-y-1">
                   {heatRows.map(row => renderRow(row))}
                 </div>
@@ -870,23 +969,28 @@ export default function TabulatorEntryPage({
     )
   }
 
-  const canScore =
-    compStatus === 'awaiting_scores' || compStatus === 'in_progress'
+  const competitionHref = `/dashboard/events/${eventId}/competitions/${compId}`
 
-  if (!canScore) {
+  if (!isOpenForScoring(compStatus)) {
+    const closed = describeScoringClosed(compStatus)
     return (
       <div className="space-y-6">
         <Link
-          href={`/dashboard/events/${eventId}/competitions/${compId}`}
+          href={competitionHref}
           className="text-sm text-muted-foreground hover:text-feis-charcoal inline-flex items-center gap-1"
         >
           <ChevronLeft className="h-4 w-4" /> Back to Competition
         </Link>
         <Card className="feis-card">
-          <CardContent className="py-12 text-center">
-            <p className="text-sm font-medium text-muted-foreground">
-              Score entry is not available. Competition status: {compStatus}
-            </p>
+          <CardContent className="py-10 text-center space-y-3 max-w-lg mx-auto">
+            <p className="text-lg font-semibold">{closed.title}</p>
+            <p className="text-sm text-muted-foreground">{closed.detail}</p>
+            <Link
+              href={competitionHref}
+              className={buttonVariants({ size: 'lg', className: 'mt-2' })}
+            >
+              Go to the competition page
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -953,25 +1057,43 @@ export default function TabulatorEntryPage({
           <CardTitle className="text-lg">Select Judge</CardTitle>
         </CardHeader>
         <CardContent>
-          <select
-            value={selectedJudgeId}
-            onChange={e => {
-              dispatch({ type: 'LOAD_EXISTING', rows: [] })
-              setSelectedJudgeId(e.target.value)
-            }}
-            className="w-full max-w-md border rounded-md px-3 py-2 text-sm"
-          >
-            <option value="">Choose a judge...</option>
-            {judges.map(j => {
-              const judgeSignedOff = round?.judge_sign_offs?.[j.id]
-              return (
-                <option key={j.id} value={j.id}>
-                  {j.first_name} {j.last_name}
-                  {judgeSignedOff ? ' (signed off)' : ''}
-                </option>
-              )
-            })}
-          </select>
+          {judges.length === 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm">
+                No judges are assigned to this competition yet, so there is no score sheet to
+                enter.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Assign this competition&apos;s judges on the Judges page, then come back here.
+              </p>
+              <Link
+                href={`/dashboard/events/${eventId}/judges`}
+                className={buttonVariants({ variant: 'outline', className: 'mt-1' })}
+              >
+                Go to Judges
+              </Link>
+            </div>
+          ) : (
+            <select
+              value={selectedJudgeId}
+              onChange={e => {
+                dispatch({ type: 'LOAD_EXISTING', rows: [] })
+                setSelectedJudgeId(e.target.value)
+              }}
+              className="w-full max-w-md border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Choose a judge...</option>
+              {judges.map(j => {
+                const judgeSignedOff = round?.judge_sign_offs?.[j.id]
+                return (
+                  <option key={j.id} value={j.id}>
+                    {j.first_name} {j.last_name}
+                    {judgeSignedOff ? ' (signed off)' : ''}
+                  </option>
+                )
+              })}
+            </select>
+          )}
           {selectedJudge && (
             <div className="mt-2 flex items-center gap-2">
               <Badge variant="outline">
@@ -982,7 +1104,7 @@ export default function TabulatorEntryPage({
                 Round {round?.round_number ?? '\u2014'}
               </Badge>
               <Badge variant="outline">
-                {enteredCount}/{activeTotal} scored
+                {savedCount}/{activeTotal} scored
               </Badge>
               {heatSnapshot && totalHeats > 0 && (
                 <Badge variant="outline">
@@ -1036,7 +1158,7 @@ export default function TabulatorEntryPage({
       )}
 
       {/* No judge selected */}
-      {!selectedJudgeId && (
+      {!selectedJudgeId && judges.length > 0 && (
         <Card className="feis-card">
           <CardContent className="py-12 text-center text-muted-foreground">
             <p>
@@ -1064,7 +1186,7 @@ export default function TabulatorEntryPage({
             {/* Center: progress + save state */}
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
-                {enteredCount}/{activeTotal} entered
+                {savedCount} of {activeTotal} entered
               </span>
               {failedCount > 0 ? (
                 <span className="flex items-center gap-2">
@@ -1080,15 +1202,21 @@ export default function TabulatorEntryPage({
                     {isSubmitting ? 'Retrying...' : 'Retry All'}
                   </Button>
                 </span>
-              ) : allAreSaved && enteredCount > 0 ? (
-                <span className="text-sm text-feis-green font-medium">
-                  All saved &#10003;
-                </span>
               ) : rows.some(r => r.status === 'saving') ? (
                 <span className="text-sm text-muted-foreground">
                   Saving...
                 </span>
-              ) : null}
+              ) : canDoSignOff ? (
+                <span className="text-sm text-feis-green font-medium">
+                  All saved &#10003;
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  {remainingCount === 1
+                    ? '1 score to go before Sign Off'
+                    : `${remainingCount} scores to go before Sign Off`}
+                </span>
+              )}
             </div>
 
             {/* Right: sign off */}

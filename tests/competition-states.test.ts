@@ -4,6 +4,7 @@ import {
   getNextStates,
   getTransitionLabel,
   getTransitionBlockReason,
+  isOpenForScoring,
   type CompetitionStatus,
   type TransitionContext,
 } from '@/lib/competition-states'
@@ -200,5 +201,29 @@ describe('getTransitionBlockReason', () => {
 
   it('allows released_to_judge -> ready_for_day_of (recall) with no preconditions', () => {
     expect(getTransitionBlockReason('released_to_judge', 'ready_for_day_of', fullContext)).toBeNull()
+  })
+})
+
+describe('isOpenForScoring', () => {
+  it('is open while scoring is under way', () => {
+    expect(isOpenForScoring('in_progress')).toBe(true)
+    expect(isOpenForScoring('awaiting_scores')).toBe(true)
+  })
+
+  it('is closed before scoring starts and after sign-off', () => {
+    const closed: CompetitionStatus[] = [
+      'draft',
+      'imported',
+      'ready_for_day_of',
+      'released_to_judge',
+      'ready_to_tabulate',
+      'recalled_round_pending',
+      'complete_unpublished',
+      'published',
+      'locked',
+    ]
+    for (const status of closed) {
+      expect(isOpenForScoring(status)).toBe(false)
+    }
   })
 })

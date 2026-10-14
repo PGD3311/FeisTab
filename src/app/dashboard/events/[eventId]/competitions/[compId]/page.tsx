@@ -15,6 +15,7 @@ import {
   getNextStates,
   getTransitionLabel,
   getTransitionBlockReason,
+  isOpenForScoring,
   type CompetitionStatus,
   type TransitionContext,
 } from '@/lib/competition-states'
@@ -40,7 +41,7 @@ import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
 import { type JudgeInfo } from '@/types/shared'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ApprovalDialog, type ApprovalChecks } from '@/components/approval-dialog'
@@ -903,6 +904,26 @@ export default function CompetitionDetailPage({
           </Card>
         )
       })()}
+
+      {/* Paper score sheets: the tabulator types them in on the judge's behalf */}
+      {isOpenForScoring(comp.status as CompetitionStatus) && (
+        <Card className="feis-card">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="font-medium">Judging on paper?</p>
+              <p className="text-sm text-muted-foreground">
+                Type each judge&apos;s score sheet in for them, then sign it off.
+              </p>
+            </div>
+            <Link
+              href={`/dashboard/events/${eventId}/competitions/${compId}/tabulator`}
+              className={buttonVariants({ variant: 'outline', size: 'lg' })}
+            >
+              Enter scores from paper sheets
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Roster Status — only show when roster actions are still meaningful */}
       {(['draft', 'imported', 'ready_for_day_of'].includes(comp.status)) && (

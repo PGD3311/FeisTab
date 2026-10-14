@@ -44,6 +44,16 @@ export const ACTIVE_STATUSES: CompetitionStatus[] = [
 /** Statuses where operator action is needed to unblock progress */
 export const BLOCKED_STATUSES: CompetitionStatus[] = ['ready_to_tabulate', 'recalled_round_pending']
 
+/**
+ * Statuses where scores can be entered and judges can sign off.
+ * Mirrors the database check in tabulator_enter_score and sign_off_judge.
+ */
+export const SCORE_ENTRY_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
+
+export function isOpenForScoring(status: CompetitionStatus): boolean {
+  return SCORE_ENTRY_STATUSES.includes(status)
+}
+
 /** Human-readable labels for operator-facing transition buttons */
 const transitionLabels: Partial<Record<string, string>> = {
   'imported→ready_for_day_of': 'Mark Ready for Day-Of',

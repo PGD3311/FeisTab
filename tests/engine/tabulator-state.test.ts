@@ -4,12 +4,11 @@ import {
   buildInitialRows,
   type ScoreRow,
   isEditable,
-  getEnteredCount,
+  getSavedCount,
   getActiveTotal,
   getFailedCount,
   getFirstEmptyEditableId,
   canSignOff,
-  allSaved,
 } from '@/lib/engine/tabulator-state'
 
 function makeRow(overrides: Partial<ScoreRow> = {}): ScoreRow {
@@ -229,13 +228,15 @@ describe('selectors', () => {
     expect(isEditable(makeRow({ registrationStatus: 'checked_in' }))).toBe(true)
   })
 
-  it('getEnteredCount counts only editable rows with scores', () => {
+  it('getSavedCount counts only editable rows with a saved score', () => {
     const rows = [
-      makeRow({ dancerId: 'd1', score: '75', registrationStatus: 'present' }),
-      makeRow({ dancerId: 'd2', score: '', registrationStatus: 'present' }),
-      makeRow({ dancerId: 'd3', score: '80', registrationStatus: 'scratched' }),
+      makeRow({ dancerId: 'd1', score: '75', status: 'saved', dbScore: 75 }),
+      makeRow({ dancerId: 'd2', score: '80', status: 'dirty' }),
+      makeRow({ dancerId: 'd3', score: '', status: 'empty' }),
+      makeRow({ dancerId: 'd4', score: '70', status: 'failed' }),
+      makeRow({ dancerId: 'd5', score: '82', status: 'saved', registrationStatus: 'scratched' }),
     ]
-    expect(getEnteredCount(rows)).toBe(1)
+    expect(getSavedCount(rows)).toBe(1)
   })
 
   it('getActiveTotal counts only editable rows', () => {
@@ -265,27 +266,50 @@ describe('selectors', () => {
     expect(getFirstEmptyEditableId(rows)).toBe('d3')
   })
 
-  it('canSignOff requires all editable rows saved or empty, with at least one saved', () => {
-    expect(canSignOff([
-      makeRow({ status: 'saved' }),
-      makeRow({ status: 'saved' }),
-    ])).toBe(true)
+  describe('canSignOff', () => {
+    it('is true when every editable row is saved', () => {
+      expect(canSignOff([
+        makeRow({ dancerId: 'd1', status: 'saved' }),
+        makeRow({ dancerId: 'd2', status: 'saved' }),
+      ])).toBe(true)
+    })
 
-    expect(canSignOff([
-      makeRow({ status: 'saved' }),
-      makeRow({ status: 'failed' }),
-    ])).toBe(false)
+    it('is false while any dancer still has no score (partial sheet)', () => {
+      expect(canSignOff([
+        makeRow({ dancerId: 'd1', status: 'saved' }),
+        makeRow({ dancerId: 'd2', status: 'saved' }),
+        makeRow({ dancerId: 'd3', status: 'empty' }),
+      ])).toBe(false)
+    })
 
-    expect(canSignOff([
-      makeRow({ status: 'empty' }),
-      makeRow({ status: 'empty' }),
-    ])).toBe(false)
-  })
+    it('is false while a save failed, is in flight, or is unsaved', () => {
+      for (const status of ['failed', 'saving', 'dirty'] as const) {
+        expect(canSignOff([
+          makeRow({ dancerId: 'd1', status: 'saved' }),
+          makeRow({ dancerId: 'd2', status }),
+        ])).toBe(false)
+      }
+    })
 
-  it('allSaved is true when all editable rows are saved or empty', () => {
-    expect(allSaved([
-      makeRow({ status: 'saved' }),
-      makeRow({ status: 'empty' }),
-    ])).toBe(true)
+    it('is false when nothing is entered', () => {
+      expect(canSignOff([
+        makeRow({ dancerId: 'd1', status: 'empty' }),
+        makeRow({ dancerId: 'd2', status: 'empty' }),
+      ])).toBe(false)
+    })
+
+    it('ignores scratched, no-show and medical dancers', () => {
+      expect(canSignOff([
+        makeRow({ dancerId: 'd1', status: 'saved' }),
+        makeRow({ dancerId: 'd2', status: 'empty', registrationStatus: 'scratched' }),
+        makeRow({ dancerId: 'd3', status: 'empty', registrationStatus: 'no_show' }),
+        makeRow({ dancerId: 'd4', status: 'empty', registrationStatus: 'medical' }),
+      ])).toBe(true)
+    })
+
+    it('is false when there are no editable rows', () => {
+      expect(canSignOff([makeRow({ status: 'empty', registrationStatus: 'scratched' })])).toBe(false)
+      expect(canSignOff([])).toBe(false)
+    })
   })
 })

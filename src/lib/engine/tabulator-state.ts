@@ -48,8 +48,9 @@ export function getEditableRows(rows: ScoreRow[]): ScoreRow[] {
   return rows.filter(isEditable)
 }
 
-export function getEnteredCount(rows: ScoreRow[]): number {
-  return rows.filter(r => isEditable(r) && r.score !== '').length
+/** Dancers whose score is saved; a typed-but-unsaved or invalid score does not count. */
+export function getSavedCount(rows: ScoreRow[]): number {
+  return rows.filter(r => isEditable(r) && r.status === 'saved').length
 }
 
 export function getActiveTotal(rows: ScoreRow[]): number {
@@ -64,18 +65,13 @@ export function getFirstEmptyEditableId(rows: ScoreRow[]): string | null {
   return rows.find(r => isEditable(r) && r.status === 'empty')?.dancerId ?? null
 }
 
+/**
+ * A judge's sheet is complete when every dancer who danced has a saved score.
+ * Scratched, no-show and other non-active dancers are not editable, so they never block it.
+ */
 export function canSignOff(rows: ScoreRow[]): boolean {
   const editable = getEditableRows(rows)
-  if (editable.length === 0) return false
-  return (
-    editable.every(r => r.status === 'saved' || r.status === 'empty') &&
-    editable.some(r => r.status === 'saved')
-  )
-}
-
-export function allSaved(rows: ScoreRow[]): boolean {
-  const editable = getEditableRows(rows)
-  return editable.length > 0 && editable.every(r => r.status === 'saved' || r.status === 'empty')
+  return editable.length > 0 && editable.every(r => r.status === 'saved')
 }
 
 // ---------------------------------------------------------------------------
