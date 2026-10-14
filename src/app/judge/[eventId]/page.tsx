@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { transitionCompetitionStatus, createRound, updateHeatSnapshot } from '@/lib/supabase/rpc'
 import { showSuccess, showCritical } from '@/lib/feedback'
@@ -56,6 +57,8 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   const [starting, setStarting] = useState<string | null>(null)
   const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
+  // Scoring comps whose latest round this judge has already signed off
+  const [signedOffCompIds, setSignedOffCompIds] = useState<Set<string>>(new Set())
 
   // Sort helper: schedule_position first (nulls last), then code
   function sortBySchedule(comps: Competition[]): Competition[] {
@@ -69,9 +72,16 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     })
   }
 
-  // Three groups: Score Now, Queued, Done
+  // Groups: Score Now, Signed off (waiting for other judges), Queued, Done
   const scoreNowComps = sortBySchedule(
-    competitions.filter((c) => SCORING_STATUSES.includes(c.status) || c.status === 'released_to_judge')
+    competitions.filter(
+      (c) =>
+        (SCORING_STATUSES.includes(c.status) && !signedOffCompIds.has(c.id)) ||
+        c.status === 'released_to_judge'
+    )
+  )
+  const waitingComps = sortBySchedule(
+    competitions.filter((c) => SCORING_STATUSES.includes(c.status) && signedOffCompIds.has(c.id))
   )
   const upNextComps = sortBySchedule(
     competitions.filter((c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at)
@@ -135,6 +145,39 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     [supabase]
   )
 
+  // Which scoring comps this judge has signed off: their latest round has the judge's sign-off
+  const loadSignedOff = useCallback(
+    async (judgeId: string, compIds: string[]) => {
+      if (compIds.length === 0) return new Set<string>()
+      const { data, error } = await supabase
+        .from('rounds')
+        .select('competition_id, round_number, judge_sign_offs')
+        .in('competition_id', compIds)
+      if (error) {
+        console.error('Failed to load sign-offs:', error.message)
+        return null
+      }
+      const latest = new Map<
+        string,
+        { round_number: number; judge_sign_offs: Record<string, unknown> | null }
+      >()
+      for (const row of (data ?? []) as Array<{
+        competition_id: string
+        round_number: number
+        judge_sign_offs: Record<string, unknown> | null
+      }>) {
+        const prev = latest.get(row.competition_id)
+        if (!prev || row.round_number > prev.round_number) latest.set(row.competition_id, row)
+      }
+      const ids = new Set<string>()
+      for (const [compId, round] of latest) {
+        if (round.judge_sign_offs?.[judgeId]) ids.add(compId)
+      }
+      return ids
+    },
+    [supabase]
+  )
+
   // Initial load — derive judge_id from authenticated user
   useEffect(() => {
     async function load() {
@@ -185,6 +228,11 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
       }
       setEvent(eventRes.data as Record<string, unknown> | null)
       setCompetitions(comps)
+      const signedOff = await loadSignedOff(
+        identity.judge_id,
+        comps.filter((c) => SCORING_STATUSES.includes(c.status)).map((c) => c.id)
+      )
+      if (signedOff) setSignedOffCompIds(signedOff)
       setStages((stagesRes.data as Array<{ id: string; name: string }> | null) ?? [])
 
       // Load judge assignment counts for schedule
@@ -236,6 +284,18 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
             roster_confirmed_by: string | null
           }
           if (!compIds.includes(updated.id)) return
+
+          if (judgeIdentity && SCORING_STATUSES.includes(updated.status)) {
+            void loadSignedOff(judgeIdentity.judge_id, [updated.id]).then((ids) => {
+              if (!ids) return
+              setSignedOffCompIds((prev) => {
+                const next = new Set(prev)
+                if (ids.has(updated.id)) next.add(updated.id)
+                else next.delete(updated.id)
+                return next
+              })
+            })
+          }
 
           setCompetitions((prev) =>
             prev.map((c) =>
@@ -358,6 +418,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   }
 
   async function handleSignOut() {
+    toast.dismiss()
     await supabase.auth.signOut()
     router.push('/auth/login')
   }
@@ -376,6 +437,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
 
   const hasNoComps =
     scoreNowComps.length === 0 &&
+    waitingComps.length === 0 &&
     upNextComps.length === 0 &&
     doneComps.length === 0
 
@@ -508,6 +570,33 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                 </div>
               )
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Signed off — scores locked, other judges still scoring */}
+      {waitingComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Signed off</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {waitingComps.map((comp) => (
+              <Link
+                key={comp.id}
+                href={`/judge/${eventId}/${comp.id}`}
+                className="flex items-center justify-between gap-3 p-4 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <span className="font-medium">
+                  {renderPositionBadge(comp)}
+                  {comp.code && `${comp.code} `}
+                  {comp.name}
+                </span>
+                <span className="text-sm font-medium text-feis-green text-right">
+                  {'\u2713'} Signed off &mdash; waiting for other judges
+                </span>
+              </Link>
+            ))}
           </CardContent>
         </Card>
       )}

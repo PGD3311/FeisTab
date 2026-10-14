@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, use } from 'react'
+import { useEffect, useState, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signOffJudge, submitScore, createRound } from '@/lib/supabase/rpc'
@@ -14,6 +14,7 @@ import { ScoreEntryForm } from '@/components/score-entry-form'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 interface JudgeIdentity {
   judge_id: string
@@ -44,6 +45,10 @@ export default function JudgeScoringPage({
   const [loadError, setLoadError] = useState(false)
   const [expandedDancerId, setExpandedDancerId] = useState<string | null>(null)
   const [expandedHeats, setCollapsedHeats] = useState<Set<number>>(new Set())
+  const [confirmSignOff, setConfirmSignOff] = useState(false)
+  const [signingOff, setSigningOff] = useState(false)
+  // Score boxes by dancer, so a save can move focus to the next dancer
+  const scoreInputRefs = useRef(new Map<string, HTMLInputElement>())
 
   // Lightweight fetch: registration statuses and round heat_snapshot (called by realtime handler)
   const pollData = useCallback(async () => {
@@ -267,19 +272,18 @@ export default function JudgeScoringPage({
   }
 
   async function handleScoreSubmit(dancerId: string, score: number, flagged: boolean, flagReason: string | null, commentData: CommentData | null) {
-    if (!judgeIdentity || !round) return
+    // Every failure throws so the score box shows the error instead of "Saved"
+    if (!judgeIdentity || !round) throw new Error('Still loading — try again')
 
     // Prevent writes after sign-off
     if (submitted) {
-      showCritical('Scores are locked — this round has been signed off')
-      return
+      throw new Error('Scores are locked — this round has been signed off')
     }
 
     // Verify round isn't signed off server-side (stale tab protection)
     const signOffs = round.judge_sign_offs ?? {}
     if (signOffs[judgeIdentity.judge_id]) {
-      showCritical('Scores are locked — this round has been signed off')
-      return
+      throw new Error('Scores are locked — this round has been signed off')
     }
 
     const validatedComment = validateCommentData(commentData) as Record<string, unknown> | null
@@ -326,12 +330,14 @@ export default function JudgeScoringPage({
       })
       // Resync from server on error to ensure consistent state
       loadData(judgeIdentity.judge_id)
+      throw err
     }
   }
 
   async function handleSignOff() {
     if (!judgeIdentity || !round) return
 
+    setSigningOff(true)
     try {
       // One atomic call: locks this judge's scores, records the sign-off, and moves the
       // competition to ready_to_tabulate when every assigned judge has signed off.
@@ -341,6 +347,9 @@ export default function JudgeScoringPage({
       showSuccess('Round signed off')
     } catch (err) {
       showCritical('Sign-off failed', { description: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setSigningOff(false)
+      setConfirmSignOff(false)
     }
   }
 
@@ -408,6 +417,35 @@ export default function JudgeScoringPage({
 
   const currentDancerId = computeCurrentDancerId()
 
+  // Score boxes in on-screen order (heat by heat, or the flat list)
+  const entryOrder: string[] = heatSnapshot
+    ? heatSnapshot.heats.flatMap((heat) => {
+        const activeIds = new Set(
+          heat.slots.filter((s) => s.status === 'active').map((s) => s.dancer_id)
+        )
+        return registrations
+          .filter((r: { dancer_id: string }) => activeIds.has(r.dancer_id))
+          .map((r: { dancer_id: string }) => r.dancer_id)
+      })
+    : activeDancers.map((r: { dancer_id: string }) => r.dancer_id)
+
+  // After a save, put the cursor in the next dancer's box with its value selected, so the
+  // next number typed replaces rather than appends
+  function focusNextScoreBox(savedDancerId: string) {
+    const start = entryOrder.indexOf(savedDancerId)
+    requestAnimationFrame(() => {
+      for (let i = start + 1; i < entryOrder.length; i++) {
+        const el = scoreInputRefs.current.get(entryOrder[i])
+        if (el && !el.disabled) {
+          el.focus()
+          el.select()
+          return
+        }
+      }
+      scoreInputRefs.current.get(savedDancerId)?.blur()
+    })
+  }
+
   // Show sign-off bar when all scored and not yet submitted
   const showSignOff = scoredCount === totalDancers && totalDancers > 0 && !submitted
 
@@ -434,6 +472,11 @@ export default function JudgeScoringPage({
           setExpandedDancerId(prev => (prev === id ? null : id))
         }
         onSaved={() => setExpandedDancerId(null)}
+        onAdvance={focusNextScoreBox}
+        inputRef={(el) => {
+          if (el) scoreInputRefs.current.set(reg.dancer_id, el)
+          else scoreInputRefs.current.delete(reg.dancer_id)
+        }}
       />
     )
   }
@@ -644,13 +687,30 @@ export default function JudgeScoringPage({
       {showSignOff && !packetBlocked && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t-2 border-feis-green z-50">
           <Button
-            onClick={handleSignOff}
+            onClick={() => setConfirmSignOff(true)}
             className="w-full py-6 text-lg font-semibold bg-feis-green hover:bg-feis-green/90"
           >
             Sign Off — All {totalDancers} Dancers Scored
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmSignOff}
+        onOpenChange={setConfirmSignOff}
+        title="Sign off and lock your scores?"
+        description={
+          <>
+            You have scored all {totalDancers} dancer{totalDancers !== 1 ? 's' : ''}
+            {comp.code ? ` in ${comp.code}` : ''}. Once you sign off, your scores are locked
+            and you can&apos;t change them. Ask the tabulator if anything needs correcting later.
+          </>
+        }
+        confirmLabel="Yes, sign off"
+        cancelLabel="Go back"
+        busy={signingOff}
+        onConfirm={() => void handleSignOff()}
+      />
     </div>
   )
 }

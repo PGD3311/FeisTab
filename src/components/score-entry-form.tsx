@@ -8,6 +8,7 @@ import {
   hasCommentContent,
   type CommentData,
 } from '@/lib/comment-codes'
+import { PRECISION } from '@/lib/engine/constants'
 import { FLAG_REASONS, type FlagReason } from '@/lib/engine/flag-reasons'
 
 interface ScoreEntryFormProps {
@@ -21,6 +22,7 @@ interface ScoreEntryFormProps {
   existingLegacyComments?: string | null
   scoreMin: number
   scoreMax: number
+  /** Must throw if the score was not saved, so the form never shows "Saved" falsely */
   onSubmit: (
     dancerId: string,
     score: number,
@@ -33,6 +35,13 @@ interface ScoreEntryFormProps {
   isExpanded?: boolean
   onToggleExpand?: (dancerId: string) => void
   onSaved?: () => void
+  /** Called right after a successful save so the parent can focus the next dancer's box */
+  onAdvance?: (dancerId: string) => void
+  inputRef?: (el: HTMLInputElement | null) => void
+}
+
+function toInt(value: number): number {
+  return Math.round(value * PRECISION)
 }
 
 export function ScoreEntryForm({
@@ -52,6 +61,8 @@ export function ScoreEntryForm({
   isExpanded,
   onToggleExpand,
   onSaved,
+  onAdvance,
+  inputRef,
 }: ScoreEntryFormProps) {
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -67,6 +78,10 @@ export function ScoreEntryForm({
   const [flagged, setFlagged] = useState(existingFlagged ?? false)
   const [flagReason, setFlagReason] = useState(existingFlagReason ?? '')
   const [saveError, setSaveError] = useState<string | null>(null)
+  // True from the first edit until a save succeeds: an edited box is never "Saved"
+  const [dirty, setDirty] = useState(false)
+  // Bumped on every edit, so a save that finishes after further typing isn't shown as saved
+  const editVersionRef = useRef(0)
   const [selectedCodes, setSelectedCodes] = useState<string[]>(
     existingCommentData?.codes ?? []
   )
@@ -74,11 +89,15 @@ export function ScoreEntryForm({
     existingCommentData?.note ?? ''
   )
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault()
-      handleSave()
-    }
+  // Enter or Tab saves, then the parent moves focus to the next dancer's box.
+  // Tab on an empty box (or Shift+Tab) just moves focus as normal.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const isEnter = e.key === 'Enter'
+    const isTab = e.key === 'Tab' && !e.shiftKey
+    if (!isEnter && !isTab) return
+    if (isTab && score.trim() === '') return
+    e.preventDefault()
+    void handleSave()
   }
 
   const hasContent = hasCommentContent(
@@ -92,14 +111,28 @@ export function ScoreEntryForm({
     setSelectedCodes(prev =>
       prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
     )
+    markEdited()
+  }
+
+  function markEdited() {
+    editVersionRef.current += 1
     setSaved(false)
+    setDirty(true)
+    setSaveError(null)
+  }
+
+  function isInRange(value: number): boolean {
+    return toInt(value) >= toInt(scoreMin) && toInt(value) <= toInt(scoreMax)
   }
 
   async function handleSave() {
+    if (saving || locked) return
     const num = parseFloat(score)
-    if (isNaN(num) || num < scoreMin || num > scoreMax) return
+    // Out-of-range values are shown as an inline error below; never save them
+    if (isNaN(num) || !isInRange(num)) return
     setSaving(true)
     setSaveError(null)
+    const versionAtSave = editVersionRef.current
 
     const note = commentNote.trim() || null
     const commentData: CommentData | null =
@@ -109,7 +142,12 @@ export function ScoreEntryForm({
 
     try {
       await onSubmit(dancerId, num, flagged, flagged ? (flagReason as FlagReason) || null : null, commentData)
+      // Edited again while saving: the box no longer matches what was saved
+      if (editVersionRef.current !== versionAtSave) return
       setSaved(true)
+      setDirty(false)
+      onAdvance?.(dancerId)
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
       if (onSaved) {
         savedTimerRef.current = setTimeout(() => {
           setSaved(false)
@@ -119,6 +157,7 @@ export function ScoreEntryForm({
         savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
       }
     } catch (err) {
+      setSaved(false)
       setSaveError(err instanceof Error ? err.message : 'Failed to save score')
     } finally {
       setSaving(false)
@@ -126,9 +165,14 @@ export function ScoreEntryForm({
   }
 
   const numScore = parseFloat(score)
-  const isValid = !isNaN(numScore) && numScore >= scoreMin && numScore <= scoreMax
+  const isValid = !isNaN(numScore) && isInRange(numScore)
   const hasError = score !== '' && !isValid
-  const isScored = existingScore != null
+  // "Saved" only when the box holds exactly the value the database has, unedited
+  const showSaved =
+    !saveError &&
+    !dirty &&
+    isValid &&
+    (saved || (existingScore != null && toInt(numScore) === toInt(existingScore)))
 
   return (
     <div
@@ -139,7 +183,7 @@ export function ScoreEntryForm({
             ? 'border-l-4 border-l-feis-green border-y border-r bg-feis-green-light/40'
             : saved
               ? 'opacity-50'
-              : isScored
+              : showSaved
                 ? 'opacity-60 bg-muted/20'
                 : 'hover:bg-feis-green-light/30'
       }`}
@@ -168,10 +212,12 @@ export function ScoreEntryForm({
           value={score}
           onChange={e => {
             setScore(e.target.value)
-            setSaved(false)
-            setSaveError(null)
+            markEdited()
           }}
           onKeyDown={handleKeyDown}
+          ref={inputRef}
+          aria-label={`Score for competitor ${competitorNumber}`}
+          aria-invalid={hasError || undefined}
           className={`flex-1 text-center font-mono text-2xl h-12 ${
             hasError
               ? 'border-destructive'
@@ -191,9 +237,15 @@ export function ScoreEntryForm({
           variant={saveError ? 'destructive' : 'default'}
           className="h-12 min-w-[72px] text-base"
         >
-          {saving ? '...' : saveError ? 'Retry' : saved ? '\u2713' : isScored ? '\u2713 Saved' : 'Save'}
+          {saving ? '...' : saveError ? 'Retry' : showSaved ? '\u2713 Saved' : 'Save'}
         </Button>
       </div>
+
+      {hasError && (
+        <p className="text-sm font-medium text-destructive px-3 pb-2" role="alert">
+          Score must be between {scoreMin} and {scoreMax}
+        </p>
+      )}
 
       {/* Expanded details: name, comments, flag */}
       {isExpanded && (
@@ -204,7 +256,10 @@ export function ScoreEntryForm({
             <input
               type="checkbox"
               checked={flagged}
-              onChange={e => setFlagged(e.target.checked)}
+              onChange={e => {
+                setFlagged(e.target.checked)
+                markEdited()
+              }}
               disabled={locked}
               className="accent-feis-orange w-5 h-5"
             />
@@ -213,7 +268,10 @@ export function ScoreEntryForm({
           {flagged && (
             <select
               value={flagReason}
-              onChange={e => setFlagReason(e.target.value)}
+              onChange={e => {
+                setFlagReason(e.target.value)
+                markEdited()
+              }}
               disabled={locked}
               className="text-xs border rounded px-2 py-2 w-full"
             >
@@ -253,7 +311,7 @@ export function ScoreEntryForm({
             value={commentNote}
             onChange={e => {
               setCommentNote(e.target.value)
-              setSaved(false)
+              markEdited()
             }}
             placeholder="Optional note..."
             disabled={locked}
@@ -263,7 +321,11 @@ export function ScoreEntryForm({
         </div>
       )}
 
-      {saveError && <p className="text-xs text-destructive px-3 pb-2">{saveError}</p>}
+      {saveError && (
+        <p className="text-sm text-destructive px-3 pb-2" role="alert">
+          Not saved: {saveError}
+        </p>
+      )}
     </div>
   )
 }
