@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { logout, fulfillInvitations } from '@/app/auth/actions'
+import { logout, checkForInvitations } from '@/app/auth/actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -78,7 +78,12 @@ function formatDate(dateStr: string) {
   })
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invites?: string }>
+}) {
+  const { invites } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -141,7 +146,7 @@ export default async function HomePage() {
                   You haven&apos;t been added to any events yet.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <form action={fulfillInvitations}>
+                  <form action={checkForInvitations}>
                     <Button
                       type="submit"
                       variant="outline"
@@ -150,6 +155,12 @@ export default async function HomePage() {
                       Check for pending invitations
                     </Button>
                   </form>
+                  {invites === '0' && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      No invitations found for {user.email}. Ask the organizer to invite this
+                      exact email address.
+                    </p>
+                  )}
                   <form action={logout}>
                     <Button type="submit" variant="ghost" className="w-full text-muted-foreground">
                       Sign out

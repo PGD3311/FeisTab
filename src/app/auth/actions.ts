@@ -44,14 +44,15 @@ export async function logout() {
   redirect('/auth/login')
 }
 
-export async function fulfillInvitations() {
+/** Applies the signed-in user's open invitations. Returns how many were accepted. */
+export async function fulfillInvitations(): Promise<number> {
   const supabase = await createClient()
   const admin = createAdminClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user?.email) return
+  if (!user?.email) return 0
 
   const normalizedEmail = user.email.toLowerCase().trim()
 
@@ -63,10 +64,11 @@ export async function fulfillInvitations() {
     .gt('expires_at', new Date().toISOString())
   if (invErr) {
     console.error('Failed to load invitations:', invErr.message)
-    return
+    return 0
   }
 
-  if (!invitations?.length) return
+  if (!invitations?.length) return 0
+  let accepted = 0
 
   // Sequential, idempotent writes. Each invitation is only marked accepted once its
   // role (and judge link) are in place, so a failure is retried on the next login.
@@ -106,7 +108,16 @@ export async function fulfillInvitations() {
       .eq('id', inv.id)
     if (acceptErr) {
       console.error(`Failed to mark invitation ${inv.id} accepted:`, acceptErr.message)
+      continue
     }
+    accepted += 1
   }
+  return accepted
+}
+
+/** Home page "Check for pending invitations": report the outcome instead of silently reloading. */
+export async function checkForInvitations() {
+  const accepted = await fulfillInvitations()
+  redirect(`/?invites=${accepted}`)
 }
 
