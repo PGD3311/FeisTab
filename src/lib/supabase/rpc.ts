@@ -1,5 +1,6 @@
 import { type SupabaseClient } from '@supabase/supabase-js'
 import { type CompetitionStatus } from '@/lib/competition-states'
+import { type CommentData } from '@/lib/comment-codes'
 
 export async function signOffJudge(
   supabase: SupabaseClient,
@@ -164,6 +165,7 @@ export async function tabulatorEnterScore(
     raw_score: number
     flagged?: boolean
     flag_reason?: string
+    comment_data?: CommentData | null
   }
 ): Promise<string> {
   const { data, error } = await supabase.rpc('tabulator_enter_score', {
@@ -174,6 +176,7 @@ export async function tabulatorEnterScore(
     p_raw_score: params.raw_score,
     p_flagged: params.flagged ?? false,
     p_flag_reason: params.flag_reason ?? null,
+    p_comment_data: params.comment_data ?? null,
   })
   if (error) throw new Error(`Tabulator enter score failed: ${error.message}`)
   return data as string

@@ -9,7 +9,7 @@ import { signOffJudge, tabulatorEnterScore } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { type FlagReason } from '@/lib/engine/flag-reasons'
 import { type CompetitionStatus } from '@/lib/competition-states'
-import { getCurrentHeat, type HeatSnapshot } from '@/lib/engine/heats'
+import { getCurrentHeat, getSnapshotDancerIds, type HeatSnapshot } from '@/lib/engine/heats'
 import {
   COMMENT_CODES,
   hasCommentContent,
@@ -98,6 +98,10 @@ export default function TabulatorEntryPage({
   // --- Reducer-based score state ---
   const [rows, dispatch] = useReducer(scoreReducer, [])
   const saveSeqRef = useRef(0)
+  // Ignores a judge's scores that arrive after the user has switched to another judge
+  const loadSeqRef = useRef(0)
+  // Rows whose flag/comment changed; saved once the reducer has applied the change
+  const pendingSaveRef = useRef<Set<string>>(new Set())
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
   const savedByKeydownRef = useRef<Set<string>>(new Set())
 
@@ -198,6 +202,7 @@ export default function TabulatorEntryPage({
 
   async function loadJudgeScores(judgeId: string) {
     if (!round) return
+    const loadSeq = ++loadSeqRef.current
 
     setPacketBlocked(null)
     setSignedOff(false)
@@ -214,6 +219,8 @@ export default function TabulatorEntryPage({
       .eq('round_id', round.id)
       .eq('judge_id', judgeId)
 
+    if (loadSeq !== loadSeqRef.current) return
+
     if (scoresErr) {
       setError(`Failed to load scores: ${scoresErr.message}`)
       return
@@ -229,8 +236,15 @@ export default function TabulatorEntryPage({
       return
     }
 
-    // Build initial rows from registrations + existing scores
-    const regInputs = registrations.map(r => ({
+    // Build initial rows from registrations + existing scores.
+    // A recall round only lists the recalled dancers (round 2's heat list).
+    const recalledIds =
+      round.round_type === 'recall' && round.heat_snapshot
+        ? getSnapshotDancerIds(round.heat_snapshot)
+        : null
+    const regInputs = registrations
+      .filter(r => !recalledIds || recalledIds.has(r.dancer_id))
+      .map(r => ({
       dancerId: r.dancer_id,
       dancerName: `${r.dancers?.first_name ?? ''} ${r.dancers?.last_name ?? ''}`,
       competitorNumber: r.competitor_number,
@@ -273,12 +287,24 @@ export default function TabulatorEntryPage({
   useEffect(() => {
     if (rows.length === 0 || didAutoFocusRef.current) return
     didAutoFocusRef.current = true
+    // Never pull focus away from a box the user is already typing in
+    const active = document.activeElement
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
     const firstEmpty = getFirstEmptyEditableId(rows)
     if (firstEmpty) {
       requestAnimationFrame(() => {
         inputRefs.current.get(firstEmpty)?.focus()
       })
     }
+  }, [rows])
+
+  // Save flag/comment changes once the reducer has applied them
+  useEffect(() => {
+    if (pendingSaveRef.current.size === 0) return
+    const ids = [...pendingSaveRef.current]
+    pendingSaveRef.current.clear()
+    ids.forEach(id => saveRow(id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows])
 
   // ---------------------------------------------------------------------------
@@ -312,6 +338,7 @@ export default function TabulatorEntryPage({
       raw_score: num,
       flagged: row.flagged || undefined,
       flag_reason: (row.flagged ? row.flagReason : null) ?? undefined,
+      comment_data: validateCommentData(row.commentData),
     })
       .then(() => {
         dispatch({
@@ -631,7 +658,8 @@ export default function TabulatorEntryPage({
               <input
                 type="checkbox"
                 checked={row.flagged}
-                onChange={e =>
+                onChange={e => {
+                  pendingSaveRef.current.add(row.dancerId)
                   dispatch({
                     type: 'SET_FLAG',
                     dancerId: row.dancerId,
@@ -640,7 +668,7 @@ export default function TabulatorEntryPage({
                       ? row.flagReason
                       : null,
                   })
-                }
+                }}
                 disabled={signedOff}
                 className="accent-feis-orange w-5 h-5"
                 tabIndex={-1}
@@ -650,14 +678,15 @@ export default function TabulatorEntryPage({
             {row.flagged && (
               <select
                 value={row.flagReason ?? ''}
-                onChange={e =>
+                onChange={e => {
+                  pendingSaveRef.current.add(row.dancerId)
                   dispatch({
                     type: 'SET_FLAG',
                     dancerId: row.dancerId,
                     flagged: true,
                     flagReason: (e.target.value as FlagReason) || null,
                   })
-                }
+                }}
                 disabled={signedOff}
                 className="text-xs border rounded px-2 py-2 w-full"
                 tabIndex={-1}
@@ -685,6 +714,7 @@ export default function TabulatorEntryPage({
                       const newCodes = isSelected
                         ? currentCodes.filter(c => c !== cc.code)
                         : [...currentCodes, cc.code]
+                      pendingSaveRef.current.add(row.dancerId)
                       dispatch({
                         type: 'SET_COMMENT',
                         dancerId: row.dancerId,
@@ -721,6 +751,7 @@ export default function TabulatorEntryPage({
                   },
                 })
               }}
+              onBlur={() => saveRow(row.dancerId)}
               placeholder="Optional note..."
               disabled={signedOff}
               rows={2}
