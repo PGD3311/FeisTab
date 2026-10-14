@@ -1,10 +1,9 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { INVITE_ROLE_PHRASES, inviteDestination, inviteState, isEventRole } from '@/lib/invitations'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { AcceptForm, AcceptSignedIn } from './accept-form'
+import { Button } from '@/components/ui/button'
+import { AcceptForm, AcceptSignedIn, LinkButton } from './accept-form'
 import { signOutAndReturn } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -107,9 +106,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     return (
       <Notice title="You've already accepted this invite">
         <p>Sign in with {invite.email} to get to your screen.</p>
-        <Link href={loginHref} className={buttonVariants({ className: 'w-full h-12 text-base' })}>
-          Sign in
-        </Link>
+        <LinkButton href={loginHref}>Sign in</LinkButton>
       </Notice>
     )
   }
@@ -129,7 +126,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       <div className="feis-card bg-white overflow-hidden">
         <div className="bg-feis-green px-6 py-6 text-white">
           <p className="text-base text-white/80">You&apos;re invited to {INVITE_ROLE_PHRASES[role]}</p>
-          <h1 className="text-3xl font-bold leading-tight mt-1 text-balance">
+          <h1 className="text-3xl font-bold leading-tight mt-1 text-balance text-white">
             {event?.name ?? 'a feis'}
           </h1>
           {(date || event?.location) && (

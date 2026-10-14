@@ -66,9 +66,15 @@ function getActionLinks(eventId: string, roles: EventRole[]) {
   return links
 }
 
+// start_date is a calendar date: read it as UTC so US time zones don't show the day before
 function formatDate(dateStr: string) {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  const date = new Date(`${dateStr}T00:00:00Z`)
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
 }
 
 export default async function HomePage() {

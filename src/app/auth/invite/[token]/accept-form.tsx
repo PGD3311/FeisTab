@@ -72,7 +72,7 @@ export function AcceptForm({
           defaultValue={defaultName}
           required
           disabled={isPending}
-          className="h-12 text-base"
+          className="h-12 text-base md:text-base"
         />
       </div>
 
@@ -88,7 +88,7 @@ export function AcceptForm({
           required
           minLength={8}
           disabled={isPending}
-          className="h-12 text-base"
+          className="h-12 text-base md:text-base"
           aria-describedby="password-hint"
         />
         <p id="password-hint" className="text-sm text-muted-foreground">
@@ -108,7 +108,7 @@ export function AcceptForm({
           required
           minLength={8}
           disabled={isPending}
-          className="h-12 text-base"
+          className="h-12 text-base md:text-base"
         />
       </div>
 
@@ -156,5 +156,14 @@ export function AcceptSignedIn({ token, email }: { token: string; email: string 
         {isPending ? 'Adding you to the event…' : 'Accept invitation'}
       </Button>
     </div>
+  )
+}
+
+/** Link styled as the primary button (buttonVariants must run on the client). */
+export function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className={buttonVariants({ className: 'w-full h-12 text-base' })}>
+      {children}
+    </Link>
   )
 }
