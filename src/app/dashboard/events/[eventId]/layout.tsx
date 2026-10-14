@@ -21,12 +21,23 @@ export default function EventLayout({
   const [competitions, setCompetitions] = useState<CompetitionData[]>([])
   const [loading, setLoading] = useState(true)
   const [compLoadError, setCompLoadError] = useState(false)
+  // This user's roles for the event; organizer pages are for organizers only
+  const [myRoles, setMyRoles] = useState<string[]>([])
 
   async function loadData() {
-    const [eventRes, compRes] = await Promise.all([
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const [eventRes, compRes, rolesRes] = await Promise.all([
       supabase.from('events').select('*').eq('id', eventId).single(),
       supabase.from('competitions').select('*, registrations(count)').eq('event_id', eventId).order('code'),
+      supabase.from('event_roles').select('role').eq('event_id', eventId).eq('user_id', user?.id ?? ''),
     ])
+
+    if (rolesRes.error) {
+      console.error('Failed to load your roles:', rolesRes.error.message)
+    }
+    setMyRoles(((rolesRes.data ?? []) as Array<{ role: string }>).map((r) => r.role))
 
     if (eventRes.error) {
       console.error('Failed to load event:', eventRes.error.message)
@@ -51,6 +62,36 @@ export default function EventLayout({
 
   if (!event) {
     return <p className="text-muted-foreground">Event not found.</p>
+  }
+
+  // Desk, side-stage and judges have their own screens; the database already
+  // refuses their organizer actions, but the pages would show misleading data
+  if (!myRoles.includes('organizer')) {
+    const stations = [
+      { role: 'registration_desk', label: 'Registration desk', href: `/registration/${eventId}` },
+      { role: 'side_stage', label: 'Side-stage', href: `/checkin/${eventId}` },
+      { role: 'judge', label: 'My judging', href: `/judge/${eventId}` },
+    ].filter((s) => myRoles.includes(s.role))
+    return (
+      <div className="max-w-md space-y-4">
+        <h1 className="text-xl font-semibold">{event.name}</h1>
+        <p className="text-muted-foreground">
+          These pages are for the event organizer.
+          {stations.length > 0 ? ' Your screens for this feis:' : ' Ask the organizer for access.'}
+        </p>
+        <div className="flex flex-col gap-2">
+          {stations.map((s) => (
+            <Link
+              key={s.role}
+              href={s.href}
+              className="rounded-md bg-feis-green px-4 py-3 text-center text-base font-medium text-white hover:bg-feis-green-600"
+            >
+              {s.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
