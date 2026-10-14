@@ -436,7 +436,7 @@ export default function CompetitionDetailPage({
     const currentStatus = comp.status as CompetitionStatus
     if (!canTransition(currentStatus, 'complete_unpublished')) return
     try {
-      await unpublishResults(supabase, compId, unpublishedBy)
+      await unpublishResults(supabase, compId, unpublishedBy, reason, note)
 
       showSuccess('Results unpublished')
       void reload()

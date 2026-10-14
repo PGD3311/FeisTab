@@ -41,6 +41,7 @@ const BADGE_MAP: Record<string, BadgeConfig> = {
   unlock_for_correction: { text: 'Correction', color: 'bg-orange-50 text-orange-700', filterGroup: 'corrections' },
   result_publish: { text: 'Published', color: 'bg-feis-green-light text-feis-green', filterGroup: 'publish' },
   result_unpublish: { text: 'Unpublished', color: 'bg-gray-100 text-gray-600', filterGroup: 'publish' },
+  unpublish_results: { text: 'Unpublished', color: 'bg-gray-100 text-gray-600', filterGroup: 'publish' },
   recall_generate: { text: 'Recall', color: 'bg-feis-green-light text-feis-green', filterGroup: 'recalls' },
   import: { text: 'Import', color: 'bg-gray-100 text-gray-600', filterGroup: 'other' },
   scratch: { text: 'Status', color: 'bg-gray-100 text-gray-600', filterGroup: 'other' },
@@ -229,6 +230,9 @@ const formatters: Record<string, Formatter> = {
     return { summary, actor: 'Organizer' }
   },
 }
+
+// The unpublish_results RPC logs under its own name
+formatters.unpublish_results = formatters.result_unpublish
 
 export function formatAuditEntry(entry: AuditEntry, names: NameMaps): FormattedAudit {
   const badge = getBadge(entry.action)

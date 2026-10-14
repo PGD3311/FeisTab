@@ -64,11 +64,15 @@ export async function publishResults(
 export async function unpublishResults(
   supabase: SupabaseClient,
   competitionId: string,
-  unpublishedBy: string
+  unpublishedBy: string,
+  reason: string,
+  note: string | null = null
 ): Promise<void> {
   const { error } = await supabase.rpc('unpublish_results', {
     p_competition_id: competitionId,
     p_unpublished_by: unpublishedBy,
+    p_reason: reason,
+    p_note: note,
   })
   if (error) throw new Error(`Unpublish failed: ${error.message}`)
 }

@@ -276,6 +276,17 @@ describe('formatAuditEntry', () => {
     expect(result.summary).toContain('Judge 2 was incorrect')
   })
 
+  it('formats unpublish_results RPC entries with reason', () => {
+    const entry = makeEntry({
+      action: 'unpublish_results',
+      after_data: { unpublished_by: 'Bridget', reason: 'premature_publish', note: null },
+    })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('Results unpublished · Premature publish')
+    expect(result.actor).toBe('Bridget')
+    expect(result.badgeText).toBe('Unpublished')
+  })
+
   it('formats result_unpublish with null after_data', () => {
     const entry = makeEntry({ action: 'result_unpublish', after_data: null })
     const result = formatAuditEntry(entry, names)

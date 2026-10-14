@@ -137,7 +137,7 @@ export default function ResultsPublishingPage({
         showError('Cannot unpublish from current status')
         return
       }
-      await unpublishResults(supabase, compId, unpublishedBy)
+      await unpublishResults(supabase, compId, unpublishedBy, reason, note)
 
       showSuccess('Results unpublished')
       loadData()
