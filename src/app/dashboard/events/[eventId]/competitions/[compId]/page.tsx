@@ -748,7 +748,7 @@ export default function CompetitionDetailPage({
       </div>
 
       {loadWarning && (
-        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
+        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange-ink text-sm">
           Some competition data could not be loaded. Roster, scores, or judge details may be incomplete. Refresh to try again.
         </div>
       )}
@@ -1004,7 +1004,7 @@ export default function CompetitionDetailPage({
                     reg.status === 'scratched' || reg.status === 'no_show' || reg.status === 'disqualified'
                       ? 'border-destructive/30 bg-destructive/10 text-destructive'
                       : reg.status === 'medical' || reg.status === 'did_not_complete'
-                        ? 'border-feis-orange/30 bg-feis-orange-light text-feis-orange'
+                        ? 'border-feis-orange/30 bg-feis-orange-light text-feis-orange-ink'
                         : 'border'
                   }`}
                 >
@@ -1045,9 +1045,9 @@ export default function CompetitionDetailPage({
             )}
             {anomalies.filter(a => a.severity === 'warning').length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-feis-orange">Warnings — review recommended</p>
+                <p className="text-sm font-medium text-feis-orange-ink">Warnings — review recommended</p>
                 {anomalies.filter(a => a.severity === 'warning').map((a) => (
-                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-feis-orange-light border border-feis-orange/20 text-feis-orange">
+                  <div key={a.dedupe_key} className="text-sm p-2 rounded bg-feis-orange-light border border-feis-orange/20 text-feis-orange-ink">
                     {resolveAnomalyMessage(a)}
                   </div>
                 ))}
@@ -1131,7 +1131,7 @@ export default function CompetitionDetailPage({
           <CardContent className="space-y-4">
             {comp.status === 'complete_unpublished' && (
               <div className="p-3 rounded-md bg-feis-orange/10 border border-feis-orange/30 text-sm">
-                <p className="font-medium text-feis-orange">Results have been tabulated.</p>
+                <p className="font-medium text-feis-orange-ink">Results have been tabulated.</p>
                 <p className="text-muted-foreground mt-1">
                   Unlocking a judge&apos;s scores will clear all current results and require re-tabulation.
                 </p>
@@ -1204,7 +1204,7 @@ export default function CompetitionDetailPage({
                       (unlockReason === 'other' && !unlockNote.trim()) ||
                       unlocking
                     }
-                    className="border-feis-orange text-feis-orange hover:bg-feis-orange/10"
+                    className="border-feis-orange text-feis-orange-ink hover:bg-feis-orange/10"
                   >
                     {unlocking ? 'Unlocking...' : 'Unlock for Correction'}
                   </Button>
@@ -1221,7 +1221,7 @@ export default function CompetitionDetailPage({
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
               <span>Tabulation Preview</span>
-              <Badge variant="outline" className="border-feis-orange text-feis-orange">
+              <Badge variant="outline" className="border-feis-orange text-feis-orange-ink">
                 Not saved — not official
               </Badge>
             </CardTitle>

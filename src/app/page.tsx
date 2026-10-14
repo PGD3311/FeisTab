@@ -5,6 +5,7 @@ import { logout, fulfillInvitations } from '@/app/auth/actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RunFeisLogo } from '@/components/runfeis-logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ const ROLE_LABELS: Record<EventRole, string> = {
 const ROLE_BADGE_CLASSES: Record<EventRole, string> = {
   organizer: 'bg-feis-green text-white border-feis-green',
   registration_desk: 'bg-feis-green-light text-feis-green border-feis-green/30',
-  side_stage: 'bg-feis-orange-light text-feis-orange border-feis-orange/30',
+  side_stage: 'bg-feis-orange-light text-feis-orange-ink border-feis-orange/30',
   judge: 'bg-muted text-feis-charcoal border-border',
 }
 
@@ -119,7 +120,9 @@ export default async function HomePage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-feis-green">RunFeis</h1>
+            <h1>
+              <RunFeisLogo size="md" />
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
           </div>
           <form action={logout}>

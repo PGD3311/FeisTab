@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSupabase } from '@/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
+import { RunFeisLogo } from '@/components/runfeis-logo'
 
 export function Nav() {
   const pathname = usePathname()
@@ -20,9 +21,7 @@ export function Nav() {
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-bold text-white tracking-wide uppercase">
-              RunFeis
-            </span>
+            <RunFeisLogo variant="onGreen" size="sm" />
           </Link>
           <nav className="flex gap-6">
             <Link

@@ -706,7 +706,7 @@ export default function RosterConfirmationPage({
         return 'bg-destructive/10 text-destructive'
       case 'scratched':
       case 'disqualified':
-        return 'bg-feis-orange-light text-feis-orange'
+        return 'bg-feis-orange-light text-feis-orange-ink'
       default:
         return 'bg-muted text-muted-foreground'
     }
@@ -825,7 +825,7 @@ export default function RosterConfirmationPage({
                   {nextHt && (
                     <div className="rounded-lg border border-feis-orange/30 bg-feis-orange/5 p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-semibold text-feis-orange uppercase tracking-wider">
+                        <span className="text-sm font-semibold text-feis-orange-ink uppercase tracking-wider">
                           Line Up Next
                         </span>
                         <Badge variant="outline">
@@ -873,7 +873,7 @@ export default function RosterConfirmationPage({
 
             {isRecallPending && !loadingHeatData && (
               <div className="rounded-lg border-2 border-feis-orange/40 bg-feis-orange/5 p-4">
-                <p className="text-sm font-semibold text-feis-orange uppercase tracking-wider">
+                <p className="text-sm font-semibold text-feis-orange-ink uppercase tracking-wider">
                   Recalled
                 </p>
                 <p className="text-base mt-1">
@@ -926,7 +926,7 @@ export default function RosterConfirmationPage({
                             <span className="text-xs text-teal-600 font-medium mt-0.5 block">
                               Arrived
                               {showCallToStage && (
-                                <span className="text-feis-orange ml-2">
+                                <span className="text-feis-orange-ink ml-2">
                                   — Call to stage
                                 </span>
                               )}
@@ -1147,7 +1147,7 @@ export default function RosterConfirmationPage({
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange-ink">
                         NEXT
                       </span>
                       <span className="text-base font-medium">
@@ -1158,7 +1158,7 @@ export default function RosterConfirmationPage({
                             )}
                             {nextComp.name}
                             {nextBlockReasons.length > 0 && (
-                              <span className="text-xs text-feis-orange ml-2">
+                              <span className="text-xs text-feis-orange-ink ml-2">
                                 {nextBlockReasons.join(' \u00b7 ')}
                               </span>
                             )}
@@ -1193,7 +1193,7 @@ export default function RosterConfirmationPage({
       {recallComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
+            <CardTitle className="text-lg text-feis-orange-ink flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-feis-orange" />
               Recalls ({recallComps.length})
             </CardTitle>
@@ -1249,7 +1249,7 @@ export default function RosterConfirmationPage({
       {readyComps.length > 0 && (
         <Card className="feis-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-feis-orange flex items-center gap-2">
+            <CardTitle className="text-lg text-feis-orange-ink flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-feis-orange" />
               Ready ({readyComps.length})
             </CardTitle>

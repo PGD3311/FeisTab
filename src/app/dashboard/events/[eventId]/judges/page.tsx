@@ -621,7 +621,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   if (loadError) {
     return (
       <div className="max-w-2xl">
-        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
+        <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange-ink text-sm">
           Could not load judges. Try refreshing.
         </div>
       </div>

@@ -437,7 +437,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange-ink">
                         NEXT
                       </span>
                       <span className="text-sm font-medium">
@@ -448,7 +448,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                             )}
                             {nextComp.name}
                             {nextBlockReasons.length > 0 && (
-                              <span className="text-xs text-feis-orange ml-2">
+                              <span className="text-xs text-feis-orange-ink ml-2">
                                 {nextBlockReasons.join(' \u00b7 ')}
                               </span>
                             )}

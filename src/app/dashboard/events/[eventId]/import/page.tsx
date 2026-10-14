@@ -111,7 +111,7 @@ export default function ImportPage({ params }: { params: Promise<{ eventId: stri
             </p>
           )}
           {imported && imported.conflicts.length > 0 && (
-            <p className="text-sm text-feis-orange mt-2">
+            <p className="text-sm text-feis-orange-ink mt-2">
               {imported.conflicts.length} dancer(s) had competitor number conflicts and were not assigned numbers.
               Review and assign numbers at the registration desk.
             </p>

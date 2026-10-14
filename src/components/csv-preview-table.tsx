@@ -23,9 +23,9 @@ export function CSVPreviewTable({ valid, errors, warnings }: CSVPreviewProps) {
 
       {warnings.length > 0 && (
         <div className="border border-feis-orange/30 rounded-md p-3 bg-feis-orange-light">
-          <p className="font-medium text-feis-orange text-sm mb-2">Warnings ({warnings.length})</p>
+          <p className="font-medium text-feis-orange-ink text-sm mb-2">Warnings ({warnings.length})</p>
           {warnings.map((w, i) => (
-            <p key={i} className="text-sm text-feis-orange">Row {w.row}: {w.message}</p>
+            <p key={i} className="text-sm text-feis-orange-ink">Row {w.row}: {w.message}</p>
           ))}
         </div>
       )}

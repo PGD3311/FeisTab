@@ -379,7 +379,7 @@ export default function EventOverviewPage() {
                     )}
                     {nextComp ? (
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase bg-feis-orange-light text-feis-orange-ink">
                           NEXT
                         </span>
                         <Link
@@ -394,7 +394,7 @@ export default function EventOverviewPage() {
                           {nextComp.name}
                         </Link>
                         {nextBlockReasons.length > 0 && (
-                          <span className="text-xs text-feis-orange">
+                          <span className="text-xs text-feis-orange-ink">
                             {nextBlockReasons.join(' \u00b7 ')}
                           </span>
                         )}

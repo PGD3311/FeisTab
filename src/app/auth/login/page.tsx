@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RunFeisLogo } from '@/components/runfeis-logo'
 
 function LoginForm() {
   const searchParams = useSearchParams()
@@ -34,7 +35,9 @@ function LoginForm() {
     <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-feis-charcoal">RunFeis</h1>
+          <h1 className="flex justify-center">
+            <RunFeisLogo size="md" full />
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
         </div>
 

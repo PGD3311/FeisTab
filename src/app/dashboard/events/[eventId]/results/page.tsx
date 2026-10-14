@@ -153,7 +153,7 @@ export default function ResultsPublishingPage({
 
   if (loadError) {
     return (
-      <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
+      <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange-ink text-sm">
         Could not load results. Try refreshing.
       </div>
     )
@@ -201,7 +201,7 @@ export default function ResultsPublishingPage({
               <button
                 type="button"
                 onClick={() => loadResultsForComp(c.id, true)}
-                className="text-sm text-feis-orange hover:text-feis-orange/80 py-2 cursor-pointer"
+                className="text-sm text-feis-orange-ink hover:text-feis-orange-ink/80 py-2 cursor-pointer"
               >
                 Failed to load results. Click to retry.
               </button>

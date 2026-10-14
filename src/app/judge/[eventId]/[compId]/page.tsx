@@ -528,7 +528,7 @@ export default function JudgeScoringPage({
                         <span className="font-mono text-base w-12 text-right text-muted-foreground line-through">
                           {reg.competitor_number ?? '\u2014'}
                         </span>
-                        <Badge variant="outline" className="text-feis-orange border-feis-orange/30 text-xs">
+                        <Badge variant="outline" className="text-feis-orange-ink border-feis-orange/30 text-xs">
                           {slot.status === 'scratched' ? 'Scratched' : slot.status === 'no_show' ? 'No Show' : slot.status}
                         </Badge>
                       </div>
@@ -622,10 +622,10 @@ export default function JudgeScoringPage({
           {packetBlocked && (
             <Card className="border-feis-orange/20 bg-feis-orange-light">
               <CardContent className="py-6 text-center">
-                <p className="text-sm font-medium text-feis-orange">
+                <p className="text-sm font-medium text-feis-orange-ink">
                   Your scores are being entered by the tabulator.
                 </p>
-                <p className="text-xs text-feis-orange/80 mt-1">
+                <p className="text-xs text-feis-orange-ink/80 mt-1">
                   Contact the tabulator if you need to make changes.
                 </p>
               </CardContent>

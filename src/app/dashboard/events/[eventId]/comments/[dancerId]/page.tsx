@@ -275,7 +275,7 @@ export default function DancerCommentSheetPage({
 
   if (loadError) {
     return (
-      <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange text-sm">
+      <div className="p-3 rounded-md bg-feis-orange-light border border-feis-orange/20 text-feis-orange-ink text-sm">
         Could not load comment sheet. Check your connection and try again.
       </div>
     )

@@ -455,7 +455,7 @@ export default function ProgramPage({
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center justify-between">
               <span>Unassigned</span>
-              <Badge variant="outline" className="border-feis-orange/40 text-feis-orange">
+              <Badge variant="outline" className="border-feis-orange/40 text-feis-orange-ink">
                 {unassigned.length} competition{unassigned.length !== 1 ? 's' : ''}
               </Badge>
             </CardTitle>
