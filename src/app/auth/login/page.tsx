@@ -55,6 +55,7 @@ function LoginForm() {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  defaultValue={searchParams.get('email') ?? ''}
                   required
                   autoFocus
                   disabled={isPending}

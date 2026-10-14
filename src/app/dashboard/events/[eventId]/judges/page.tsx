@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, use } from 'react'
+import { useEffect, useRef, useState, useCallback, use } from 'react'
 import { showSuccess, showError } from '@/lib/feedback'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { removeJudge } from '@/lib/supabase/rpc'
+import { INVITE_ROLE_LABELS, inviteState, inviteUrl, isEventRole } from '@/lib/invitations'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { Button } from '@/components/ui/button'
@@ -12,10 +13,29 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { type JudgeInfo } from '@/types/shared'
+import {
+  createInvitation,
+  getTeamEmails,
+  resendInvitation,
+  type InviteActionResult
+} from './actions'
 
 interface Judge extends JudgeInfo {
-  access_code: string | null
+  user_id: string | null
 }
+
+interface PendingInvite {
+  id: string
+  email: string
+  role: string
+  judge_id: string | null
+  token: string
+  created_at: string
+  expires_at: string
+  accepted_at: string | null
+}
+
+type InviteOutcome = Extract<InviteActionResult, { ok: true }>
 
 interface Competition {
   id: string
@@ -39,12 +59,6 @@ interface JudgeAssignment {
   id: string
   competition_id: string
   competition: Competition
-}
-
-function generateAccessCode(lastName: string): string {
-  const pin = Math.floor(1000 + Math.random() * 9000).toString()
-  const name = lastName.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8)
-  return `${name}-${pin}`
 }
 
 function parseCodeAsNumber(code: string | null): number | null {
@@ -87,13 +101,11 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     created_at: string
     user_email?: string
   }>>([])
-  const [pendingInvites, setPendingInvites] = useState<Array<{
-    id: string
-    email: string
-    role: string
-    created_at: string
-    accepted_at: string | null
-  }>>([])
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const [memberEmails, setMemberEmails] = useState<Record<string, string>>({})
+  const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null)
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
+  const inviteEmailRef = useRef<HTMLInputElement>(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('registration_desk')
   const [inviteJudgeId, setInviteJudgeId] = useState<string | null>(null)
@@ -102,7 +114,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const loadJudges = useCallback(async () => {
     const { data, error } = await supabase
       .from('judges')
-      .select('id, first_name, last_name, access_code')
+      .select('id, first_name, last_name, user_id')
       .eq('event_id', eventId)
       .order('created_at')
     if (error) {
@@ -179,12 +191,13 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
 
     const { data: invites } = await supabase
       .from('pending_invitations')
-      .select('id, email, role, created_at, accepted_at')
+      .select('id, email, role, judge_id, token, created_at, expires_at, accepted_at')
       .eq('event_id', eventId)
       .order('created_at')
 
     if (roles) setTeamMembers(roles)
-    if (invites) setPendingInvites(invites)
+    if (invites) setPendingInvites(invites as PendingInvite[])
+    setMemberEmails(await getTeamEmails(eventId))
   }, [supabase, eventId])
 
   useEffect(() => {
@@ -340,13 +353,10 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     if (!firstName.trim() || !lastName.trim()) return
     setSaving(true)
 
-    const code = generateAccessCode(lastName)
-
     const { error: err } = await supabase.from('judges').insert({
       event_id: eventId,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
-      access_code: code,
     })
 
     if (err) {
@@ -360,37 +370,66 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     setSaving(false)
   }
 
-  async function handleRegenCode(judgeId: string, lastName: string) {
-    const code = generateAccessCode(lastName)
-    const { error } = await supabase.from('judges').update({ access_code: code }).eq('id', judgeId)
-    if (error) {
-      showError('Failed to regenerate code', { description: error.message })
-      return
-    }
-    showSuccess('Access code regenerated')
-    void loadJudges()
-  }
-
   async function handleInvite() {
     if (!inviteEmail.trim()) return
     setInviting(true)
+    setInviteOutcome(null)
     try {
-      const { error } = await supabase.from('pending_invitations').insert({
-        email: inviteEmail.toLowerCase().trim(),
-        event_id: eventId,
+      const result = await createInvitation({
+        eventId,
+        email: inviteEmail,
         role: inviteRole,
-        judge_id: inviteRole === 'judge' ? inviteJudgeId : null,
-        invited_by: (await supabase.auth.getUser()).data.user?.id,
+        judgeId: inviteRole === 'judge' ? inviteJudgeId : null,
       })
-      if (error) throw error
-      showSuccess('Invitation sent')
+      if (!result.ok) {
+        showError(result.error)
+        return
+      }
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed to ${result.email}` : 'Invite created')
       setInviteEmail('')
       setInviteJudgeId(null)
       await loadTeamData()
     } catch {
-      showError('Failed to send invitation')
+      showError('Could not create the invitation. Try again.')
+    } finally {
+      setInviting(false)
     }
-    setInviting(false)
+  }
+
+  async function handleResend(inviteId: string) {
+    setBusyInviteId(inviteId)
+    try {
+      const result = await resendInvitation(inviteId)
+      if (!result.ok) {
+        showError(result.error)
+        return
+      }
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed again to ${result.email}` : 'Invite renewed')
+      await loadTeamData()
+    } catch {
+      showError('Could not resend the invitation. Try again.')
+    } finally {
+      setBusyInviteId(null)
+    }
+  }
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      showSuccess('Invite link copied')
+    } catch {
+      showError('Could not copy. Select the link and copy it by hand.')
+    }
+  }
+
+  function startJudgeInvite(judgeId: string) {
+    setInviteRole('judge')
+    setInviteJudgeId(judgeId)
+    setInviteOutcome(null)
+    inviteEmailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    inviteEmailRef.current?.focus()
   }
 
   async function handleRemoveRole(roleId: string) {
@@ -548,12 +587,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     void assignCompetitions(judgeId, allIds)
   }
 
-  const ROLE_LABELS: Record<string, string> = {
-    organizer: 'Organizer',
-    registration_desk: 'Registration Desk',
-    side_stage: 'Side Stage',
-    judge: 'Judge',
-  }
+  const roleLabel = (role: string) => (isEventRole(role) ? INVITE_ROLE_LABELS[role] : role)
 
   function roleBadgeVariant(role: string): 'default' | 'secondary' | 'outline' | 'destructive' {
     switch (role) {
@@ -570,10 +604,11 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     }
   }
 
-  // Judges not yet linked to an invite (for judge role invite dropdown)
-  const unlinkedJudges = judges.filter(
-    (j) => !pendingInvites.some((inv) => inv.role === 'judge' && inv.accepted_at === null)
-  )
+  // Judges with no login and no open invite (for the judge invite dropdown)
+  const openJudgeInvite = (judgeId: string) =>
+    pendingInvites.find((inv) => inv.judge_id === judgeId && inv.accepted_at === null) ?? null
+  const unlinkedJudges = judges.filter((j) => !j.user_id && !openJudgeInvite(j.id))
+  const now = new Date()
 
   // Derive unique levels and age groups for dropdowns
   const uniqueLevels = [...new Set(competitions.map((c) => c.level).filter(Boolean))] as string[]
@@ -611,6 +646,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                 </Label>
                 <Input
                   id="inviteEmail"
+                  ref={inviteEmailRef}
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
@@ -657,9 +693,39 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                 </div>
               )}
               <Button onClick={() => void handleInvite()} disabled={inviting || !inviteEmail.trim()}>
-                {inviting ? 'Sending...' : 'Invite'}
+                {inviting ? 'Sending…' : 'Send invite'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              They get a link to set a password. It takes them straight to their screen, already
+              connected to this event.
+            </p>
+
+            {inviteOutcome && (
+              <div className="rounded-md border border-feis-green/30 bg-feis-green-light p-3 space-y-2">
+                <p className="text-sm font-medium text-feis-green">
+                  {inviteOutcome.emailed
+                    ? `Invite emailed to ${inviteOutcome.email}.`
+                    : `${inviteOutcome.emailProblem ?? 'The email was not sent'}. Text or email this link to ${inviteOutcome.email}:`}
+                </p>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    readOnly
+                    value={inviteOutcome.url}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="font-mono text-xs bg-white"
+                    aria-label="Invite link"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void copyLink(inviteOutcome.url)}
+                  >
+                    Copy link
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Current Team Members */}
@@ -671,7 +737,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left p-2 font-medium">Role</th>
-                      <th className="text-left p-2 font-medium">User ID</th>
+                      <th className="text-left p-2 font-medium">Email</th>
                       <th className="text-left p-2 font-medium">Added</th>
                       <th className="p-2"></th>
                     </tr>
@@ -681,11 +747,11 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                       <tr key={member.id} className="border-b last:border-b-0">
                         <td className="p-2">
                           <Badge variant={roleBadgeVariant(member.role)}>
-                            {ROLE_LABELS[member.role] ?? member.role}
+                            {roleLabel(member.role)}
                           </Badge>
                         </td>
-                        <td className="p-2 font-mono text-xs text-muted-foreground">
-                          {member.user_id.slice(0, 8)}...
+                        <td className="p-2 text-muted-foreground break-all">
+                          {memberEmails[member.user_id] ?? `${member.user_id.slice(0, 8)}…`}
                         </td>
                         <td className="p-2 text-muted-foreground">
                           {new Date(member.created_at).toLocaleDateString()}
@@ -711,7 +777,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
           {/* Pending Invitations */}
           {pendingInvites.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Pending Invitations</h4>
+              <h4 className="text-sm font-medium">Invitations</h4>
               <div className="rounded-md border">
                 <table className="w-full text-sm">
                   <thead>
@@ -729,33 +795,60 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                         <td className="p-2">{invite.email}</td>
                         <td className="p-2">
                           <Badge variant={roleBadgeVariant(invite.role)}>
-                            {ROLE_LABELS[invite.role] ?? invite.role}
+                            {roleLabel(invite.role)}
                           </Badge>
                         </td>
                         <td className="p-2">
-                          {invite.accepted_at ? (
+                          {inviteState(invite, now) === 'accepted' ? (
                             <Badge variant="default" className="text-xs">
                               Accepted
                             </Badge>
+                          ) : inviteState(invite, now) === 'expired' ? (
+                            <Badge variant="destructive" className="text-xs">
+                              Expired
+                            </Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">
-                              Pending
+                              Waiting
                             </Badge>
                           )}
                         </td>
                         <td className="p-2 text-muted-foreground">
                           {new Date(invite.created_at).toLocaleDateString()}
                         </td>
-                        <td className="p-2 text-right">
+                        <td className="p-2 text-right whitespace-nowrap">
                           {!invite.accepted_at && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                              onClick={() => void handleRevokeInvite(invite.id)}
-                            >
-                              Revoke
-                            </Button>
+                            <>
+                              {inviteState(invite, now) === 'open' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() =>
+                                    void copyLink(inviteUrl(window.location.origin, invite.token))
+                                  }
+                                >
+                                  Copy link
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                disabled={busyInviteId === invite.id}
+                                onClick={() => void handleResend(invite.id)}
+                              >
+                                {busyInviteId === invite.id ? 'Sending…' : 'Resend'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                                onClick={() => void handleRevokeInvite(invite.id)}
+                              >
+                                Revoke
+                              </Button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -838,8 +931,12 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                         <p className="font-medium">
                           {judge.first_name} {judge.last_name}
                         </p>
-                        <p className="font-mono text-lg tracking-widest text-feis-green font-bold mt-0.5">
-                          {judge.access_code ?? 'No code'}
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {judge.user_id
+                            ? 'Has a login'
+                            : openJudgeInvite(judge.id)
+                              ? `Invited: ${openJudgeInvite(judge.id)?.email}`
+                              : 'No login yet'}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-xs">
@@ -848,16 +945,18 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                       </Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleRegenCode(judge.id, judge.last_name)
-                        }}
-                      >
-                        New Code
-                      </Button>
+                      {!judge.user_id && !openJudgeInvite(judge.id) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startJudgeInvite(judge.id)
+                          }}
+                        >
+                          Invite
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

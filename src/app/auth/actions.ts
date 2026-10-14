@@ -60,6 +60,7 @@ export async function fulfillInvitations() {
     .select('*')
     .eq('email', normalizedEmail)
     .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
   if (invErr) {
     console.error('Failed to load invitations:', invErr.message)
     return
