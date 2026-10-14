@@ -13,6 +13,7 @@ import { detectStatusScoreMismatch } from './detect-status-score-mismatch'
 import { detectLargeScoreSpread } from './detect-score-spread'
 import { detectJudgeFlaggedAll } from './detect-judge-flagged-all'
 import { detectJudgeFlatScores } from './detect-judge-flat-scores'
+import { detectUnresolvedTies } from './detect-unresolved-ties'
 
 const SCORE_SPREAD_THRESHOLD = 30
 
@@ -43,6 +44,7 @@ export function detectAnomalies(input: AnomalyInput): Anomaly[] {
     // Warnings
     anomalies.push(...detectUnexplainedNoScores(scores, registrations, round.id, competition_id))
     anomalies.push(...detectStatusScoreMismatch(scores, registrations, round.id, competition_id))
+    anomalies.push(...detectUnresolvedTies(scores, registrations, rules, round.id, competition_id))
 
     // Review signals
     anomalies.push(...detectLargeScoreSpread(scores, round.id, competition_id, SCORE_SPREAD_THRESHOLD))

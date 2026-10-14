@@ -13,6 +13,7 @@ export type AnomalyType =
   | 'large_score_spread'
   | 'judge_flagged_all'
   | 'judge_flat_scores'
+  | 'unresolved_tie'
 
 export interface Anomaly {
   type: AnomalyType

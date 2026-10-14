@@ -290,10 +290,11 @@ export default function CompetitionDetailPage({
       const detected = detectAnomalies(anomalyInput)
       const status = compRes.data.status as string
       const postScoring = ['ready_to_tabulate', 'complete_unpublished', 'published', 'locked'].includes(status)
-      // Only show "no scores" and "incomplete packet" warnings after scoring is done
+      // Only show "no scores", "incomplete packet" and tie warnings after scoring is done
+      const preScoringHidden = ['unexplained_no_scores', 'incomplete_judge_packet', 'unresolved_tie']
       const filtered = postScoring
         ? detected
-        : detected.filter(a => a.type !== 'unexplained_no_scores' && a.type !== 'incomplete_judge_packet')
+        : detected.filter(a => !preScoringHidden.includes(a.type))
       setAnomalies(filtered)
     } else {
       setAnomalies([])
