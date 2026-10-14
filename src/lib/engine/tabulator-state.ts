@@ -97,6 +97,12 @@ function updateRow(
   return rows.map(r => (r.dancerId === dancerId ? updater(r) : r))
 }
 
+// An edit made while a save is in flight supersedes that save: clearing saveSeq makes its
+// late MARK_SAVED a no-op, so the row stays dirty and the newer content is saved next.
+function supersedeInFlightSave(row: ScoreRow): number {
+  return row.status === 'saving' ? 0 : row.saveSeq
+}
+
 export function scoreReducer(state: ScoreRow[], action: ScoreAction): ScoreRow[] {
   switch (action.type) {
     case 'SET_SCORE':
@@ -106,6 +112,7 @@ export function scoreReducer(state: ScoreRow[], action: ScoreAction): ScoreRow[]
         return {
           ...row,
           score: newScore,
+          saveSeq: supersedeInFlightSave(row),
           status:
             newScore === '' && row.dbScore === null ? 'empty' : dirty ? 'dirty' : 'saved',
         }
@@ -120,6 +127,7 @@ export function scoreReducer(state: ScoreRow[], action: ScoreAction): ScoreRow[]
           ...row,
           flagged: newFlagged,
           flagReason: action.flagReason,
+          saveSeq: supersedeInFlightSave(row),
           status: rowHasContent ? 'dirty' : row.dbScore === null ? 'empty' : 'dirty',
         }
       })
@@ -132,6 +140,7 @@ export function scoreReducer(state: ScoreRow[], action: ScoreAction): ScoreRow[]
         return {
           ...row,
           commentData: newCommentData,
+          saveSeq: supersedeInFlightSave(row),
           status: rowHasContent ? 'dirty' : row.dbScore === null ? 'empty' : 'dirty',
         }
       })

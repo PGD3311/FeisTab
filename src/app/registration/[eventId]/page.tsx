@@ -339,10 +339,10 @@ export default function RegistrationDeskPage({
     <div className="space-y-4">
       <div>
         <Link
-          href={`/dashboard/events/${eventId}`}
+          href="/"
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2"
         >
-          <ArrowLeft className="h-3 w-3" /> Dashboard
+          <ArrowLeft className="h-3 w-3" /> My events
         </Link>
         <h1 className="text-2xl font-bold">Registration desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
@@ -523,7 +523,7 @@ export default function RegistrationDeskPage({
             <>
               {undoTarget.first_name} {undoTarget.last_name} will no longer be checked in
               {checkInMap.get(undoTarget.dancer_id)
-                ? `, and number #${checkInMap.get(undoTarget.dancer_id)?.competitor_number} will be removed`
+                ? `. They keep number #${checkInMap.get(undoTarget.dancer_id)?.competitor_number}`
                 : ''}
               .
             </>

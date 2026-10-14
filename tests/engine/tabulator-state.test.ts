@@ -312,4 +312,26 @@ describe('selectors', () => {
       expect(canSignOff([])).toBe(false)
     })
   })
+
+  describe('edits during an in-flight save', () => {
+    it('a note typed while a save is in flight is not marked saved by that save', () => {
+      let rows = [makeRow({ status: 'dirty', score: '75' })]
+      rows = scoreReducer(rows, { type: 'MARK_SAVING', dancerId: 'd1', saveSeq: 1 })
+      rows = scoreReducer(rows, {
+        type: 'SET_COMMENT',
+        dancerId: 'd1',
+        commentData: { codes: ['posture'], note: 'Point your toes' }
+      })
+      rows = scoreReducer(rows, { type: 'MARK_SAVED', dancerId: 'd1', dbScore: 75, saveSeq: 1 })
+      expect(rows[0].status).toBe('dirty')
+      expect(rows[0].commentData?.note).toBe('Point your toes')
+    })
+
+    it('a save with no edits in between still marks the row saved', () => {
+      let rows = [makeRow({ status: 'dirty', score: '75' })]
+      rows = scoreReducer(rows, { type: 'MARK_SAVING', dancerId: 'd1', saveSeq: 1 })
+      rows = scoreReducer(rows, { type: 'MARK_SAVED', dancerId: 'd1', dbScore: 75, saveSeq: 1 })
+      expect(rows[0].status).toBe('saved')
+    })
+  })
 })
