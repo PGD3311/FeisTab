@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react'
 import {
   formatAuditEntry,
   matchesFilter,
+  sortAuditEntries,
   FILTER_GROUPS,
   type AuditEntry,
   type NameMaps,
@@ -15,6 +16,36 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 const PAGE_SIZE = 25
+const SCORE_ID_CHUNK = 100
+
+interface JudgeRow {
+  id: string
+  first_name: string
+  last_name: string
+  user_id: string | null
+}
+
+interface RegistrationRow {
+  dancer_id: string
+  competitor_number: string | number | null
+  dancers: { first_name: string; last_name: string } | null
+}
+
+interface EventRoleRow {
+  user_id: string
+  role: string
+}
+
+interface RoundRow {
+  id: string
+  round_number: number
+}
+
+interface ScoreEntryRow {
+  id: string
+  judge_id: string
+  dancer_id: string
+}
 
 export default function AuditTrailPage({
   params,
@@ -32,13 +63,16 @@ export default function AuditTrailPage({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   async function loadData() {
-    const [compRes, judgesRes, regRes] = await Promise.all([
+    const [compRes, judgesRes, regRes, rolesRes, roundsRes, scoresRes] = await Promise.all([
       supabase.from('competitions').select('code, name').eq('id', compId).single(),
-      supabase.from('judges').select('id, first_name, last_name').eq('event_id', eventId),
+      supabase.from('judges').select('id, first_name, last_name, user_id').eq('event_id', eventId),
       supabase
         .from('registrations')
         .select('dancer_id, competitor_number, dancers(first_name, last_name)')
         .eq('competition_id', compId),
+      supabase.from('event_roles').select('user_id, role').eq('event_id', eventId),
+      supabase.from('rounds').select('id, round_number').eq('competition_id', compId),
+      supabase.from('score_entries').select('id, judge_id, dancer_id').eq('competition_id', compId)
     ])
 
     if (compRes.error) {
@@ -47,32 +81,62 @@ export default function AuditTrailPage({
       return
     }
 
-    if (judgesRes.error) {
-      console.error('Failed to load judges:', judgesRes.error.message)
+    for (const [label, res] of [
+      ['judges', judgesRes],
+      ['registrations', regRes],
+      ['event roles', rolesRes],
+      ['rounds', roundsRes],
+      ['score entries', scoresRes]
+    ] as const) {
+      if (res.error) console.error(`Failed to load ${label}:`, res.error.message)
     }
 
-    if (regRes.error) {
-      console.error('Failed to load registrations:', regRes.error.message)
+    const judges = (judgesRes.data ?? []) as JudgeRow[]
+    // Untyped client infers the dancers join as an array; it's many-to-one, so an object
+    const registrations = (regRes.data ?? []) as unknown as RegistrationRow[]
+    const roles = (rolesRes.data ?? []) as EventRoleRow[]
+    const rounds = (roundsRes.data ?? []) as RoundRow[]
+    const scoreEntries = (scoresRes.data ?? []) as ScoreEntryRow[]
+
+    const rolesByUser = new Map<string, string[]>()
+    for (const r of roles) {
+      rolesByUser.set(r.user_id, [...(rolesByUser.get(r.user_id) ?? []), r.role])
     }
 
     setComp(compRes.data)
     setNameMaps({
-      judges: new Map(
-        (judgesRes.data ?? []).map((j) => [j.id, `${j.first_name} ${j.last_name}`])
-      ),
+      judges: new Map(judges.map((j) => [j.id, `${j.first_name} ${j.last_name}`])),
       dancers: new Map(
-        // TODO: type when Supabase types generated
-        (regRes.data ?? []).map((r: any) => [
+        registrations.map((r) => [
           r.dancer_id,
           r.dancers
             ? `${r.dancers.first_name} ${r.dancers.last_name} (#${r.competitor_number})`
-            : r.dancer_id,
+            : r.dancer_id
         ])
       ),
+      judgesByUser: new Map(
+        judges
+          .filter((j): j is JudgeRow & { user_id: string } => j.user_id !== null)
+          .map((j) => [j.user_id, `${j.first_name} ${j.last_name}`])
+      ),
+      rolesByUser,
+      rounds: new Map(rounds.map((r) => [r.id, r.round_number])),
+      scoreEntries: new Map(
+        scoreEntries.map((s) => [s.id, { judge_id: s.judge_id, dancer_id: s.dancer_id }])
+      )
     })
 
-    // Fetch audit entries — two queries, deduplicate
-    const [byEntity, byPayload] = await Promise.all([
+    // Audit rows for this competition live under four keys:
+    // the competition itself, payloads naming it, its rounds (sign-offs, recalls)
+    // and its score entries (score RPCs). Score ids are chunked to keep URLs short.
+    const roundIds = rounds.map((r) => r.id)
+    const scoreIds = scoreEntries.map((s) => s.id)
+    const scoreChunks: string[][] = []
+    for (let i = 0; i < scoreIds.length; i += SCORE_ID_CHUNK) {
+      scoreChunks.push(scoreIds.slice(i, i + SCORE_ID_CHUNK))
+    }
+
+    const auditQueries = [
       supabase
         .from('audit_log')
         .select('*')
@@ -85,25 +149,38 @@ export default function AuditTrailPage({
         .contains('after_data', { competition_id: compId })
         .order('created_at', { ascending: false })
         .limit(500),
-    ])
-
-    if (byEntity.error) {
-      console.error('Failed to load audit entries by entity:', byEntity.error.message)
-    }
-    if (byPayload.error) {
-      console.error('Failed to load audit entries by payload:', byPayload.error.message)
-    }
+      ...(roundIds.length > 0
+        ? [
+            supabase
+              .from('audit_log')
+              .select('*')
+              .eq('entity_type', 'round')
+              .in('entity_id', roundIds)
+              .limit(1000)
+          ]
+        : []),
+      ...scoreChunks.map((ids) =>
+        supabase
+          .from('audit_log')
+          .select('*')
+          .eq('entity_type', 'score_entry')
+          .in('entity_id', ids)
+          .limit(1000)
+      )
+    ]
+    const auditResults = await Promise.all(auditQueries)
 
     const auditMap = new Map<string, AuditEntry>()
-    for (const row of [...(byEntity.data ?? []), ...(byPayload.data ?? [])]) {
-      if (!auditMap.has(row.id)) {
-        auditMap.set(row.id, row as AuditEntry)
+    for (const res of auditResults) {
+      if (res.error) {
+        console.error('Failed to load audit entries:', res.error.message)
+        continue
+      }
+      for (const row of (res.data ?? []) as AuditEntry[]) {
+        if (!auditMap.has(row.id)) auditMap.set(row.id, row)
       }
     }
-    const sorted = [...auditMap.values()].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    setEntries(sorted)
+    setEntries(sortAuditEntries([...auditMap.values()]))
     setLoading(false)
   }
 

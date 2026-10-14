@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-format'
+import {
+  formatAuditEntry,
+  matchesFilter,
+  resolveActor,
+  sortAuditEntries,
+  type AuditEntry,
+  type NameMaps
+} from '@/lib/audit-format'
 
 const names: NameMaps = {
   judges: new Map([
@@ -304,5 +311,277 @@ describe('formatAuditEntry', () => {
     })
     const result = formatAuditEntry(entry, names)
     expect(result.actor).toBe('Judge')
+  })
+})
+
+// Live names: rows written by the RPCs/trigger carry user_id and need these lookups
+const liveNames: NameMaps = {
+  judges: new Map([
+    ['judge-aine', 'Aine Hennessy'],
+    ['judge-declan', 'Declan Moran']
+  ]),
+  dancers: new Map([['dancer-104', 'Siobhan Murphy (#104)']]),
+  judgesByUser: new Map([
+    ['user-aine', 'Aine Hennessy'],
+    ['user-declan', 'Declan Moran']
+  ]),
+  rolesByUser: new Map([
+    ['user-org', ['organizer']],
+    ['user-side', ['side_stage']],
+    ['user-desk', ['registration_desk']],
+    ['user-both', ['side_stage', 'organizer']],
+    ['user-aine', ['judge']],
+    ['user-declan', ['judge']]
+  ]),
+  rounds: new Map([
+    ['round-1', 1],
+    ['round-2', 2]
+  ]),
+  scoreEntries: new Map([
+    ['score-1', { judge_id: 'judge-aine', dancer_id: 'dancer-104' }],
+    ['score-2', { judge_id: 'judge-declan', dancer_id: 'dancer-104' }]
+  ])
+}
+
+describe('status_change from the competition trigger', () => {
+  it('reads the old status from before_data and the new one from after_data', () => {
+    const entry = makeEntry({
+      user_id: 'user-org',
+      before_data: { status: 'in_progress' },
+      after_data: { status: 'awaiting_scores' }
+    })
+    expect(formatAuditEntry(entry, liveNames).summary).toBe('In Progress → Awaiting Scores')
+  })
+
+  it('formats a dancer status change with the dancer name', () => {
+    const entry = makeEntry({
+      action: 'set_registration_status',
+      entity_type: 'registration',
+      entity_id: 'reg-1',
+      user_id: 'user-side',
+      before_data: { status: 'registered' },
+      after_data: { status: 'scratched', dancer_id: 'dancer-104', competition_id: 'comp-1' }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe('Siobhan Murphy (#104): Registered → Scratched')
+    expect(result.actor).toBe('Side-stage')
+    expect(matchesFilter(entry.action, 'status')).toBe(true)
+  })
+
+  it('formats the legacy transition_status RPC shape', () => {
+    const entry = makeEntry({
+      action: 'transition_status',
+      after_data: { from: 'imported', to: 'ready_for_day_of' }
+    })
+    expect(formatAuditEntry(entry, names).summary).toBe('Imported → Ready For Day Of')
+  })
+})
+
+describe('resolveActor', () => {
+  it('names a judge whose login made the change', () => {
+    expect(resolveActor('user-aine', liveNames)).toBe('Judge Aine Hennessy')
+  })
+
+  it('labels staff by event role', () => {
+    expect(resolveActor('user-org', liveNames)).toBe('Organizer')
+    expect(resolveActor('user-side', liveNames)).toBe('Side-stage')
+    expect(resolveActor('user-desk', liveNames)).toBe('Registration desk')
+  })
+
+  it('prefers organizer when a user holds several roles', () => {
+    expect(resolveActor('user-both', liveNames)).toBe('Organizer')
+  })
+
+  it('says so when a user id cannot be resolved', () => {
+    expect(resolveActor('user-stranger', liveNames)).toBe('Unknown user')
+  })
+
+  it('returns null without a user id or lookup maps', () => {
+    expect(resolveActor(null, liveNames)).toBeNull()
+    expect(resolveActor('user-org', names)).toBeNull()
+  })
+
+  it('overrides the per-action guess in formatted rows', () => {
+    const sideStage = makeEntry({
+      user_id: 'user-side',
+      before_data: { status: 'ready_for_day_of' },
+      after_data: { status: 'released_to_judge' }
+    })
+    expect(formatAuditEntry(sideStage, liveNames).actor).toBe('Side-stage')
+
+    const judge = makeEntry({
+      user_id: 'user-aine',
+      before_data: { status: 'released_to_judge' },
+      after_data: { status: 'in_progress' }
+    })
+    expect(formatAuditEntry(judge, liveNames).actor).toBe('Judge Aine Hennessy')
+  })
+
+  it('keeps the legacy guess for rows without a user id', () => {
+    const entry = makeEntry({
+      before_data: { status: 'in_progress' },
+      after_data: { status: 'awaiting_scores' }
+    })
+    expect(formatAuditEntry(entry, liveNames).actor).toBe('Organizer')
+  })
+})
+
+describe('score and sign-off RPC rows', () => {
+  it('formats submit_score using the score entry for the judge', () => {
+    const entry = makeEntry({
+      action: 'submit_score',
+      entity_type: 'score_entry',
+      entity_id: 'score-1',
+      user_id: 'user-aine',
+      after_data: { dancer_id: 'dancer-104', raw_score: 72.5 }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe(
+      'Score 72.5 entered for Siobhan Murphy (#104) by Judge Aine Hennessy'
+    )
+    expect(result.actor).toBe('Judge Aine Hennessy')
+    expect(result.badgeText).toBe('Score')
+    expect(matchesFilter(entry.action, 'scores')).toBe(true)
+  })
+
+  it('formats tabulator_enter_score as a transcription by the organizer', () => {
+    const entry = makeEntry({
+      action: 'tabulator_enter_score',
+      entity_type: 'score_entry',
+      entity_id: 'score-1',
+      user_id: 'user-org',
+      after_data: { dancer_id: 'dancer-104', judge_id: 'judge-aine' }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe(
+      'Score entered for Siobhan Murphy (#104) by Judge Aine Hennessy · transcribed from score sheet'
+    )
+    expect(result.actor).toBe('Organizer')
+    expect(result.badgeText).toBe('Score')
+  })
+
+  it('formats sign_off_judge with judge name and round number', () => {
+    const entry = makeEntry({
+      action: 'sign_off_judge',
+      entity_type: 'round',
+      entity_id: 'round-1',
+      user_id: 'user-declan',
+      after_data: { judge_id: 'judge-declan', action: 'add' }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe('Judge Declan Moran signed off round 1')
+    expect(result.actor).toBe('Judge Declan Moran')
+    expect(result.badgeText).toBe('Sign-off')
+    expect(matchesFilter(entry.action, 'signoffs')).toBe(true)
+  })
+
+  it('formats a reopened sign-off', () => {
+    const entry = makeEntry({
+      action: 'sign_off_judge',
+      entity_type: 'round',
+      entity_id: 'round-2',
+      user_id: 'user-org',
+      after_data: { judge_id: 'judge-aine', action: 'remove' }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe('Sign-off reopened for Judge Aine Hennessy · round 2')
+    expect(result.actor).toBe('Organizer')
+  })
+
+  it('handles score rows whose judge or dancer is unknown', () => {
+    const entry = makeEntry({
+      action: 'submit_score',
+      entity_type: 'score_entry',
+      entity_id: 'score-missing',
+      after_data: { dancer_id: 'dancer-unknown', raw_score: 60 }
+    })
+    expect(formatAuditEntry(entry, liveNames).summary).toBe(
+      'Score 60 entered for unknown dancer by a judge'
+    )
+  })
+})
+
+describe('other RPC rows', () => {
+  it('formats publish_results like result_publish', () => {
+    const entry = makeEntry({
+      action: 'publish_results',
+      user_id: 'user-org',
+      after_data: { approved_by: 'Bridget' }
+    })
+    const result = formatAuditEntry(entry, liveNames)
+    expect(result.summary).toBe('Results published by Bridget')
+    expect(result.badgeText).toBe('Published')
+  })
+
+  it('formats approve_tabulation', () => {
+    const entry = makeEntry({ action: 'approve_tabulation', after_data: { result_count: 12 } })
+    const result = formatAuditEntry(entry, names)
+    expect(result.summary).toBe('12 results approved and saved')
+    expect(result.badgeText).toBe('Tabulation')
+  })
+
+  it('formats generate_recall with the new round number', () => {
+    const entry = makeEntry({
+      action: 'generate_recall',
+      entity_type: 'round',
+      entity_id: 'round-2',
+      after_data: { recall_count: 3, competition_id: 'comp-1' }
+    })
+    expect(formatAuditEntry(entry, liveNames).summary).toBe('3 dancers recalled to round 2')
+  })
+
+  it('formats create_round and roster confirmation', () => {
+    const round = makeEntry({ action: 'create_round', after_data: { round_number: 2 } })
+    expect(formatAuditEntry(round, names).summary).toBe('Round 2 created')
+    const roster = makeEntry({ action: 'confirm_roster', user_id: 'user-side', after_data: {} })
+    const result = formatAuditEntry(roster, liveNames)
+    expect(result.summary).toBe('Roster confirmed')
+    expect(result.actor).toBe('Side-stage')
+  })
+})
+
+describe('sortAuditEntries', () => {
+  const t1 = '2026-10-14T15:00:00.000Z'
+  const t2 = '2026-10-14T15:10:02.917Z'
+
+  it('puts newest first', () => {
+    const older = makeEntry({ id: 'a', created_at: t1 })
+    const newer = makeEntry({ id: 'b', created_at: t2 })
+    expect(sortAuditEntries([older, newer]).map((e) => e.id)).toEqual(['b', 'a'])
+  })
+
+  it('orders one transaction as cause, then chained status changes', () => {
+    const signOff = makeEntry({
+      id: 'sign-off',
+      action: 'sign_off_judge',
+      entity_type: 'round',
+      created_at: t2
+    })
+    const toReady = makeEntry({
+      id: 'to-ready',
+      created_at: t2,
+      before_data: { status: 'awaiting_scores' },
+      after_data: { status: 'ready_to_tabulate' }
+    })
+    const toAwaiting = makeEntry({
+      id: 'to-awaiting',
+      created_at: t2,
+      before_data: { status: 'in_progress' },
+      after_data: { status: 'awaiting_scores' }
+    })
+    for (const input of [
+      [signOff, toAwaiting, toReady],
+      [toAwaiting, toReady, signOff],
+      [toReady, signOff, toAwaiting],
+      [signOff, toReady, toAwaiting],
+      [toAwaiting, signOff, toReady],
+      [toReady, toAwaiting, signOff]
+    ]) {
+      expect(sortAuditEntries(input).map((e) => e.id)).toEqual([
+        'to-ready',
+        'to-awaiting',
+        'sign-off'
+      ])
+    }
   })
 })
