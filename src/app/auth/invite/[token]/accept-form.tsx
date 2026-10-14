@@ -43,7 +43,7 @@ export function AcceptForm({
     return (
       <div className="space-y-4">
         <p className="text-base text-feis-charcoal leading-relaxed">
-          {email} already has a FeisTab account. Sign in with it and you&apos;ll be added to this
+          {email} already has a RunFeis account. Sign in with it and you&apos;ll be added to this
           event.
         </p>
         <Link href={loginHref} className={buttonVariants({ className: 'w-full h-12 text-base' })}>
@@ -123,7 +123,7 @@ export function AcceptForm({
       </Button>
 
       <p className="text-center text-base text-muted-foreground">
-        Already have a FeisTab account?{' '}
+        Already have a RunFeis account?{' '}
         <Link href={loginHref} className="text-feis-green font-medium hover:underline">
           Sign in
         </Link>

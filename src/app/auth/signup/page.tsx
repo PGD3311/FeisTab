@@ -38,7 +38,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-feis-charcoal">FeisTab</h1>
+          <h1 className="text-3xl font-bold text-feis-charcoal">RunFeis</h1>
           <p className="text-sm text-muted-foreground mt-1">Create your account</p>
         </div>
 

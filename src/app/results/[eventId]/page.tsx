@@ -141,7 +141,7 @@ export default async function PublicResultsPage({
         <footer className="mt-16 pb-8 text-center">
           <div className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em] font-mono">
             <span className="w-1 h-1 rounded-full bg-feis-green/30" />
-            FeisTab
+            RunFeis
           </div>
         </footer>
       </main>

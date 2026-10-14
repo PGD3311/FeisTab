@@ -119,7 +119,7 @@ export default async function HomePage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-feis-green">FeisTab</h1>
+            <h1 className="text-3xl font-bold text-feis-green">RunFeis</h1>
             <p className="text-sm text-muted-foreground mt-0.5">{user.email}</p>
           </div>
           <form action={logout}>

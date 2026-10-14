@@ -12,7 +12,7 @@ const outfit = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: 'FeisTab',
+  title: 'RunFeis',
   description: 'Live tabulation and results engine for Irish dance competitions',
 }
 

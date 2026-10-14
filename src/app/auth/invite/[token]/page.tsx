@@ -27,7 +27,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-feis-cream flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
-        <p className="text-center text-2xl font-bold text-feis-charcoal">FeisTab</p>
+        <p className="text-center text-2xl font-bold text-feis-charcoal">RunFeis</p>
         {children}
       </div>
     </div>

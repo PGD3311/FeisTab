@@ -21,7 +21,7 @@ export function Nav() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-lg font-bold text-white tracking-wide uppercase">
-              FeisTab
+              RunFeis
             </span>
           </Link>
           <nav className="flex gap-6">

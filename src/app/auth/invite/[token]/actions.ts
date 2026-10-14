@@ -69,7 +69,7 @@ export async function acceptInvitation(token: string, formData: FormData): Promi
   })
   if (createErr) {
     if (createErr.code === 'email_exists' || createErr.status === 422) {
-      return { error: 'You already have a FeisTab account.', accountExists: true }
+      return { error: 'You already have a RunFeis account.', accountExists: true }
     }
     console.error('[invite] Failed to create account:', createErr.message)
     return { error: 'Could not create your account. Try again.' }

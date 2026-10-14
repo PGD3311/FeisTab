@@ -75,7 +75,7 @@ export function buildInviteEmail(input: InviteEmailInput): InviteEmail {
 <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
   <tr>
     <td style="background-color:#0B4D2C;padding:24px 40px;text-align:center;">
-      <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">FeisTab</p>
+      <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">RunFeis</p>
     </td>
   </tr>
   <tr>
