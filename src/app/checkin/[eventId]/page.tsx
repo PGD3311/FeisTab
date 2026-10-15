@@ -767,7 +767,7 @@ export default function RosterConfirmationPage({
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
             )}
             {comp.code && (
-              <span className="font-mono text-sm font-semibold text-feis-green w-6 text-right tabular-nums shrink-0">
+              <span className="font-mono text-sm font-semibold text-feis-green min-w-6 text-right tabular-nums shrink-0 whitespace-nowrap">
                 {comp.code}
               </span>
             )}

@@ -375,7 +375,7 @@ export default function ProgramPage({
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-mono text-sm font-semibold text-feis-green w-6 text-right tabular-nums shrink-0">
+                        <span className="font-mono text-sm font-semibold text-feis-green min-w-6 text-right tabular-nums shrink-0 whitespace-nowrap">
                           {comp.code ?? idx + 1}
                         </span>
                         <div className="min-w-0">
