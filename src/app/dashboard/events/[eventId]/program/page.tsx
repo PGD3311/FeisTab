@@ -267,7 +267,7 @@ export default function ProgramPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold">Schedule</h2>
-          <Button size="sm" onClick={handleAddStage} disabled={addingStage}>
+          <Button size="sm" variant="outline" onClick={handleAddStage} disabled={addingStage}>
             {addingStage ? 'Adding...' : 'Add stage'}
           </Button>
         </div>
