@@ -39,6 +39,30 @@ export default function RegistrationDeskPage({
 }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
+  // Organisers came here from the feis's own page, so Back returns there; staff go to their events
+  const [isOrganizer, setIsOrganizer] = useState(false)
+
+  useEffect(() => {
+    async function loadRole() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from('event_roles')
+        .select('role')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .eq('role', 'organizer')
+        .maybeSingle()
+      if (error) {
+        console.error('Failed to load role:', error.message)
+        return
+      }
+      setIsOrganizer(data !== null)
+    }
+    void loadRole()
+  }, [supabase, eventId])
   const [event, setEvent] = useState<{ id: string; name: string } | null>(null)
   const [dancers, setDancers] = useState<DancerWithRegistrations[]>([])
   const [checkInMap, setCheckInMap] = useState<Map<string, CheckInRow>>(new Map())
@@ -339,10 +363,10 @@ export default function RegistrationDeskPage({
     <div className="space-y-4">
       <div>
         <Link
-          href="/"
+          href={isOrganizer ? `/dashboard/events/${eventId}` : '/'}
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-2"
         >
-          <ArrowLeft className="h-3 w-3" /> My events
+          <ArrowLeft className="h-3 w-3" /> {isOrganizer ? 'Back to this feis' : 'My events'}
         </Link>
         <h1 className="text-2xl font-bold">Registration desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
