@@ -246,7 +246,7 @@ export default function RegistrationDeskPage({
         next.delete(dancer.dancer_id)
         return next
       })
-      showSuccess(`Undid check-in for ${dancer.first_name} ${dancer.last_name}`)
+      showSuccess(`Undid number given for ${dancer.first_name} ${dancer.last_name}`)
       setUndoTarget(null)
     } catch (err) {
       showCritical('Failed to undo', { description: err instanceof Error ? err.message : 'Unknown error' })
@@ -347,7 +347,7 @@ export default function RegistrationDeskPage({
         return next
       })
 
-      showSuccess(`${dancer.first_name} ${dancer.last_name} checked in`)
+      showSuccess(`Number given to ${dancer.first_name} ${dancer.last_name}`)
     } catch (err) {
       showCritical('Unexpected error', {
         description: err instanceof Error ? err.message : 'Unknown error',
@@ -370,6 +370,9 @@ export default function RegistrationDeskPage({
         </Link>
         <h1 className="text-2xl font-bold">Registration desk</h1>
         {event && <p className="text-muted-foreground">{event.name}</p>}
+        <p className="text-sm text-muted-foreground mt-1">
+          This desk hands out competitor numbers. Dancers are checked in at side-stage.
+        </p>
       </div>
 
       <div className="flex gap-3 items-center">
@@ -498,7 +501,7 @@ export default function RegistrationDeskPage({
                         disabled={acting === dancer.dancer_id}
                         size="lg"
                       >
-                        {acting === dancer.dancer_id ? 'Checking in...' : 'Check In'}
+                        {acting === dancer.dancer_id ? 'Saving...' : 'Number given'}
                       </Button>
                     </div>
                   )}
@@ -514,7 +517,7 @@ export default function RegistrationDeskPage({
                       >
                         {acting === dancer.dancer_id
                           ? 'Assigning...'
-                          : `Assign #${nextNumber} & Check In`}
+                          : `Give #${nextNumber}`}
                       </Button>
                     </div>
                   )}
@@ -527,8 +530,8 @@ export default function RegistrationDeskPage({
 
       <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-4">
         <div className="flex gap-4">
-          <span><strong className="text-foreground">{stats.checkedIn}</strong> Checked In</span>
-          <span><strong className="text-foreground">{stats.awaitingArrival}</strong> Awaiting Arrival</span>
+          <span><strong className="text-foreground">{stats.checkedIn}</strong> Number given</span>
+          <span><strong className="text-foreground">{stats.awaitingArrival}</strong> Not collected yet</span>
           <span><strong className="text-foreground">{stats.needsNumber}</strong> Needs Number</span>
         </div>
         <span>
@@ -541,11 +544,11 @@ export default function RegistrationDeskPage({
         onOpenChange={(open) => {
           if (!open) setUndoTarget(null)
         }}
-        title="Undo this check-in?"
+        title="Undo number given?"
         description={
           undoTarget ? (
             <>
-              {undoTarget.first_name} {undoTarget.last_name} will no longer be checked in
+              {undoTarget.first_name} {undoTarget.last_name} will be marked as not having their number
               {checkInMap.get(undoTarget.dancer_id)
                 ? `. They keep number #${checkInMap.get(undoTarget.dancer_id)?.competitor_number}`
                 : ''}
@@ -554,7 +557,7 @@ export default function RegistrationDeskPage({
           ) : null
         }
         confirmLabel="Yes, undo"
-        cancelLabel="Keep checked in"
+        cancelLabel="Keep"
         destructive
         busy={undoTarget !== null && acting === undoTarget.dancer_id}
         onConfirm={() => {
