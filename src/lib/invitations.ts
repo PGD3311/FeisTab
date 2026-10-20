@@ -59,3 +59,23 @@ export function normalizeInviteEmail(email: string): string | null {
   const normalized = email.trim().toLowerCase()
   return EMAIL_PATTERN.test(normalized) ? normalized : null
 }
+
+export type JudgeLoginStatus = 'can_sign_in' | 'invited' | 'paper_only'
+
+export const JUDGE_LOGIN_LABELS: Record<JudgeLoginStatus, string> = {
+  can_sign_in: 'Can sign in',
+  invited: 'Invited',
+  paper_only: 'Paper only'
+}
+
+/** A judge's login status from their linked user and the invites linked to them. */
+export function judgeLoginStatus(
+  judge: { id: string; user_id: string | null },
+  invites: Array<{ judge_id: string | null; accepted_at: string | null }>
+): JudgeLoginStatus {
+  if (judge.user_id) return 'can_sign_in'
+  const linked = invites.filter((inv) => inv.judge_id === judge.id)
+  if (linked.some((inv) => inv.accepted_at !== null)) return 'can_sign_in'
+  if (linked.length > 0) return 'invited'
+  return 'paper_only'
+}

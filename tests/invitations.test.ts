@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   inviteDestination,
+  judgeLoginStatus,
   inviteState,
   inviteUrl,
   isEventRole,
@@ -101,5 +102,22 @@ describe('buildInviteEmail', () => {
   it('handles a missing date', () => {
     const email = buildInviteEmail({ ...base, feisDate: null, role: 'organizer', judgeName: null })
     expect(email.text.split('\n')[0]).toBe("You're invited to help organize Newport Feis.")
+  })
+})
+
+describe('judgeLoginStatus', () => {
+  const judge = { id: 'j1', user_id: null }
+  it('is paper only with no user and no invites', () => {
+    expect(judgeLoginStatus(judge, [])).toBe('paper_only')
+    expect(judgeLoginStatus(judge, [{ judge_id: 'j2', accepted_at: null }])).toBe('paper_only')
+  })
+  it('is invited with a pending invite linked to the judge', () => {
+    expect(judgeLoginStatus(judge, [{ judge_id: 'j1', accepted_at: null }])).toBe('invited')
+  })
+  it('can sign in with a linked user or an accepted invite', () => {
+    expect(judgeLoginStatus({ id: 'j1', user_id: 'u1' }, [])).toBe('can_sign_in')
+    expect(judgeLoginStatus(judge, [{ judge_id: 'j1', accepted_at: '2026-10-01' }])).toBe(
+      'can_sign_in'
+    )
   })
 })

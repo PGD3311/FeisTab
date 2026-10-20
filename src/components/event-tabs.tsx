@@ -34,7 +34,7 @@ const tabs: Tab[] = [
     external: true,
   },
   {
-    label: 'Judges',
+    label: 'Team & judges',
     href: (bp) => `${bp}/judges`,
     isActive: (pn, bp) => pn.startsWith(`${bp}/judges`),
   },

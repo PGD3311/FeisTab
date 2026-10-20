@@ -1,10 +1,17 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, use } from 'react'
+import { useEffect, useState, useCallback, use } from 'react'
 import { showSuccess, showError } from '@/lib/feedback'
 import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
 import { removeJudge } from '@/lib/supabase/rpc'
-import { INVITE_ROLE_LABELS, inviteState, inviteUrl, isEventRole } from '@/lib/invitations'
+import {
+  INVITE_ROLE_LABELS,
+  JUDGE_LOGIN_LABELS,
+  inviteState,
+  inviteUrl,
+  isEventRole,
+  judgeLoginStatus
+} from '@/lib/invitations'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { Button } from '@/components/ui/button'
@@ -74,6 +81,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [judges, setJudges] = useState<Judge[]>([])
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [newJudgeEmail, setNewJudgeEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -105,10 +113,12 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   const [memberEmails, setMemberEmails] = useState<Record<string, string>>({})
   const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null)
   const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
-  const inviteEmailRef = useRef<HTMLInputElement>(null)
+  const [outcomeScope, setOutcomeScope] = useState<'team' | 'judge'>('team')
+  const [inviteForJudgeId, setInviteForJudgeId] = useState<string | null>(null)
+  const [judgeInviteEmail, setJudgeInviteEmail] = useState('')
+  const [judgeInviting, setJudgeInviting] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('registration_desk')
-  const [inviteJudgeId, setInviteJudgeId] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
 
   const loadJudges = useCallback(async () => {
@@ -351,23 +361,73 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!firstName.trim() || !lastName.trim()) return
+    const email = newJudgeEmail.trim()
     setSaving(true)
+    try {
+      const { data, error: err } = await supabase
+        .from('judges')
+        .insert({
+          event_id: eventId,
+          first_name: firstName.trim(),
+          last_name: lastName.trim()
+        })
+        .select('id')
+        .single()
 
-    const { error: err } = await supabase.from('judges').insert({
-      event_id: eventId,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-    })
-
-    if (err) {
-      showError('Failed to add judge', { description: err.message })
-    } else {
+      if (err || !data) {
+        showError('Failed to add judge', { description: err?.message })
+        return
+      }
       showSuccess('Judge added')
       setFirstName('')
       setLastName('')
+      setNewJudgeEmail('')
       await loadJudges()
+      if (email) {
+        // The judge is kept even if the invite fails; Invite on their row retries it.
+        await sendJudgeInvite((data as { id: string }).id, email)
+      }
+    } catch {
+      showError('Could not add the judge. Try again.')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
+  }
+
+  /** Invite a judge by email, linked to their judge row. Returns true if created. */
+  async function sendJudgeInvite(judgeId: string, email: string): Promise<boolean> {
+    try {
+      const result = await createInvitation({
+        eventId,
+        email,
+        role: 'judge',
+        judgeId
+      })
+      if (!result.ok) {
+        showError(result.error)
+        return false
+      }
+      setOutcomeScope('judge')
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed to ${result.email}` : 'Invite created')
+      await loadTeamData()
+      return true
+    } catch {
+      showError('Could not create the invitation. Try again.')
+      return false
+    }
+  }
+
+  async function handleJudgeRowInvite(judgeId: string) {
+    if (!judgeInviteEmail.trim()) return
+    setJudgeInviting(true)
+    setInviteOutcome(null)
+    const ok = await sendJudgeInvite(judgeId, judgeInviteEmail)
+    if (ok) {
+      setInviteForJudgeId(null)
+      setJudgeInviteEmail('')
+    }
+    setJudgeInviting(false)
   }
 
   async function handleInvite() {
@@ -379,16 +439,16 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
         eventId,
         email: inviteEmail,
         role: inviteRole,
-        judgeId: inviteRole === 'judge' ? inviteJudgeId : null,
+        judgeId: null,
       })
       if (!result.ok) {
         showError(result.error)
         return
       }
+      setOutcomeScope('team')
       setInviteOutcome(result)
       showSuccess(result.emailed ? `Invite emailed to ${result.email}` : 'Invite created')
       setInviteEmail('')
-      setInviteJudgeId(null)
       await loadTeamData()
     } catch {
       showError('Could not create the invitation. Try again.')
@@ -405,6 +465,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
         showError(result.error)
         return
       }
+      setOutcomeScope(judges.some((j) => pendingInvites.some((i) => i.id === inviteId && i.judge_id === j.id)) ? 'judge' : 'team')
       setInviteOutcome(result)
       showSuccess(result.emailed ? `Invite emailed again to ${result.email}` : 'Invite renewed')
       await loadTeamData()
@@ -422,14 +483,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     } catch {
       showError('Could not copy. Select the link and copy it by hand.')
     }
-  }
-
-  function startJudgeInvite(judgeId: string) {
-    setInviteRole('judge')
-    setInviteJudgeId(judgeId)
-    setInviteOutcome(null)
-    inviteEmailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    inviteEmailRef.current?.focus()
   }
 
   async function handleRemoveRole(roleId: string) {
@@ -604,10 +657,10 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
     }
   }
 
-  // Judges with no login and no open invite (for the judge invite dropdown)
   const openJudgeInvite = (judgeId: string) =>
     pendingInvites.find((inv) => inv.judge_id === judgeId && inv.accepted_at === null) ?? null
-  const unlinkedJudges = judges.filter((j) => !j.user_id && !openJudgeInvite(j.id))
+  const teamOnlyMembers = teamMembers.filter((m) => m.role !== 'judge')
+  const teamOnlyInvites = pendingInvites.filter((inv) => inv.role !== 'judge')
   const now = new Date()
 
   // Derive unique levels and age groups for dropdowns
@@ -633,7 +686,11 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
       {/* Event Team Section */}
       <Card className="feis-card mb-6">
         <CardHeader>
-          <CardTitle className="text-lg">Event Team</CardTitle>
+          <CardTitle className="text-lg">Team</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            People who run the feis with you. Each gets a link to set a password and goes straight
+            to their screen.
+          </p>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Invite Form */}
@@ -646,7 +703,6 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                 </Label>
                 <Input
                   id="inviteEmail"
-                  ref={inviteEmailRef}
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
@@ -660,48 +716,20 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                 <select
                   id="inviteRole"
                   value={inviteRole}
-                  onChange={(e) => {
-                    setInviteRole(e.target.value)
-                    if (e.target.value !== 'judge') setInviteJudgeId(null)
-                  }}
+                  onChange={(e) => setInviteRole(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="registration_desk">Registration Desk</option>
-                  <option value="side_stage">Side Stage</option>
-                  <option value="judge">Judge</option>
                   <option value="organizer">Organizer</option>
+                  <option value="registration_desk">Registration desk</option>
+                  <option value="side_stage">Side-stage</option>
                 </select>
               </div>
-              {inviteRole === 'judge' && (
-                <div className="w-48">
-                  <Label htmlFor="inviteJudgeId" className="text-xs">
-                    Link to Judge
-                  </Label>
-                  <select
-                    id="inviteJudgeId"
-                    value={inviteJudgeId ?? ''}
-                    onChange={(e) => setInviteJudgeId(e.target.value || null)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Select judge...</option>
-                    {unlinkedJudges.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.first_name} {j.last_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <Button onClick={() => void handleInvite()} disabled={inviting || !inviteEmail.trim()}>
                 {inviting ? 'Sending…' : 'Send invite'}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              They get a link to set a password. It takes them straight to their screen, already
-              connected to this event.
-            </p>
 
-            {inviteOutcome && (
+            {inviteOutcome && outcomeScope === 'team' && (
               <div className="rounded-md border border-feis-green/30 bg-feis-green-light p-3 space-y-2">
                 <p className="text-sm font-medium text-feis-green">
                   {inviteOutcome.emailed
@@ -729,7 +757,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
           </div>
 
           {/* Current Team Members */}
-          {teamMembers.length > 0 && (
+          {teamOnlyMembers.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Current Members</h4>
               <div className="rounded-md border">
@@ -743,7 +771,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                     </tr>
                   </thead>
                   <tbody>
-                    {teamMembers.map((member) => (
+                    {teamOnlyMembers.map((member) => (
                       <tr key={member.id} className="border-b last:border-b-0">
                         <td className="p-2">
                           <Badge variant={roleBadgeVariant(member.role)}>
@@ -775,7 +803,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
           )}
 
           {/* Pending Invitations */}
-          {pendingInvites.length > 0 && (
+          {teamOnlyInvites.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Invitations</h4>
               <div className="rounded-md border">
@@ -790,7 +818,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingInvites.map((invite) => (
+                    {teamOnlyInvites.map((invite) => (
                       <tr key={invite.id} className="border-b last:border-b-0">
                         <td className="p-2">{invite.email}</td>
                         <td className="p-2">
@@ -859,7 +887,7 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
             </div>
           )}
 
-          {teamMembers.length === 0 && pendingInvites.length === 0 && (
+          {teamOnlyMembers.length === 0 && teamOnlyInvites.length === 0 && (
             <p className="text-muted-foreground text-sm">
               No team members or invitations yet. Invite people above to give them access to this
               event.
@@ -868,46 +896,84 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
         </CardContent>
       </Card>
 
-      <Card className="feis-card mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Add Judge</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAdd} className="flex gap-3 items-end">
-            <div className="flex-1">
-              <Label htmlFor="firstName" className="text-sm font-medium">
-                First Name
-              </Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <Label htmlFor="lastName" className="text-sm font-medium">
-                Last Name
-              </Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Adding...' : 'Add Judge'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
       <Card className="feis-card">
         <CardHeader>
-          <CardTitle className="text-lg">Judge List ({judges.length})</CardTitle>
+          <CardTitle className="text-lg">Judges ({judges.length})</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Every adjudicator for this feis. Add an email to give them a login for scoring on a
+            tablet; leave it blank for paper sheets.
+          </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleAdd} className="space-y-3">
+            <h4 className="text-sm font-medium">Add a judge</h4>
+            <div className="flex gap-3 items-end flex-wrap">
+              <div className="flex-1 min-w-[140px]">
+                <Label htmlFor="firstName" className="text-xs">
+                  First name
+                </Label>
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <Label htmlFor="lastName" className="text-xs">
+                  Last name
+                </Label>
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="newJudgeEmail" className="text-xs">
+                  Email (optional)
+                </Label>
+                <Input
+                  id="newJudgeEmail"
+                  type="email"
+                  value={newJudgeEmail}
+                  onChange={(e) => setNewJudgeEmail(e.target.value)}
+                  placeholder="judge@example.com"
+                />
+              </div>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Adding...' : 'Add judge'}
+              </Button>
+            </div>
+          </form>
+
+          {inviteOutcome && outcomeScope === 'judge' && (
+            <div className="rounded-md border border-feis-green/30 bg-feis-green-light p-3 space-y-2">
+              <p className="text-sm font-medium text-feis-green">
+                {inviteOutcome.emailed
+                  ? `Invite emailed to ${inviteOutcome.email}.`
+                  : `${inviteOutcome.emailProblem ?? 'The email was not sent'}. Text or email this link to ${inviteOutcome.email}:`}
+              </p>
+              <div className="flex gap-2 items-center">
+                <Input
+                  readOnly
+                  value={inviteOutcome.url}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="font-mono text-xs bg-white"
+                  aria-label="Invite link"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copyLink(inviteOutcome.url)}
+                >
+                  Copy link
+                </Button>
+              </div>
+            </div>
+          )}
+
           {judges.length === 0 ? (
             <p className="text-muted-foreground text-sm">No judges added yet.</p>
           ) : (
@@ -932,11 +998,10 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                           {judge.first_name} {judge.last_name}
                         </p>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                          {judge.user_id
-                            ? 'Has a login'
-                            : openJudgeInvite(judge.id)
-                              ? `Invited: ${openJudgeInvite(judge.id)?.email}`
-                              : 'No login yet'}
+                          {JUDGE_LOGIN_LABELS[judgeLoginStatus(judge, pendingInvites)]}
+                          {openJudgeInvite(judge.id) && !judge.user_id
+                            ? `: ${openJudgeInvite(judge.id)?.email}`
+                            : ''}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-xs">
@@ -945,18 +1010,35 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                       </Badge>
                     </div>
                     <div className="flex gap-2">
-                      {!judge.user_id && !openJudgeInvite(judge.id) && (
+                      {judgeLoginStatus(judge, pendingInvites) === 'paper_only' && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            startJudgeInvite(judge.id)
+                            setInviteOutcome(null)
+                            setJudgeInviteEmail('')
+                            setInviteForJudgeId(inviteForJudgeId === judge.id ? null : judge.id)
                           }}
                         >
                           Invite
                         </Button>
                       )}
+                      {judgeLoginStatus(judge, pendingInvites) === 'invited' &&
+                        openJudgeInvite(judge.id) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyInviteId === openJudgeInvite(judge.id)?.id}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const inv = openJudgeInvite(judge.id)
+                              if (inv) void handleResend(inv.id)
+                            }}
+                          >
+                            Resend
+                          </Button>
+                        )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -970,6 +1052,40 @@ export default function JudgeManagementPage({ params }: { params: Promise<{ even
                       </Button>
                     </div>
                   </div>
+
+                  {inviteForJudgeId === judge.id && (
+                    <form
+                      className="flex gap-2 items-end border-t px-3 py-3"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void handleJudgeRowInvite(judge.id)
+                      }}
+                    >
+                      <div className="flex-1">
+                        <Label htmlFor={`judgeInvite-${judge.id}`} className="text-xs">
+                          Email for {judge.first_name}
+                        </Label>
+                        <Input
+                          id={`judgeInvite-${judge.id}`}
+                          type="email"
+                          value={judgeInviteEmail}
+                          onChange={(e) => setJudgeInviteEmail(e.target.value)}
+                          placeholder="judge@example.com"
+                          autoFocus
+                        />
+                      </div>
+                      <Button type="submit" disabled={judgeInviting || !judgeInviteEmail.trim()}>
+                        {judgeInviting ? 'Sending…' : 'Send invite'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setInviteForJudgeId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </form>
+                  )}
 
                   {expandedJudgeId === judge.id && (
                     <div className="border-t px-3 pb-3 pt-3 space-y-4">
