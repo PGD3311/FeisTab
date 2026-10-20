@@ -5,6 +5,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react'
 import { useSupabase } from '@/hooks/use-supabase'
 import { useEvent } from '@/contexts/event-context'
 import { showSuccess, showError } from '@/lib/feedback'
+import { nextStageName } from '@/lib/stages'
 import { type CompetitionStatus } from '@/lib/competition-states'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
@@ -201,24 +202,23 @@ export default function ProgramPage({
     return dt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
-  const [addingStageName, setAddingStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteRefusedId, setDeleteRefusedId] = useState<string | null>(null)
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [editingStageName, setEditingStageName] = useState('')
 
   async function handleAddStage() {
-    if (!addingStageName.trim()) return
     setAddingStage(true)
     const nextOrder = stages.length > 0 ? Math.max(...stages.map(s => s.display_order)) + 1 : 1
     const { error } = await supabase.from('stages').insert({
       event_id: eventId,
-      name: addingStageName.trim(),
+      name: nextStageName(stages.map(s => s.name)),
       display_order: nextOrder,
     })
     if (error) {
       showError('Failed to add stage', { description: error.message })
     } else {
-      setAddingStageName('')
       await loadData()
       showSuccess('Stage added')
     }
@@ -243,6 +243,8 @@ export default function ProgramPage({
   async function handleDeleteStage(stageId: string) {
     const stageComps = getCompsForStage(stageId)
     if (stageComps.length > 0) {
+      setDeleteConfirmId(null)
+      setDeleteRefusedId(stageId)
       showError('Cannot delete a stage that has competitions assigned')
       return
     }
@@ -253,6 +255,7 @@ export default function ProgramPage({
       await loadData()
       showSuccess('Stage deleted')
     }
+    setDeleteConfirmId(null)
   }
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>
@@ -262,7 +265,12 @@ export default function ProgramPage({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Schedule</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold">Schedule</h2>
+          <Button size="sm" onClick={handleAddStage} disabled={addingStage}>
+            {addingStage ? 'Adding...' : 'Add stage'}
+          </Button>
+        </div>
         <span className="text-sm text-muted-foreground">
           {competitions.length} competition{competitions.length !== 1 ? 's' : ''} total
         </span>
@@ -338,12 +346,35 @@ export default function ProgramPage({
                   <Badge variant="outline">
                     {stageComps.length} competition{stageComps.length !== 1 ? 's' : ''}
                   </Badge>
-                  {stageComps.length === 0 && (
+                  {deleteConfirmId === stage.id ? (
+                    <>
+                      <span className="text-sm font-normal">Delete {stage.name}?</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                        onClick={() => handleDeleteStage(stage.id)}
+                      >
+                        Delete
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setDeleteConfirmId(null)}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      className="text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeleteStage(stage.id)}
+                      variant="outline"
+                      className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                      onClick={() => {
+                        setDeleteRefusedId(null)
+                        if (stageComps.length > 0) {
+                          setDeleteRefusedId(stage.id)
+                          showError('Cannot delete a stage that has competitions assigned')
+                        } else {
+                          setDeleteConfirmId(stage.id)
+                        }
+                      }}
                     >
                       Delete
                     </Button>
@@ -352,6 +383,11 @@ export default function ProgramPage({
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {deleteRefusedId === stage.id && stageComps.length > 0 && (
+                <p className="text-sm text-destructive pb-2">
+                  Cannot delete a stage that has competitions assigned. Move them first.
+                </p>
+              )}
               {stageComps.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">
                   No competitions assigned to this stage yet.
@@ -534,25 +570,6 @@ export default function ProgramPage({
           </CardContent>
         </Card>
       )}
-
-      {/* Add Stage */}
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={addingStageName}
-          onChange={(e) => setAddingStageName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleAddStage() }}
-          placeholder="New stage name..."
-          className="border rounded-md px-3 py-2 text-sm flex-1"
-        />
-        <Button
-          onClick={handleAddStage}
-          disabled={!addingStageName.trim() || addingStage}
-          size="sm"
-        >
-          {addingStage ? 'Adding...' : 'Add Stage'}
-        </Button>
-      </div>
 
       {/* Save confirmation */}
       {competitions.length > 0 && (
