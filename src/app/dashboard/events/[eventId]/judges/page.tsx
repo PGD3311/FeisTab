@@ -1,294 +1,268 @@
-"use client";
+'use client'
 
-import { useEffect, useState, useCallback, use } from "react";
-import { showSuccess, showError } from "@/lib/feedback";
-import {
-  canTransition,
-  type CompetitionStatus,
-} from "@/lib/competition-states";
-import { removeJudge } from "@/lib/supabase/rpc";
+import { useEffect, useState, useCallback, use } from 'react'
+import { showSuccess, showError } from '@/lib/feedback'
+import { canTransition, type CompetitionStatus } from '@/lib/competition-states'
+import { removeJudge } from '@/lib/supabase/rpc'
 import {
   INVITE_ROLE_LABELS,
   JUDGE_LOGIN_LABELS,
   inviteState,
   inviteUrl,
   isEventRole,
-  judgeLoginStatus,
-} from "@/lib/invitations";
-import { useSupabase } from "@/hooks/use-supabase";
-import { useEvent } from "@/contexts/event-context";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { type JudgeInfo } from "@/types/shared";
+  judgeLoginStatus
+} from '@/lib/invitations'
+import { useSupabase } from '@/hooks/use-supabase'
+import { useEvent } from '@/contexts/event-context'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { type JudgeInfo } from '@/types/shared'
 import {
   createInvitation,
   getTeamEmails,
   resendInvitation,
-  type InviteActionResult,
-} from "./actions";
+  type InviteActionResult
+} from './actions'
 
 interface Judge extends JudgeInfo {
-  user_id: string | null;
+  user_id: string | null
 }
 
 interface PendingInvite {
-  id: string;
-  email: string;
-  role: string;
-  judge_id: string | null;
-  token: string;
-  created_at: string;
-  expires_at: string;
-  accepted_at: string | null;
+  id: string
+  email: string
+  role: string
+  judge_id: string | null
+  token: string
+  created_at: string
+  expires_at: string
+  accepted_at: string | null
 }
 
-type InviteOutcome = Extract<InviteActionResult, { ok: true }>;
+type InviteOutcome = Extract<InviteActionResult, { ok: true }>
 
 interface Competition {
-  id: string;
-  code: string | null;
-  name: string;
-  age_group: string | null;
-  level: string | null;
-  stage_id: string | null;
+  id: string
+  code: string | null
+  name: string
+  age_group: string | null
+  level: string | null
+  stage_id: string | null
 }
 
 interface Stage {
-  id: string;
-  name: string;
+  id: string
+  name: string
 }
 
 interface AssignmentCounts {
-  [judgeId: string]: number;
+  [judgeId: string]: number
 }
 
 interface JudgeAssignment {
-  id: string;
-  competition_id: string;
-  competition: Competition;
+  id: string
+  competition_id: string
+  competition: Competition
 }
 
 function parseCodeAsNumber(code: string | null): number | null {
-  if (!code) return null;
-  const n = parseInt(code, 10);
-  return isNaN(n) ? null : n;
+  if (!code) return null
+  const n = parseInt(code, 10)
+  return isNaN(n) ? null : n
 }
 
-export default function JudgeManagementPage({
-  params,
-}: {
-  params: Promise<{ eventId: string }>;
-}) {
-  const { eventId } = use(params);
-  const supabase = useSupabase();
-  const { reload } = useEvent();
-  const [judges, setJudges] = useState<Judge[]>([]);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [newJudgeEmail, setNewJudgeEmail] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+export default function JudgeManagementPage({ params }: { params: Promise<{ eventId: string }> }) {
+  const { eventId } = use(params)
+  const supabase = useSupabase()
+  const { reload } = useEvent()
+  const [judges, setJudges] = useState<Judge[]>([])
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [newJudgeEmail, setNewJudgeEmail] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   // Assignment state
-  const [, setStages] = useState<Stage[]>([]);
-  const [competitions, setCompetitions] = useState<Competition[]>([]);
-  const [assignmentCounts, setAssignmentCounts] = useState<AssignmentCounts>(
-    {},
-  );
-  const [expandedJudgeId, setExpandedJudgeId] = useState<string | null>(null);
-  const [judgeAssignments, setJudgeAssignments] = useState<JudgeAssignment[]>(
-    [],
-  );
-  const [loadingAssignments, setLoadingAssignments] = useState(false);
-  const [assigningBatch, setAssigningBatch] = useState(false);
+  const [, setStages] = useState<Stage[]>([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [assignmentCounts, setAssignmentCounts] = useState<AssignmentCounts>({})
+  const [expandedJudgeId, setExpandedJudgeId] = useState<string | null>(null)
+  const [judgeAssignments, setJudgeAssignments] = useState<JudgeAssignment[]>([])
+  const [loadingAssignments, setLoadingAssignments] = useState(false)
+  const [assigningBatch, setAssigningBatch] = useState(false)
 
   // Batch assign controls
-  const [codeStart, setCodeStart] = useState("");
-  const [codeEnd, setCodeEnd] = useState("");
-  const [filterLevel, setFilterLevel] = useState("");
-  const [filterAgeGroup, setFilterAgeGroup] = useState("");
+  const [codeStart, setCodeStart] = useState('')
+  const [codeEnd, setCodeEnd] = useState('')
+  const [filterLevel, setFilterLevel] = useState('')
+  const [filterAgeGroup, setFilterAgeGroup] = useState('')
 
   // Team management state
-  const [teamMembers, setTeamMembers] = useState<
-    Array<{
-      id: string;
-      user_id: string;
-      role: string;
-      created_at: string;
-      user_email?: string;
-    }>
-  >([]);
-  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-  const [memberEmails, setMemberEmails] = useState<Record<string, string>>({});
-  const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(
-    null,
-  );
-  const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
-  const [outcomeScope, setOutcomeScope] = useState<"team" | "judge">("team");
-  const [inviteForJudgeId, setInviteForJudgeId] = useState<string | null>(null);
-  const [judgeInviteEmail, setJudgeInviteEmail] = useState("");
-  const [judgeInviting, setJudgeInviting] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("registration_desk");
-  const [inviting, setInviting] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<Array<{
+    id: string
+    user_id: string
+    role: string
+    created_at: string
+    user_email?: string
+  }>>([])
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const [memberEmails, setMemberEmails] = useState<Record<string, string>>({})
+  const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null)
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
+  const [outcomeScope, setOutcomeScope] = useState<'team' | 'judge'>('team')
+  const [inviteForJudgeId, setInviteForJudgeId] = useState<string | null>(null)
+  const [judgeInviteEmail, setJudgeInviteEmail] = useState('')
+  const [judgeInviting, setJudgeInviting] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('registration_desk')
+  const [inviting, setInviting] = useState(false)
 
   const loadJudges = useCallback(async () => {
     const { data, error } = await supabase
-      .from("judges")
-      .select("id, first_name, last_name, user_id")
-      .eq("event_id", eventId)
-      .order("created_at");
+      .from('judges')
+      .select('id, first_name, last_name, user_id')
+      .eq('event_id', eventId)
+      .order('created_at')
     if (error) {
-      console.error("Failed to load judges:", error.message);
-      setLoadError(true);
-      setLoading(false);
-      return;
+      console.error('Failed to load judges:', error.message)
+      setLoadError(true)
+      setLoading(false)
+      return
     }
-    setLoadError(false);
-    setJudges((data as Judge[]) ?? []);
-    setLoading(false);
-  }, [supabase, eventId]);
+    setLoadError(false)
+    setJudges((data as Judge[]) ?? [])
+    setLoading(false)
+  }, [supabase, eventId])
 
   const loadStages = useCallback(async () => {
     const { data, error } = await supabase
-      .from("stages")
-      .select("id, name")
-      .eq("event_id", eventId)
-      .order("display_order");
-    if (!error) setStages((data as Stage[]) ?? []);
-  }, [supabase, eventId]);
+      .from('stages')
+      .select('id, name')
+      .eq('event_id', eventId)
+      .order('display_order')
+    if (!error) setStages((data as Stage[]) ?? [])
+  }, [supabase, eventId])
 
   const loadCompetitions = useCallback(async () => {
     const { data, error } = await supabase
-      .from("competitions")
-      .select("id, code, name, age_group, level, stage_id")
-      .eq("event_id", eventId)
-      .order("code");
+      .from('competitions')
+      .select('id, code, name, age_group, level, stage_id')
+      .eq('event_id', eventId)
+      .order('code')
     if (error) {
-      console.error("Failed to load competitions:", error.message);
-      return;
+      console.error('Failed to load competitions:', error.message)
+      return
     }
-    setCompetitions((data as Competition[]) ?? []);
-  }, [supabase, eventId]);
+    setCompetitions((data as Competition[]) ?? [])
+  }, [supabase, eventId])
 
   const loadAssignmentCounts = useCallback(async () => {
     // Get all assignments for this event's judges, then count per judge
     const { data: judgeIds, error: judgeError } = await supabase
-      .from("judges")
-      .select("id")
-      .eq("event_id", eventId);
+      .from('judges')
+      .select('id')
+      .eq('event_id', eventId)
     if (judgeError) {
-      console.error("Failed to load judge IDs for counts:", judgeError.message);
-      return;
+      console.error('Failed to load judge IDs for counts:', judgeError.message)
+      return
     }
     if (!judgeIds || judgeIds.length === 0) {
-      setAssignmentCounts({});
-      return;
+      setAssignmentCounts({})
+      return
     }
 
-    const ids = (judgeIds as Array<{ id: string }>).map((j) => j.id);
+    const ids = (judgeIds as Array<{ id: string }>).map((j) => j.id)
     const { data, error } = await supabase
-      .from("judge_assignments")
-      .select("judge_id")
-      .in("judge_id", ids);
+      .from('judge_assignments')
+      .select('judge_id')
+      .in('judge_id', ids)
     if (error) {
-      console.error("Failed to load assignment counts:", error.message);
-      return;
+      console.error('Failed to load assignment counts:', error.message)
+      return
     }
 
-    const counts: AssignmentCounts = {};
+    const counts: AssignmentCounts = {}
     for (const row of (data as Array<{ judge_id: string }>) ?? []) {
-      counts[row.judge_id] = (counts[row.judge_id] ?? 0) + 1;
+      counts[row.judge_id] = (counts[row.judge_id] ?? 0) + 1
     }
-    setAssignmentCounts(counts);
-  }, [supabase, eventId]);
+    setAssignmentCounts(counts)
+  }, [supabase, eventId])
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [confirmRemoveRoleId, setConfirmRemoveRoleId] = useState<string | null>(
-    null,
-  );
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [confirmRemoveRoleId, setConfirmRemoveRoleId] = useState<string | null>(null)
 
   const loadTeamData = useCallback(async () => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
-    setCurrentUserId(user?.id ?? null);
+    } = await supabase.auth.getUser()
+    setCurrentUserId(user?.id ?? null)
     const { data: roles } = await supabase
-      .from("event_roles")
-      .select("id, user_id, role, created_at")
-      .eq("event_id", eventId)
-      .order("created_at");
+      .from('event_roles')
+      .select('id, user_id, role, created_at')
+      .eq('event_id', eventId)
+      .order('created_at')
 
     const { data: invites } = await supabase
-      .from("pending_invitations")
-      .select(
-        "id, email, role, judge_id, token, created_at, expires_at, accepted_at",
-      )
-      .eq("event_id", eventId)
-      .order("created_at");
+      .from('pending_invitations')
+      .select('id, email, role, judge_id, token, created_at, expires_at, accepted_at')
+      .eq('event_id', eventId)
+      .order('created_at')
 
-    if (roles) setTeamMembers(roles);
-    if (invites) setPendingInvites(invites as PendingInvite[]);
-    setMemberEmails(await getTeamEmails(eventId));
-  }, [supabase, eventId]);
+    if (roles) setTeamMembers(roles)
+    if (invites) setPendingInvites(invites as PendingInvite[])
+    setMemberEmails(await getTeamEmails(eventId))
+  }, [supabase, eventId])
 
   useEffect(() => {
-    void loadJudges();
-    void loadCompetitions();
-    void loadAssignmentCounts();
-    void loadStages();
-    void loadTeamData();
-  }, [
-    loadJudges,
-    loadCompetitions,
-    loadAssignmentCounts,
-    loadStages,
-    loadTeamData,
-  ]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    void loadJudges()
+    void loadCompetitions()
+    void loadAssignmentCounts()
+    void loadStages()
+    void loadTeamData()
+  }, [loadJudges, loadCompetitions, loadAssignmentCounts, loadStages, loadTeamData])
 
   async function loadJudgeAssignments(judgeId: string) {
-    setLoadingAssignments(true);
+    setLoadingAssignments(true)
     const { data, error } = await supabase
-      .from("judge_assignments")
-      .select(
-        "id, competition_id, competitions(id, code, name, age_group, level)",
-      )
-      .eq("judge_id", judgeId);
+      .from('judge_assignments')
+      .select('id, competition_id, competitions(id, code, name, age_group, level)')
+      .eq('judge_id', judgeId)
     if (error) {
-      showError("Failed to load assignments", { description: error.message });
-      setLoadingAssignments(false);
-      return;
+      showError('Failed to load assignments', { description: error.message })
+      setLoadingAssignments(false)
+      return
     }
 
     // Supabase returns joined relations; cast through unknown for safety
     const rawRows = (data ?? []) as unknown as Array<{
-      id: string;
-      competition_id: string;
-      competitions: Competition;
-    }>;
+      id: string
+      competition_id: string
+      competitions: Competition
+    }>
 
     const assignments: JudgeAssignment[] = rawRows.map((row) => ({
       id: row.id,
       competition_id: row.competition_id,
       competition: row.competitions,
-    }));
+    }))
 
     // Sort by competition code numerically
     assignments.sort((a, b) => {
-      const codeA = parseCodeAsNumber(a.competition.code);
-      const codeB = parseCodeAsNumber(b.competition.code);
-      if (codeA !== null && codeB !== null) return codeA - codeB;
-      if (codeA !== null) return -1;
-      if (codeB !== null) return 1;
-      return (a.competition.code ?? "").localeCompare(b.competition.code ?? "");
-    });
+      const codeA = parseCodeAsNumber(a.competition.code)
+      const codeB = parseCodeAsNumber(b.competition.code)
+      if (codeA !== null && codeB !== null) return codeA - codeB
+      if (codeA !== null) return -1
+      if (codeB !== null) return 1
+      return (a.competition.code ?? '').localeCompare(b.competition.code ?? '')
+    })
 
-    setJudgeAssignments(assignments);
-    setLoadingAssignments(false);
+    setJudgeAssignments(assignments)
+    setLoadingAssignments(false)
   }
 
   /**
@@ -297,474 +271,423 @@ export default function JudgeManagementPage({
    * their status to `awaiting_scores` and audit-log the change.
    */
   async function revertStaleReadyToTabulate(competitionIds: string[]) {
-    if (competitionIds.length === 0) return;
+    if (competitionIds.length === 0) return
 
     // 1. Find which of these competitions are currently ready_to_tabulate
     const { data: comps, error: compErr } = await supabase
-      .from("competitions")
-      .select("id, status")
-      .in("id", competitionIds)
-      .eq("status", "ready_to_tabulate");
+      .from('competitions')
+      .select('id, status')
+      .in('id', competitionIds)
+      .eq('status', 'ready_to_tabulate')
     if (compErr) {
-      console.error("Failed to check competition statuses:", compErr.message);
-      return;
+      console.error('Failed to check competition statuses:', compErr.message)
+      return
     }
-    if (!comps || comps.length === 0) return;
+    if (!comps || comps.length === 0) return
 
     for (const comp of comps as Array<{ id: string; status: string }>) {
       // 2. Get the latest round's sign-offs
       const { data: rounds, error: roundErr } = await supabase
-        .from("rounds")
-        .select("id, judge_sign_offs")
-        .eq("competition_id", comp.id)
-        .order("round_number", { ascending: false })
-        .limit(1);
+        .from('rounds')
+        .select('id, judge_sign_offs')
+        .eq('competition_id', comp.id)
+        .order('round_number', { ascending: false })
+        .limit(1)
       if (roundErr) {
-        console.error(
-          `Failed to load rounds for ${comp.id}:`,
-          roundErr.message,
-        );
-        continue;
+        console.error(`Failed to load rounds for ${comp.id}:`, roundErr.message)
+        continue
       }
       const latestRound = rounds?.[0] as
         | { id: string; judge_sign_offs: Record<string, string> | null }
-        | undefined;
-      const signOffs = latestRound?.judge_sign_offs ?? {};
+        | undefined
+      const signOffs = latestRound?.judge_sign_offs ?? {}
 
       // 3. Get the NEW assignment list for this competition
       const { data: assignments, error: assignErr } = await supabase
-        .from("judge_assignments")
-        .select("judge_id")
-        .eq("competition_id", comp.id);
+        .from('judge_assignments')
+        .select('judge_id')
+        .eq('competition_id', comp.id)
       if (assignErr) {
-        console.error(
-          `Failed to load assignments for ${comp.id}:`,
-          assignErr.message,
-        );
-        continue;
+        console.error(`Failed to load assignments for ${comp.id}:`, assignErr.message)
+        continue
       }
 
       const assignedJudgeIds = (assignments ?? []).map(
-        (a: { judge_id: string }) => a.judge_id,
-      );
+        (a: { judge_id: string }) => a.judge_id
+      )
 
       // 4. Check if every assigned judge has signed off
       const allSignedOff =
         assignedJudgeIds.length > 0 &&
-        assignedJudgeIds.every((id: string) => signOffs[id]);
+        assignedJudgeIds.every((id: string) => signOffs[id])
 
       if (!allSignedOff) {
-        const from = comp.status as CompetitionStatus;
-        const to: CompetitionStatus = "awaiting_scores";
+        const from = comp.status as CompetitionStatus
+        const to: CompetitionStatus = 'awaiting_scores'
 
         if (!canTransition(from, to)) {
           console.error(
-            `Cannot transition competition ${comp.id} from ${from} to ${to}`,
-          );
-          continue;
+            `Cannot transition competition ${comp.id} from ${from} to ${to}`
+          )
+          continue
         }
 
         const { error: updateErr } = await supabase
-          .from("competitions")
+          .from('competitions')
           .update({ status: to })
-          .eq("id", comp.id);
+          .eq('id', comp.id)
         if (updateErr) {
           console.error(
             `Failed to revert competition ${comp.id} status:`,
-            updateErr.message,
-          );
-          continue;
+            updateErr.message
+          )
+          continue
         }
 
         console.log(
-          `Reverted competition ${comp.id} from ${from} to ${to} due to assignment change`,
-        );
+          `Reverted competition ${comp.id} from ${from} to ${to} due to assignment change`
+        )
       }
     }
   }
 
   function toggleExpanded(judgeId: string) {
     if (expandedJudgeId === judgeId) {
-      setExpandedJudgeId(null);
-      setJudgeAssignments([]);
-      return;
+      setExpandedJudgeId(null)
+      setJudgeAssignments([])
+      return
     }
-    setExpandedJudgeId(judgeId);
-    setCodeStart("");
-    setCodeEnd("");
-    setFilterLevel("");
-    setFilterAgeGroup("");
-    void loadJudgeAssignments(judgeId);
+    setExpandedJudgeId(judgeId)
+    setCodeStart('')
+    setCodeEnd('')
+    setFilterLevel('')
+    setFilterAgeGroup('')
+    void loadJudgeAssignments(judgeId)
   }
 
   async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!firstName.trim() || !lastName.trim()) return;
-    const email = newJudgeEmail.trim();
-    setSaving(true);
+    e.preventDefault()
+    if (!firstName.trim() || !lastName.trim()) return
+    const email = newJudgeEmail.trim()
+    setSaving(true)
     try {
       const { data, error: err } = await supabase
-        .from("judges")
+        .from('judges')
         .insert({
           event_id: eventId,
           first_name: firstName.trim(),
-          last_name: lastName.trim(),
+          last_name: lastName.trim()
         })
-        .select("id")
-        .single();
+        .select('id')
+        .single()
 
       if (err || !data) {
-        showError("Failed to add judge", { description: err?.message });
-        return;
+        showError('Failed to add judge', { description: err?.message })
+        return
       }
-      showSuccess("Judge added");
-      setFirstName("");
-      setLastName("");
-      setNewJudgeEmail("");
-      await loadJudges();
+      showSuccess('Judge added')
+      setFirstName('')
+      setLastName('')
+      setNewJudgeEmail('')
+      await loadJudges()
       if (email) {
         // The judge is kept even if the invite fails; Invite on their row retries it.
-        await sendJudgeInvite((data as { id: string }).id, email);
+        await sendJudgeInvite((data as { id: string }).id, email)
       }
     } catch {
-      showError("Could not add the judge. Try again.");
+      showError('Could not add the judge. Try again.')
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
   /** Invite a judge by email, linked to their judge row. Returns true if created. */
-  async function sendJudgeInvite(
-    judgeId: string,
-    email: string,
-  ): Promise<boolean> {
+  async function sendJudgeInvite(judgeId: string, email: string): Promise<boolean> {
     try {
       const result = await createInvitation({
         eventId,
         email,
-        role: "judge",
-        judgeId,
-      });
+        role: 'judge',
+        judgeId
+      })
       if (!result.ok) {
-        showError(result.error);
-        return false;
+        showError(result.error)
+        return false
       }
-      setOutcomeScope("judge");
-      setInviteOutcome(result);
-      showSuccess(
-        result.emailed ? `Invite emailed to ${result.email}` : "Invite created",
-      );
-      await loadTeamData();
-      return true;
+      setOutcomeScope('judge')
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed to ${result.email}` : 'Invite created')
+      await loadTeamData()
+      return true
     } catch {
-      showError("Could not create the invitation. Try again.");
-      return false;
+      showError('Could not create the invitation. Try again.')
+      return false
     }
   }
 
   async function handleJudgeRowInvite(judgeId: string) {
-    if (!judgeInviteEmail.trim()) return;
-    setJudgeInviting(true);
-    setInviteOutcome(null);
-    const ok = await sendJudgeInvite(judgeId, judgeInviteEmail);
+    if (!judgeInviteEmail.trim()) return
+    setJudgeInviting(true)
+    setInviteOutcome(null)
+    const ok = await sendJudgeInvite(judgeId, judgeInviteEmail)
     if (ok) {
-      setInviteForJudgeId(null);
-      setJudgeInviteEmail("");
+      setInviteForJudgeId(null)
+      setJudgeInviteEmail('')
     }
-    setJudgeInviting(false);
+    setJudgeInviting(false)
   }
 
   async function handleInvite() {
-    if (!inviteEmail.trim()) return;
-    setInviting(true);
-    setInviteOutcome(null);
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    setInviteOutcome(null)
     try {
       const result = await createInvitation({
         eventId,
         email: inviteEmail,
         role: inviteRole,
         judgeId: null,
-      });
+      })
       if (!result.ok) {
-        showError(result.error);
-        return;
+        showError(result.error)
+        return
       }
-      setOutcomeScope("team");
-      setInviteOutcome(result);
-      showSuccess(
-        result.emailed ? `Invite emailed to ${result.email}` : "Invite created",
-      );
-      setInviteEmail("");
-      await loadTeamData();
+      setOutcomeScope('team')
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed to ${result.email}` : 'Invite created')
+      setInviteEmail('')
+      await loadTeamData()
     } catch {
-      showError("Could not create the invitation. Try again.");
+      showError('Could not create the invitation. Try again.')
     } finally {
-      setInviting(false);
+      setInviting(false)
     }
   }
 
   async function handleResend(inviteId: string) {
-    setBusyInviteId(inviteId);
+    setBusyInviteId(inviteId)
     try {
-      const result = await resendInvitation(inviteId);
+      const result = await resendInvitation(inviteId)
       if (!result.ok) {
-        showError(result.error);
-        return;
+        showError(result.error)
+        return
       }
-      setOutcomeScope(
-        judges.some((j) =>
-          pendingInvites.some((i) => i.id === inviteId && i.judge_id === j.id),
-        )
-          ? "judge"
-          : "team",
-      );
-      setInviteOutcome(result);
-      showSuccess(
-        result.emailed
-          ? `Invite emailed again to ${result.email}`
-          : "Invite renewed",
-      );
-      await loadTeamData();
+      setOutcomeScope(judges.some((j) => pendingInvites.some((i) => i.id === inviteId && i.judge_id === j.id)) ? 'judge' : 'team')
+      setInviteOutcome(result)
+      showSuccess(result.emailed ? `Invite emailed again to ${result.email}` : 'Invite renewed')
+      await loadTeamData()
     } catch {
-      showError("Could not resend the invitation. Try again.");
+      showError('Could not resend the invitation. Try again.')
     } finally {
-      setBusyInviteId(null);
+      setBusyInviteId(null)
     }
   }
 
   async function copyLink(url: string) {
     try {
-      await navigator.clipboard.writeText(url);
-      showSuccess("Invite link copied");
+      await navigator.clipboard.writeText(url)
+      showSuccess('Invite link copied')
     } catch {
-      showError("Could not copy. Select the link and copy it by hand.");
+      showError('Could not copy. Select the link and copy it by hand.')
     }
   }
 
   async function handleRemoveRole(roleId: string) {
-    setConfirmRemoveRoleId(null);
-    const member = teamMembers.find((m) => m.id === roleId);
+    setConfirmRemoveRoleId(null)
+    const member = teamMembers.find((m) => m.id === roleId)
     if (member && member.user_id === currentUserId) {
-      showError("You can't remove yourself from this feis");
-      return;
+      showError("You can't remove yourself from this feis")
+      return
     }
-    if (member?.role === "organizer" && organizerCount <= 1) {
-      showError("A feis needs at least one organiser");
-      return;
+    if (member?.role === 'organizer' && organizerCount <= 1) {
+      showError('A feis needs at least one organiser')
+      return
     }
-    const { error } = await supabase
-      .from("event_roles")
-      .delete()
-      .eq("id", roleId);
+    const { error } = await supabase.from('event_roles').delete().eq('id', roleId)
     if (error) {
-      showError("Failed to remove role");
-      return;
+      showError('Failed to remove role')
+      return
     }
-    showSuccess("Role removed");
-    await loadTeamData();
+    showSuccess('Role removed')
+    await loadTeamData()
   }
 
   async function handleRevokeInvite(inviteId: string) {
-    const { error } = await supabase
-      .from("pending_invitations")
-      .delete()
-      .eq("id", inviteId);
+    const { error } = await supabase.from('pending_invitations').delete().eq('id', inviteId)
     if (error) {
-      showError("Failed to revoke invitation");
-      return;
+      showError('Failed to revoke invitation')
+      return
     }
-    showSuccess("Invitation revoked");
-    await loadTeamData();
+    showSuccess('Invitation revoked')
+    await loadTeamData()
   }
 
   async function handleRemove(judgeId: string) {
     try {
       // Refused by the database if the judge has entered any scores
-      await removeJudge(supabase, judgeId);
+      await removeJudge(supabase, judgeId)
     } catch (err) {
-      showError("Failed to remove judge", {
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
-      return;
+      showError('Failed to remove judge', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+      return
     }
-    showSuccess("Judge removed");
+    showSuccess('Judge removed')
     if (expandedJudgeId === judgeId) {
-      setExpandedJudgeId(null);
-      setJudgeAssignments([]);
+      setExpandedJudgeId(null)
+      setJudgeAssignments([])
     }
-    void loadJudges();
-    void loadAssignmentCounts();
+    void loadJudges()
+    void loadAssignmentCounts()
   }
 
   async function assignCompetitions(judgeId: string, competitionIds: string[]) {
-    if (competitionIds.length === 0) return;
+    if (competitionIds.length === 0) return
 
     // Filter out already-assigned competitions
-    const existingIds = new Set(judgeAssignments.map((a) => a.competition_id));
-    const newIds = competitionIds.filter((id) => !existingIds.has(id));
+    const existingIds = new Set(judgeAssignments.map((a) => a.competition_id))
+    const newIds = competitionIds.filter((id) => !existingIds.has(id))
     if (newIds.length === 0) {
-      showSuccess("All selected competitions already assigned");
-      return;
+      showSuccess('All selected competitions already assigned')
+      return
     }
 
-    setAssigningBatch(true);
+    setAssigningBatch(true)
     const rows = newIds.map((compId) => ({
       judge_id: judgeId,
       competition_id: compId,
-    }));
+    }))
 
-    const { error } = await supabase.from("judge_assignments").insert(rows);
+    const { error } = await supabase.from('judge_assignments').insert(rows)
     if (error) {
-      showError("Failed to assign competitions", {
-        description: error.message,
-      });
-      setAssigningBatch(false);
-      return;
+      showError('Failed to assign competitions', { description: error.message })
+      setAssigningBatch(false)
+      return
     }
 
-    showSuccess(
-      `Assigned ${newIds.length} competition${newIds.length === 1 ? "" : "s"}`,
-    );
-    await loadJudgeAssignments(judgeId);
-    void loadAssignmentCounts();
-    await revertStaleReadyToTabulate(newIds);
-    void reload();
-    setAssigningBatch(false);
+    showSuccess(`Assigned ${newIds.length} competition${newIds.length === 1 ? '' : 's'}`)
+    await loadJudgeAssignments(judgeId)
+    void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(newIds)
+    void reload()
+    setAssigningBatch(false)
   }
 
   async function handleRemoveAssignment(assignmentId: string, judgeId: string) {
     // Capture affected competition before deleting
-    const affected = judgeAssignments.find((a) => a.id === assignmentId);
-    const affectedCompIds = affected ? [affected.competition_id] : [];
+    const affected = judgeAssignments.find((a) => a.id === assignmentId)
+    const affectedCompIds = affected ? [affected.competition_id] : []
 
-    const { error } = await supabase
-      .from("judge_assignments")
-      .delete()
-      .eq("id", assignmentId);
+    const { error } = await supabase.from('judge_assignments').delete().eq('id', assignmentId)
     if (error) {
-      showError("Failed to remove assignment", { description: error.message });
-      return;
+      showError('Failed to remove assignment', { description: error.message })
+      return
     }
-    showSuccess("Assignment removed");
-    await loadJudgeAssignments(judgeId);
-    void loadAssignmentCounts();
-    await revertStaleReadyToTabulate(affectedCompIds);
-    void reload();
+    showSuccess('Assignment removed')
+    await loadJudgeAssignments(judgeId)
+    void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(affectedCompIds)
+    void reload()
   }
 
   async function handleClearAll(judgeId: string) {
     // Capture affected competition IDs before clearing
-    const affectedCompIds = judgeAssignments.map((a) => a.competition_id);
+    const affectedCompIds = judgeAssignments.map((a) => a.competition_id)
 
     const { error } = await supabase
-      .from("judge_assignments")
+      .from('judge_assignments')
       .delete()
-      .eq("judge_id", judgeId);
+      .eq('judge_id', judgeId)
     if (error) {
-      showError("Failed to clear assignments", { description: error.message });
-      return;
+      showError('Failed to clear assignments', { description: error.message })
+      return
     }
-    showSuccess("All assignments cleared");
-    await loadJudgeAssignments(judgeId);
-    void loadAssignmentCounts();
-    await revertStaleReadyToTabulate(affectedCompIds);
-    void reload();
+    showSuccess('All assignments cleared')
+    await loadJudgeAssignments(judgeId)
+    void loadAssignmentCounts()
+    await revertStaleReadyToTabulate(affectedCompIds)
+    void reload()
   }
 
   function handleAssignByCodeRange(judgeId: string) {
-    const start = parseInt(codeStart, 10);
-    const end = parseInt(codeEnd, 10);
+    const start = parseInt(codeStart, 10)
+    const end = parseInt(codeEnd, 10)
     if (isNaN(start) || isNaN(end) || start > end) {
-      showError("Invalid code range", {
-        description: "Enter valid start and end numbers",
-      });
-      return;
+      showError('Invalid code range', { description: 'Enter valid start and end numbers' })
+      return
     }
 
     const matchingIds = competitions
       .filter((c) => {
-        const num = parseCodeAsNumber(c.code);
-        return num !== null && num >= start && num <= end;
+        const num = parseCodeAsNumber(c.code)
+        return num !== null && num >= start && num <= end
       })
-      .map((c) => c.id);
+      .map((c) => c.id)
 
     if (matchingIds.length === 0) {
-      showError("No competitions found in that code range");
-      return;
+      showError('No competitions found in that code range')
+      return
     }
 
-    void assignCompetitions(judgeId, matchingIds);
+    void assignCompetitions(judgeId, matchingIds)
   }
 
   function handleAssignByLevel(judgeId: string) {
-    if (!filterLevel) return;
-    const matchingIds = competitions
-      .filter((c) => c.level === filterLevel)
-      .map((c) => c.id);
+    if (!filterLevel) return
+    const matchingIds = competitions.filter((c) => c.level === filterLevel).map((c) => c.id)
     if (matchingIds.length === 0) {
-      showError(`No competitions found for level "${filterLevel}"`);
-      return;
+      showError(`No competitions found for level "${filterLevel}"`)
+      return
     }
-    void assignCompetitions(judgeId, matchingIds);
+    void assignCompetitions(judgeId, matchingIds)
   }
 
   function handleAssignByAgeGroup(judgeId: string) {
-    if (!filterAgeGroup) return;
-    const matchingIds = competitions
-      .filter((c) => c.age_group === filterAgeGroup)
-      .map((c) => c.id);
+    if (!filterAgeGroup) return
+    const matchingIds = competitions.filter((c) => c.age_group === filterAgeGroup).map((c) => c.id)
     if (matchingIds.length === 0) {
-      showError(`No competitions found for age group "${filterAgeGroup}"`);
-      return;
+      showError(`No competitions found for age group "${filterAgeGroup}"`)
+      return
     }
-    void assignCompetitions(judgeId, matchingIds);
+    void assignCompetitions(judgeId, matchingIds)
   }
 
   function handleAssignAll(judgeId: string) {
-    const allIds = competitions.map((c) => c.id);
-    void assignCompetitions(judgeId, allIds);
+    const allIds = competitions.map((c) => c.id)
+    void assignCompetitions(judgeId, allIds)
   }
 
-  const roleLabel = (role: string) =>
-    isEventRole(role) ? INVITE_ROLE_LABELS[role] : role;
+  const roleLabel = (role: string) => (isEventRole(role) ? INVITE_ROLE_LABELS[role] : role)
 
-  function roleBadgeVariant(
-    role: string,
-  ): "default" | "secondary" | "outline" | "destructive" {
+  function roleBadgeVariant(role: string): 'default' | 'secondary' | 'outline' | 'destructive' {
     switch (role) {
-      case "organizer":
-        return "default";
-      case "registration_desk":
-        return "secondary";
-      case "side_stage":
-        return "outline";
-      case "judge":
-        return "destructive";
+      case 'organizer':
+        return 'default'
+      case 'registration_desk':
+        return 'secondary'
+      case 'side_stage':
+        return 'outline'
+      case 'judge':
+        return 'destructive'
       default:
-        return "secondary";
+        return 'secondary'
     }
   }
 
   const openJudgeInvite = (judgeId: string) =>
-    pendingInvites.find(
-      (inv) => inv.judge_id === judgeId && inv.accepted_at === null,
-    ) ?? null;
-  const teamOnlyMembers = teamMembers.filter((m) => m.role !== "judge");
-  const organizerCount = teamMembers.filter(
-    (m) => m.role === "organizer",
-  ).length;
-  const teamOnlyInvites = pendingInvites.filter((inv) => inv.role !== "judge");
-  const now = new Date();
+    pendingInvites.find((inv) => inv.judge_id === judgeId && inv.accepted_at === null) ?? null
+  const teamOnlyMembers = teamMembers.filter((m) => m.role !== 'judge')
+  const organizerCount = teamMembers.filter((m) => m.role === 'organizer').length
+  const teamOnlyInvites = pendingInvites.filter((inv) => inv.role !== 'judge')
+  const now = new Date()
 
   // Derive unique levels and age groups for dropdowns
-  const uniqueLevels = [
-    ...new Set(competitions.map((c) => c.level).filter(Boolean)),
-  ] as string[];
+  const uniqueLevels = [...new Set(competitions.map((c) => c.level).filter(Boolean))] as string[]
   const uniqueAgeGroups = [
     ...new Set(competitions.map((c) => c.age_group).filter(Boolean)),
-  ] as string[];
+  ] as string[]
 
-  if (loading) return <p className="text-muted-foreground p-6">Loading...</p>;
+  if (loading) return <p className="text-muted-foreground p-6">Loading...</p>
 
   if (loadError) {
     return (
@@ -773,7 +696,7 @@ export default function JudgeManagementPage({
           Could not load judges. Try refreshing.
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -783,8 +706,8 @@ export default function JudgeManagementPage({
         <CardHeader>
           <CardTitle className="text-lg">Team</CardTitle>
           <p className="text-sm text-muted-foreground">
-            People who run the feis with you. Each gets a link to set a password
-            and goes straight to their screen.
+            People who run the feis with you. Each gets a link to set a password and goes straight
+            to their screen.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -819,20 +742,17 @@ export default function JudgeManagementPage({
                   <option value="side_stage">Side-stage</option>
                 </select>
               </div>
-              <Button
-                onClick={() => void handleInvite()}
-                disabled={inviting || !inviteEmail.trim()}
-              >
-                {inviting ? "Sending…" : "Send invite"}
+              <Button onClick={() => void handleInvite()} disabled={inviting || !inviteEmail.trim()}>
+                {inviting ? 'Sending…' : 'Send invite'}
               </Button>
             </div>
 
-            {inviteOutcome && outcomeScope === "team" && (
+            {inviteOutcome && outcomeScope === 'team' && (
               <div className="rounded-md border border-feis-green/30 bg-feis-green-light p-3 space-y-2">
                 <p className="text-sm font-medium text-feis-green">
                   {inviteOutcome.emailed
                     ? `Invite emailed to ${inviteOutcome.email}.`
-                    : `${inviteOutcome.emailProblem ?? "The email was not sent"}. Text or email this link to ${inviteOutcome.email}:`}
+                    : `${inviteOutcome.emailProblem ?? 'The email was not sent'}. Text or email this link to ${inviteOutcome.email}:`}
                 </p>
                 <div className="flex gap-2 items-center">
                   <Input
@@ -877,19 +797,15 @@ export default function JudgeManagementPage({
                           </Badge>
                         </td>
                         <td className="p-2 text-muted-foreground break-all">
-                          {memberEmails[member.user_id] ??
-                            `${member.user_id.slice(0, 8)}…`}
+                          {memberEmails[member.user_id] ?? `${member.user_id.slice(0, 8)}…`}
                         </td>
                         <td className="p-2 text-muted-foreground">
                           {new Date(member.created_at).toLocaleDateString()}
                         </td>
                         <td className="p-2 text-right">
                           {member.user_id === currentUserId ? (
-                            <span className="text-xs text-muted-foreground">
-                              You
-                            </span>
-                          ) : member.role === "organizer" &&
-                            organizerCount <= 1 ? null : confirmRemoveRoleId ===
+                            <span className="text-xs text-muted-foreground">You</span>
+                          ) : member.role === 'organizer' && organizerCount <= 1 ? null : confirmRemoveRoleId ===
                             member.id ? (
                             <span className="inline-flex items-center gap-1">
                               <span className="text-xs">Remove?</span>
@@ -954,11 +870,11 @@ export default function JudgeManagementPage({
                           </Badge>
                         </td>
                         <td className="p-2">
-                          {inviteState(invite, now) === "accepted" ? (
+                          {inviteState(invite, now) === 'accepted' ? (
                             <Badge variant="default" className="text-xs">
                               Accepted
                             </Badge>
-                          ) : inviteState(invite, now) === "expired" ? (
+                          ) : inviteState(invite, now) === 'expired' ? (
                             <Badge variant="destructive" className="text-xs">
                               Expired
                             </Badge>
@@ -974,18 +890,13 @@ export default function JudgeManagementPage({
                         <td className="p-2 text-right whitespace-nowrap">
                           {!invite.accepted_at && (
                             <>
-                              {inviteState(invite, now) === "open" && (
+                              {inviteState(invite, now) === 'open' && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-xs"
                                   onClick={() =>
-                                    void copyLink(
-                                      inviteUrl(
-                                        window.location.origin,
-                                        invite.token,
-                                      ),
-                                    )
+                                    void copyLink(inviteUrl(window.location.origin, invite.token))
                                   }
                                 >
                                   Copy link
@@ -998,17 +909,13 @@ export default function JudgeManagementPage({
                                 disabled={busyInviteId === invite.id}
                                 onClick={() => void handleResend(invite.id)}
                               >
-                                {busyInviteId === invite.id
-                                  ? "Sending…"
-                                  : "Resend"}
+                                {busyInviteId === invite.id ? 'Sending…' : 'Resend'}
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                                onClick={() =>
-                                  void handleRevokeInvite(invite.id)
-                                }
+                                onClick={() => void handleRevokeInvite(invite.id)}
                               >
                                 Revoke
                               </Button>
@@ -1025,8 +932,8 @@ export default function JudgeManagementPage({
 
           {teamOnlyMembers.length === 0 && teamOnlyInvites.length === 0 && (
             <p className="text-muted-foreground text-sm">
-              No team members or invitations yet. Invite people above to give
-              them access to this event.
+              No team members or invitations yet. Invite people above to give them access to this
+              event.
             </p>
           )}
         </CardContent>
@@ -1036,8 +943,8 @@ export default function JudgeManagementPage({
         <CardHeader>
           <CardTitle className="text-lg">Judges ({judges.length})</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Every adjudicator for this feis. Add an email to give them a login
-            for scoring on a tablet; leave it blank for paper sheets.
+            Every adjudicator for this feis. Add an email to give them a login for scoring on a
+            tablet; leave it blank for paper sheets.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1079,17 +986,17 @@ export default function JudgeManagementPage({
                 />
               </div>
               <Button type="submit" disabled={saving}>
-                {saving ? "Adding..." : "Add judge"}
+                {saving ? 'Adding...' : 'Add judge'}
               </Button>
             </div>
           </form>
 
-          {inviteOutcome && outcomeScope === "judge" && (
+          {inviteOutcome && outcomeScope === 'judge' && (
             <div className="rounded-md border border-feis-green/30 bg-feis-green-light p-3 space-y-2">
               <p className="text-sm font-medium text-feis-green">
                 {inviteOutcome.emailed
                   ? `Invite emailed to ${inviteOutcome.email}.`
-                  : `${inviteOutcome.emailProblem ?? "The email was not sent"}. Text or email this link to ${inviteOutcome.email}:`}
+                  : `${inviteOutcome.emailProblem ?? 'The email was not sent'}. Text or email this link to ${inviteOutcome.email}:`}
               </p>
               <div className="flex gap-2 items-center">
                 <Input
@@ -1111,9 +1018,7 @@ export default function JudgeManagementPage({
           )}
 
           {judges.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No judges added yet.
-            </p>
+            <p className="text-muted-foreground text-sm">No judges added yet.</p>
           ) : (
             <div className="space-y-3">
               {judges.map((judge) => (
@@ -1124,9 +1029,9 @@ export default function JudgeManagementPage({
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleExpanded(judge.id);
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleExpanded(judge.id)
                       }
                     }}
                   >
@@ -1136,54 +1041,42 @@ export default function JudgeManagementPage({
                           {judge.first_name} {judge.last_name}
                         </p>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                          {
-                            JUDGE_LOGIN_LABELS[
-                              judgeLoginStatus(judge, pendingInvites)
-                            ]
-                          }
+                          {JUDGE_LOGIN_LABELS[judgeLoginStatus(judge, pendingInvites)]}
                           {openJudgeInvite(judge.id) && !judge.user_id
                             ? `: ${openJudgeInvite(judge.id)?.email}`
-                            : ""}
+                            : ''}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-xs">
                         {assignmentCounts[judge.id] ?? 0} comp
-                        {(assignmentCounts[judge.id] ?? 0) === 1
-                          ? ""
-                          : "s"}{" "}
-                        assigned
+                        {(assignmentCounts[judge.id] ?? 0) === 1 ? '' : 's'} assigned
                       </Badge>
                     </div>
                     <div className="flex gap-2">
-                      {judgeLoginStatus(judge, pendingInvites) ===
-                        "paper_only" && (
+                      {judgeLoginStatus(judge, pendingInvites) === 'paper_only' && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            setInviteOutcome(null);
-                            setJudgeInviteEmail("");
-                            setInviteForJudgeId(
-                              inviteForJudgeId === judge.id ? null : judge.id,
-                            );
+                            e.stopPropagation()
+                            setInviteOutcome(null)
+                            setJudgeInviteEmail('')
+                            setInviteForJudgeId(inviteForJudgeId === judge.id ? null : judge.id)
                           }}
                         >
                           Invite
                         </Button>
                       )}
-                      {judgeLoginStatus(judge, pendingInvites) === "invited" &&
+                      {judgeLoginStatus(judge, pendingInvites) === 'invited' &&
                         openJudgeInvite(judge.id) && (
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={
-                              busyInviteId === openJudgeInvite(judge.id)?.id
-                            }
+                            disabled={busyInviteId === openJudgeInvite(judge.id)?.id}
                             onClick={(e) => {
-                              e.stopPropagation();
-                              const inv = openJudgeInvite(judge.id);
-                              if (inv) void handleResend(inv.id);
+                              e.stopPropagation()
+                              const inv = openJudgeInvite(judge.id)
+                              if (inv) void handleResend(inv.id)
                             }}
                           >
                             Resend
@@ -1193,8 +1086,8 @@ export default function JudgeManagementPage({
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
-                          e.stopPropagation();
-                          void handleRemove(judge.id);
+                          e.stopPropagation()
+                          void handleRemove(judge.id)
                         }}
                         className="text-destructive hover:text-destructive"
                       >
@@ -1207,15 +1100,12 @@ export default function JudgeManagementPage({
                     <form
                       className="flex gap-2 items-end border-t px-3 py-3"
                       onSubmit={(e) => {
-                        e.preventDefault();
-                        void handleJudgeRowInvite(judge.id);
+                        e.preventDefault()
+                        void handleJudgeRowInvite(judge.id)
                       }}
                     >
                       <div className="flex-1">
-                        <Label
-                          htmlFor={`judgeInvite-${judge.id}`}
-                          className="text-xs"
-                        >
+                        <Label htmlFor={`judgeInvite-${judge.id}`} className="text-xs">
                           Email for {judge.first_name}
                         </Label>
                         <Input
@@ -1227,11 +1117,8 @@ export default function JudgeManagementPage({
                           autoFocus
                         />
                       </div>
-                      <Button
-                        type="submit"
-                        disabled={judgeInviting || !judgeInviteEmail.trim()}
-                      >
-                        {judgeInviting ? "Sending…" : "Send invite"}
+                      <Button type="submit" disabled={judgeInviting || !judgeInviteEmail.trim()}>
+                        {judgeInviting ? 'Sending…' : 'Send invite'}
                       </Button>
                       <Button
                         type="button"
@@ -1247,13 +1134,9 @@ export default function JudgeManagementPage({
                     <div className="border-t px-3 pb-3 pt-3 space-y-4">
                       {/* Current Assignments */}
                       <div>
-                        <h4 className="text-sm font-medium mb-2">
-                          Current Assignments
-                        </h4>
+                        <h4 className="text-sm font-medium mb-2">Current Assignments</h4>
                         {loadingAssignments ? (
-                          <p className="text-muted-foreground text-sm">
-                            Loading assignments...
-                          </p>
+                          <p className="text-muted-foreground text-sm">Loading assignments...</p>
                         ) : judgeAssignments.length === 0 ? (
                           <p className="text-muted-foreground text-sm">
                             No competitions assigned yet.
@@ -1267,12 +1150,12 @@ export default function JudgeManagementPage({
                               >
                                 <span>
                                   <span className="font-mono font-medium">
-                                    {assignment.competition.code ?? "—"}
-                                  </span>{" "}
+                                    {assignment.competition.code ?? '—'}
+                                  </span>{' '}
                                   {assignment.competition.name}
                                   {assignment.competition.level && (
                                     <span className="text-muted-foreground">
-                                      {" "}
+                                      {' '}
                                       ({assignment.competition.level})
                                     </span>
                                   )}
@@ -1282,10 +1165,7 @@ export default function JudgeManagementPage({
                                   size="sm"
                                   className="h-6 px-2 text-xs text-destructive hover:text-destructive"
                                   onClick={() =>
-                                    void handleRemoveAssignment(
-                                      assignment.id,
-                                      judge.id,
-                                    )
+                                    void handleRemoveAssignment(assignment.id, judge.id)
                                   }
                                 >
                                   Remove
@@ -1309,9 +1189,7 @@ export default function JudgeManagementPage({
                       {/* Batch Assign Controls */}
                       {competitions.length > 0 && (
                         <div className="border-t pt-3">
-                          <h4 className="text-sm font-medium mb-3">
-                            Assign Competitions
-                          </h4>
+                          <h4 className="text-sm font-medium mb-3">Assign Competitions</h4>
                           <div className="space-y-3">
                             {/* By Code Range */}
                             <div className="flex items-end gap-2">
@@ -1336,12 +1214,8 @@ export default function JudgeManagementPage({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                disabled={
-                                  assigningBatch || !codeStart || !codeEnd
-                                }
-                                onClick={() =>
-                                  handleAssignByCodeRange(judge.id)
-                                }
+                                disabled={assigningBatch || !codeStart || !codeEnd}
+                                onClick={() => handleAssignByCodeRange(judge.id)}
                               >
                                 Assign Range
                               </Button>
@@ -1354,9 +1228,7 @@ export default function JudgeManagementPage({
                                   <Label className="text-xs">By Level</Label>
                                   <select
                                     value={filterLevel}
-                                    onChange={(e) =>
-                                      setFilterLevel(e.target.value)
-                                    }
+                                    onChange={(e) => setFilterLevel(e.target.value)}
                                     className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                   >
                                     <option value="">Select level...</option>
@@ -1382,19 +1254,13 @@ export default function JudgeManagementPage({
                             {uniqueAgeGroups.length > 0 && (
                               <div className="flex items-end gap-2">
                                 <div className="w-48">
-                                  <Label className="text-xs">
-                                    By Age Group
-                                  </Label>
+                                  <Label className="text-xs">By Age Group</Label>
                                   <select
                                     value={filterAgeGroup}
-                                    onChange={(e) =>
-                                      setFilterAgeGroup(e.target.value)
-                                    }
+                                    onChange={(e) => setFilterAgeGroup(e.target.value)}
                                     className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                   >
-                                    <option value="">
-                                      Select age group...
-                                    </option>
+                                    <option value="">Select age group...</option>
                                     {uniqueAgeGroups.map((ag) => (
                                       <option key={ag} value={ag}>
                                         {ag}
@@ -1406,9 +1272,7 @@ export default function JudgeManagementPage({
                                   variant="outline"
                                   size="sm"
                                   disabled={assigningBatch || !filterAgeGroup}
-                                  onClick={() =>
-                                    handleAssignByAgeGroup(judge.id)
-                                  }
+                                  onClick={() => handleAssignByAgeGroup(judge.id)}
                                 >
                                   Assign Age Group
                                 </Button>
@@ -1432,8 +1296,8 @@ export default function JudgeManagementPage({
 
                       {competitions.length === 0 && (
                         <p className="text-muted-foreground text-sm">
-                          No competitions imported yet. Import competitions
-                          first, then assign them to judges.
+                          No competitions imported yet. Import competitions first, then assign them
+                          to judges.
                         </p>
                       )}
                     </div>
@@ -1445,5 +1309,5 @@ export default function JudgeManagementPage({
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
