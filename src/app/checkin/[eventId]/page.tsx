@@ -146,6 +146,8 @@ export default function RosterConfirmationPage({
   const [stages, setStages] = useState<Array<{ id: string; name: string }>>([])
   const [selectedStageId, setSelectedStageId] = useState<string>('')
   const [judgeCounts, setJudgeCounts] = useState<Map<string, number>>(new Map())
+  // Competitions with at least one dancer entered (the rest are hidden)
+  const [compsWithEntries, setCompsWithEntries] = useState<Set<string> | null>(null)
 
   // Heat snapshot state for scoring competitions
   const [heatSnapshot, setHeatSnapshot] = useState<HeatSnapshot | null>(null)
@@ -176,7 +178,7 @@ export default function RosterConfirmationPage({
       supabase
         .from('competitions')
         .select(
-          'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id'
+          'id, code, name, age_group, level, status, roster_confirmed_at, roster_confirmed_by, schedule_position, stage_id, registrations(count)'
         )
         .eq('event_id', eventId)
         .order('code'),
@@ -201,11 +203,17 @@ export default function RosterConfirmationPage({
       console.error('Failed to load stages:', stagesRes.error.message)
     }
 
-    const loadedComps = (compsRes.data as Competition[] | null) ?? []
+    const compRows =
+      (compsRes.data as Array<Competition & { registrations: Array<{ count: number }> }> | null) ??
+      []
+    const loadedComps: Competition[] = compRows
 
     setEvent(eventRes.data as EventInfo | null)
     setJudges((judgesRes.data as JudgeInfo[] | null) ?? [])
     setCompetitions(loadedComps)
+    setCompsWithEntries(
+      new Set(compRows.filter((c) => (c.registrations?.[0]?.count ?? 0) > 0).map((c) => c.id))
+    )
     setStages((stagesRes.data as Array<{ id: string; name: string }> | null) ?? [])
 
     // Load judge assignment counts
@@ -665,9 +673,14 @@ export default function RosterConfirmationPage({
 
   // --- Filtering & Grouping ---
 
-  const filteredCompetitions = competitions
+  const stageAndJudgeComps = competitions
     .filter((c) => assignedCompIds === null || assignedCompIds.has(c.id))
     .filter((c) => !selectedStageId || c.stage_id === selectedStageId)
+  // Hide competitions nobody entered
+  const filteredCompetitions = stageAndJudgeComps.filter(
+    (c) => compsWithEntries === null || compsWithEntries.has(c.id)
+  )
+  const emptyHiddenCount = stageAndJudgeComps.length - filteredCompetitions.length
 
   // Sort helper: schedule_position first (nulls last), then code
   function sortBySchedule(comps: Competition[]): Competition[] {
@@ -1335,6 +1348,12 @@ export default function RosterConfirmationPage({
             </CardContent>
           )}
         </Card>
+      )}
+
+      {emptyHiddenCount > 0 && (
+        <p className="text-sm text-muted-foreground text-center">
+          {emptyHiddenCount} empty competition{emptyHiddenCount !== 1 ? 's' : ''} hidden
+        </p>
       )}
 
       {hasNoComps && (
