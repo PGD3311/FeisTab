@@ -7,7 +7,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
-      position="bottom-right"
+      // Top: the scoring screens keep their Sign Off bar along the bottom
+      position="top-center"
       richColors
       className="toaster group"
       icons={{
