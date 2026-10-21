@@ -990,7 +990,7 @@ export default function RosterConfirmationPage({
                           )}
                           {!hasArrived && !isPresent && hasNumber && (
                             <span className="text-xs text-destructive/70 mt-0.5 block">
-                              Not arrived · Number assigned, not checked in
+                              Number given · not checked in at side-stage yet
                             </span>
                           )}
                         </div>
