@@ -8,7 +8,7 @@ import { showSuccess, showError } from '@/lib/feedback'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { Button } from '@/components/ui/button'
 import { ACTIVE_STATUSES, canTransition, getTransitionBlockReason } from '@/lib/competition-states'
-import { type CompetitionStatus } from '@/lib/competition-states'
+import { feisProgress } from '@/lib/engine/feis-progress'
 import {
   groupBySchedule,
   getScheduleBlockReasons,
@@ -22,20 +22,6 @@ interface Stage {
 }
 
 const POLL_INTERVAL_MS = 5000
-
-const STATUS_WEIGHT: Record<CompetitionStatus, number> = {
-  draft: 0,
-  imported: 10,
-  ready_for_day_of: 15,
-  released_to_judge: 20,
-  in_progress: 30,
-  awaiting_scores: 40,
-  ready_to_tabulate: 60,
-  recalled_round_pending: 55,
-  complete_unpublished: 80,
-  published: 100,
-  locked: 100,
-}
 
 export default function EventOverviewPage() {
   const { event, competitions, loading, reload } = useEvent()
@@ -165,14 +151,9 @@ export default function EventOverviewPage() {
       c.status === 'recalled_round_pending' ||
       c.status === 'complete_unpublished'
   )
-  const progressPct =
-    competitions.length > 0
-      ? Math.round(
-          (competitions.reduce((sum, c) => sum + (STATUS_WEIGHT[c.status] ?? 0), 0) /
-            (competitions.length * 100)) *
-            100
-        )
-      : 0
+  const progress = feisProgress(
+    competitions.map((c) => ({ status: c.status, dancerCount: c.registrations?.[0]?.count ?? 0 }))
+  )
 
   return (
     <div className="space-y-5">
@@ -183,7 +164,7 @@ export default function EventOverviewPage() {
           competitions
         </span>
         <span>
-          <strong className="text-foreground tabular-nums">{totalDancers}</strong> dancers
+          <strong className="text-foreground tabular-nums">{totalDancers}</strong> entries
         </span>
         <span>
           <strong className="text-foreground tabular-nums">{publishedCount}</strong> published
@@ -196,7 +177,10 @@ export default function EventOverviewPage() {
           needed
         </span>
         <span>
-          <strong className="text-foreground tabular-nums">{progressPct}%</strong> complete
+          <strong className="text-foreground tabular-nums">
+            {progress.finished} of {progress.toRun}
+          </strong>{' '}
+          competitions finished
         </span>
       </div>
 
