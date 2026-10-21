@@ -573,16 +573,9 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                     {comp.name}
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    Side-stage confirmed &middot; view dancers
+                    Side-stage confirmed &middot; waiting for them to send it to you
                   </span>
                 </Link>
-                <Button
-                  size="sm"
-                  onClick={() => handleStart(comp)}
-                  disabled={starting === comp.id}
-                >
-                  {starting === comp.id ? 'Starting...' : 'Start'}
-                </Button>
               </div>
             ))}
           </CardContent>

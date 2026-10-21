@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { type CompetitionStatus, getNextStates } from '@/lib/competition-states'
 
-// The database enforces the same state machine (is_valid_transition in migration 032,
+// The database enforces the same state machine (is_valid_transition, latest in migration 042,
 // used by trg_competition_status_guard). If the two drift, the UI offers transitions
 // the database rejects, or the database allows ones the UI never would.
 
@@ -25,11 +25,11 @@ const ALL_STATUSES: CompetitionStatus[] = [
 
 function dbTransitions(): string[] {
   const sql = readFileSync(
-    join(__dirname, '../../supabase/migrations/032_phase1_unbreak_chain.sql'),
+    join(__dirname, '../../supabase/migrations/042_send_to_judge.sql'),
     'utf8'
   )
   const fn = sql.match(/FUNCTION is_valid_transition[\s\S]*?\$\$([\s\S]*?)\$\$/)
-  if (!fn) throw new Error('is_valid_transition not found in migration 032')
+  if (!fn) throw new Error('is_valid_transition not found in migration 042')
   return [...fn[1].matchAll(/\('(\w+)',\s*'(\w+)'\)/g)].map((m) => `${m[1]}->${m[2]}`).sort()
 }
 

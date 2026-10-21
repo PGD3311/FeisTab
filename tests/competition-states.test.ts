@@ -20,12 +20,16 @@ describe('competition state machine', () => {
 
   it('allows full happy path', () => {
     const path: CompetitionStatus[] = [
-      'draft', 'imported', 'ready_for_day_of', 'in_progress',
+      'draft', 'imported', 'ready_for_day_of', 'released_to_judge', 'in_progress',
       'awaiting_scores', 'ready_to_tabulate', 'complete_unpublished', 'published', 'locked'
     ]
     for (let i = 0; i < path.length - 1; i++) {
       expect(canTransition(path[i], path[i + 1])).toBe(true)
     }
+  })
+
+  it('blocks ready_for_day_of -> in_progress (side-stage must send to judge first)', () => {
+    expect(canTransition('ready_for_day_of', 'in_progress')).toBe(false)
   })
 
   it('allows ready_to_tabulate -> recalled_round_pending', () => {
@@ -89,10 +93,6 @@ describe('getTransitionLabel', () => {
     expect(getTransitionLabel('imported', 'ready_for_day_of')).toBe('Mark Ready for Day-Of')
   })
 
-  it('returns label for ready_for_day_of -> in_progress', () => {
-    expect(getTransitionLabel('ready_for_day_of', 'in_progress')).toBe('Start Scoring')
-  })
-
   it('returns label for ready_for_day_of -> released_to_judge', () => {
     expect(getTransitionLabel('ready_for_day_of', 'released_to_judge')).toBe('Send to Judge')
   })
@@ -149,13 +149,6 @@ describe('getTransitionBlockReason', () => {
     )
   })
 
-  it('blocks ready_for_day_of -> in_progress without judges', () => {
-    const ctx = { ...fullContext, judgeCount: 0 }
-    expect(getTransitionBlockReason('ready_for_day_of', 'in_progress', ctx)).toBe(
-      'Assign judges before starting'
-    )
-  })
-
   it('allows in_progress -> awaiting_scores with no rounds', () => {
     const ctx = { ...fullContext, roundCount: 0 }
     expect(getTransitionBlockReason('in_progress', 'awaiting_scores', ctx)).toBeNull()
@@ -186,13 +179,6 @@ describe('getTransitionBlockReason', () => {
   it('allows ready_for_day_of -> released_to_judge with roster confirmed and judges', () => {
     const ctx = { ...fullContext, rosterConfirmedAt: '2026-03-13T00:00:00Z' }
     expect(getTransitionBlockReason('ready_for_day_of', 'released_to_judge', ctx)).toBeNull()
-  })
-
-  it('blocks ready_for_day_of -> in_progress without roster confirmation', () => {
-    const ctx = { ...fullContext, rosterConfirmedAt: null }
-    expect(getTransitionBlockReason('ready_for_day_of', 'in_progress', ctx)).toBe(
-      'Roster must be confirmed before starting'
-    )
   })
 
   it('allows released_to_judge -> in_progress with no preconditions', () => {

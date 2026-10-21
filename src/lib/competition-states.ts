@@ -14,7 +14,8 @@ export type CompetitionStatus =
 const transitions: Record<CompetitionStatus, CompetitionStatus[]> = {
   draft: ['imported'],
   imported: ['ready_for_day_of'],
-  ready_for_day_of: ['released_to_judge', 'in_progress'],
+  // Side-stage sends every competition to the judge; nothing starts straight from ready
+  ready_for_day_of: ['released_to_judge'],
   released_to_judge: ['in_progress', 'ready_for_day_of'],
   in_progress: ['awaiting_scores'],
   awaiting_scores: ['ready_to_tabulate'],
@@ -58,7 +59,6 @@ export function isOpenForScoring(status: CompetitionStatus): boolean {
 const transitionLabels: Partial<Record<string, string>> = {
   'imported→ready_for_day_of': 'Mark Ready for Day-Of',
   'ready_for_day_of→released_to_judge': 'Send to Judge',
-  'ready_for_day_of→in_progress': 'Start Scoring',
   'released_to_judge→in_progress': 'Start Scoring',
   'released_to_judge→ready_for_day_of': 'Recall to Side-Stage',
   'in_progress→awaiting_scores': 'Open for Scoring',
@@ -103,11 +103,6 @@ export function getTransitionBlockReason(
   if (from === 'ready_for_day_of' && to === 'released_to_judge') {
     if (!context.rosterConfirmedAt) return 'Roster must be confirmed before sending to judge'
     if (context.judgeCount === 0) return 'No judges assigned'
-  }
-
-  if (from === 'ready_for_day_of' && to === 'in_progress') {
-    if (!context.rosterConfirmedAt) return 'Roster must be confirmed before starting'
-    if (context.judgeCount === 0) return 'Assign judges before starting'
   }
 
   return null
