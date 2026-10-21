@@ -22,6 +22,7 @@ import {
   type ScheduleCompetition,
 } from '@/lib/engine/schedule'
 import { type RegistrationStatus } from '@/lib/engine/anomalies/types'
+import { sideStageBlockReason } from '@/lib/engine/side-stage'
 import { type JudgeInfo } from '@/types/shared'
 
 // --- Interfaces ---
@@ -514,13 +515,11 @@ export default function RosterConfirmationPage({
   }
 
   async function handleConfirmRoster(compId: string) {
-    // Block if any dancer is still unaccounted for (status = 'registered')
+    // Block if any dancer is still unmarked; the database refuses it too
     if (expandedCompId === compId && registrations.length > 0) {
-      const unaccounted = registrations.filter((r) => r.status === 'registered')
-      if (unaccounted.length > 0) {
-        showError(
-          `${unaccounted.length} dancer${unaccounted.length !== 1 ? 's' : ''} not accounted for — mark each as Present, No Show, or Scratched before confirming`
-        )
+      const blocked = sideStageBlockReason(registrations.map((r) => r.status))
+      if (blocked) {
+        showError(blocked)
         return
       }
     }

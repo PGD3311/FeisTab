@@ -38,6 +38,7 @@ import { formatAuditEntry, type AuditEntry, type NameMaps } from '@/lib/audit-fo
 import { buildCalculatedPayload } from '@/lib/result-payload'
 import { generateHeats, type HeatDancer, type HeatSnapshot } from '@/lib/engine/heats'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { sideStageBlockReason } from '@/lib/engine/side-stage'
 import { type JudgeInfo } from '@/types/shared'
 import { CompetitionStatusBadge } from '@/components/competition-status-badge'
 import { ResultsTable } from '@/components/results-table'
@@ -77,6 +78,12 @@ export default function CompetitionDetailPage({
   const [, setStages] = useState<{ id: string; name: string; display_order: number }[]>([])
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [showUnpublishDialog, setShowUnpublishDialog] = useState(false)
+
+  // The preview renders at the foot of the page: bring it into view when it appears
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (previewResults) previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [previewResults])
 
   // Polling
   const POLL_INTERVAL_MS = 5000
@@ -939,11 +946,17 @@ export default function CompetitionDetailPage({
               ) : (
                 <Badge variant="outline" className="text-muted-foreground">Not confirmed</Badge>
               )}
+              {!comp.roster_confirmed_at && (
+                <span className="text-sm text-feis-orange-ink">
+                  {sideStageBlockReason(registrations.map((r: { status: string }) => r.status))}
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
               {!comp.roster_confirmed_at && ['draft', 'imported', 'ready_for_day_of'].includes(comp.status) && (
                 <Button
                   size="sm"
+                  disabled={sideStageBlockReason(registrations.map((r: { status: string }) => r.status)) !== null}
                   onClick={async () => {
                     try {
                       await confirmRoster(supabase, compId)
@@ -1029,6 +1042,9 @@ export default function CompetitionDetailPage({
                         : 'border'
                   }`}
                 >
+                  {(reg.status === 'registered' || reg.status === 'checked_in') && (
+                    <option value={reg.status} disabled>Not checked in</option>
+                  )}
                   <option value="present">Present</option>
                   <option value="scratched">Scratched</option>
                   <option value="no_show">No Show</option>
@@ -1238,7 +1254,7 @@ export default function CompetitionDetailPage({
 
       {/* Tabulation Preview */}
       {previewResults && (
-        <Card className="feis-card border-feis-orange/50 bg-feis-orange/5">
+        <Card ref={previewRef} className="feis-card border-feis-orange/50 bg-feis-orange/5">
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
               <span>Tabulation Preview</span>
