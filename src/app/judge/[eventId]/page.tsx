@@ -18,6 +18,7 @@ import {
 } from '@/lib/engine/schedule'
 import { generateHeats, type HeatDancer } from '@/lib/engine/heats'
 import { NON_ACTIVE_STATUSES } from '@/lib/engine/anomalies/types'
+import { groupJudgeCompetitions } from '@/lib/engine/judge-preview'
 
 interface JudgeIdentity {
   judge_id: string
@@ -39,13 +40,6 @@ interface Competition {
 }
 
 const SCORING_STATUSES: CompetitionStatus[] = ['in_progress', 'awaiting_scores']
-const DONE_STATUSES: CompetitionStatus[] = [
-  'ready_to_tabulate',
-  'complete_unpublished',
-  'published',
-  'locked',
-  'recalled_round_pending',
-]
 export default function JudgeEventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params)
   const supabase = useSupabase()
@@ -60,33 +54,15 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
   // Scoring comps whose latest round this judge has already signed off
   const [signedOffCompIds, setSignedOffCompIds] = useState<Set<string>>(new Set())
 
-  // Sort helper: schedule_position first (nulls last), then code
-  function sortBySchedule(comps: Competition[]): Competition[] {
-    return [...comps].sort((a, b) => {
-      if (a.schedule_position !== null && b.schedule_position !== null) {
-        return a.schedule_position - b.schedule_position
-      }
-      if (a.schedule_position !== null) return -1
-      if (b.schedule_position !== null) return 1
-      return (a.code ?? '').localeCompare(b.code ?? '')
-    })
-  }
-
-  // Groups: Score Now, Signed off (waiting for other judges), Queued, Done
-  const scoreNowComps = sortBySchedule(
-    competitions.filter(
-      (c) =>
-        (SCORING_STATUSES.includes(c.status) && !signedOffCompIds.has(c.id)) ||
-        c.status === 'released_to_judge'
-    )
-  )
-  const waitingComps = sortBySchedule(
-    competitions.filter((c) => SCORING_STATUSES.includes(c.status) && signedOffCompIds.has(c.id))
-  )
-  const upNextComps = sortBySchedule(
-    competitions.filter((c) => c.status === 'ready_for_day_of' && !!c.roster_confirmed_at)
-  )
-  const doneComps = sortBySchedule(competitions.filter((c) => DONE_STATUSES.includes(c.status)))
+  // Groups, each in schedule order: Score Now, Queued (side-stage confirmed), Waiting for
+  // side-stage, Signed off (waiting for other judges), Done
+  const {
+    scoreNow: scoreNowComps,
+    queued: upNextComps,
+    waitingForSideStage: sideStageComps,
+    signedOff: waitingComps,
+    done: doneComps,
+  } = groupJudgeCompetitions(competitions, signedOffCompIds)
 
   // Schedule grouping for NOW/NEXT
   const hasSchedulePositions = competitions.some((c) => c.schedule_position !== null)
@@ -439,6 +415,7 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
     scoreNowComps.length === 0 &&
     waitingComps.length === 0 &&
     upNextComps.length === 0 &&
+    sideStageComps.length === 0 &&
     doneComps.length === 0
 
   return (
@@ -574,6 +551,69 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
         </Card>
       )}
 
+      {/* Queued */}
+      {upNextComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Queued</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {upNextComps.map((comp) => (
+              <div
+                key={comp.id}
+                className="flex items-center justify-between gap-3 p-4 rounded-md border"
+              >
+                <Link
+                  href={`/judge/${eventId}/${comp.id}`}
+                  className="min-w-0 hover:text-feis-green transition-colors"
+                >
+                  <span className="font-medium">
+                    {renderPositionBadge(comp)}
+                    {comp.code && `${comp.code} `}
+                    {comp.name}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Side-stage confirmed &middot; view dancers
+                  </span>
+                </Link>
+                <Button
+                  size="sm"
+                  onClick={() => handleStart(comp)}
+                  disabled={starting === comp.id}
+                >
+                  {starting === comp.id ? 'Starting...' : 'Start'}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Waiting for side-stage — roster not confirmed yet; the dancer list is read-only */}
+      {sideStageComps.length > 0 && (
+        <Card className="feis-card">
+          <CardHeader>
+            <CardTitle className="text-lg">Waiting for side-stage</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {sideStageComps.map((comp) => (
+              <Link
+                key={comp.id}
+                href={`/judge/${eventId}/${comp.id}`}
+                className="flex items-center justify-between gap-3 p-4 rounded-md border border-dashed text-muted-foreground hover:bg-muted/30 transition-colors"
+              >
+                <span className="font-medium">
+                  {renderPositionBadge(comp)}
+                  {comp.code && `${comp.code} `}
+                  {comp.name}
+                </span>
+                <span className="text-sm text-right shrink-0">Waiting for side-stage</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Signed off — scores locked, other judges still scoring */}
       {waitingComps.length > 0 && (
         <Card className="feis-card">
@@ -596,36 +636,6 @@ export default function JudgeEventPage({ params }: { params: Promise<{ eventId: 
                   {'\u2713'} Signed off &mdash; waiting for other judges
                 </span>
               </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Queued */}
-      {upNextComps.length > 0 && (
-        <Card className="feis-card">
-          <CardHeader>
-            <CardTitle className="text-lg">Queued</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {upNextComps.map((comp) => (
-              <div
-                key={comp.id}
-                className="flex items-center justify-between p-4 rounded-md border"
-              >
-                <span className="font-medium">
-                  {renderPositionBadge(comp)}
-                  {comp.code && `${comp.code} `}
-                  {comp.name}
-                </span>
-                <Button
-                  size="sm"
-                  onClick={() => handleStart(comp)}
-                  disabled={starting === comp.id}
-                >
-                  {starting === comp.id ? 'Starting...' : 'Start'}
-                </Button>
-              </div>
             ))}
           </CardContent>
         </Card>

@@ -7,6 +7,7 @@ import { signOffJudge, submitScore, createRound } from '@/lib/supabase/rpc'
 import { canEnterScores, type EntryMode } from '@/lib/entry-mode'
 import { NON_ACTIVE_STATUSES, type RegistrationStatus } from '@/lib/engine/anomalies/types'
 import { getCurrentHeat, getSnapshotDancerIds, type HeatSnapshot } from '@/lib/engine/heats'
+import { isJudgePreviewStatus, judgeDancerState } from '@/lib/engine/judge-preview'
 import { showSuccess, showCritical } from '@/lib/feedback'
 import { validateCommentData, type CommentData } from '@/lib/comment-codes'
 import { useSupabase } from '@/hooks/use-supabase'
@@ -101,6 +102,14 @@ export default function JudgeScoringPage({
   // Track if competition has been recalled/changed by organizer
   const [compRecalled, setCompRecalled] = useState(false)
 
+  // Opened before side-stage sent it: the dancer list stays read-only, with no scoring, until
+  // the judge starts it from Score Now (which sets up the heats) or it starts elsewhere
+  const [openedBeforeRelease, setOpenedBeforeRelease] = useState(false)
+  const previewMode =
+    !!comp &&
+    (isJudgePreviewStatus(comp.status) ||
+      (openedBeforeRelease && comp.status === 'released_to_judge'))
+
   // Realtime subscriptions for instant updates from organizer actions
   useEffect(() => {
     if (loading || submitted) return
@@ -114,7 +123,23 @@ export default function JudgeScoringPage({
         void pollData()
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions', filter: `id=eq.${compId}` }, (payload) => {
-        const updated = payload.new as { status: string }
+        const updated = payload.new as { status: string; roster_confirmed_at: string | null }
+        if (previewMode) {
+          setComp((prev: { status: string } | null) =>
+            prev
+              ? { ...prev, status: updated.status, roster_confirmed_at: updated.roster_confirmed_at }
+              : prev
+          )
+          // Scoring started (on this or another tablet): load the round and scores
+          if (
+            !isJudgePreviewStatus(updated.status) &&
+            updated.status !== 'released_to_judge' &&
+            judgeIdentity
+          ) {
+            void loadData(judgeIdentity.judge_id)
+          }
+          return
+        }
         if (!SCORING_OR_DONE.includes(updated.status)) {
           setCompRecalled(true)
         }
@@ -124,7 +149,8 @@ export default function JudgeScoringPage({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loading, submitted, supabase, compId, pollData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData is a plain function
+  }, [loading, submitted, supabase, compId, pollData, previewMode, judgeIdentity])
 
   // Initial load — derive judge_id from authenticated user
   useEffect(() => {
@@ -204,6 +230,13 @@ export default function JudgeScoringPage({
     setComp(compRes.data)
     setRegistrations(merged)
     setRuleConfig(compRes.data?.rule_sets?.config)
+
+    // Not sent to the judge yet: the dancer list is read-only, so no round or scores
+    if (isJudgePreviewStatus(compRes.data.status)) {
+      setOpenedBeforeRelease(true)
+      setLoading(false)
+      return
+    }
 
     // Ensure a round exists — create one if the event page's best-effort creation failed
     let round = roundRes.error ? null : roundRes.data
@@ -374,6 +407,105 @@ export default function JudgeScoringPage({
         >
           Retry
         </Button>
+      </div>
+    )
+  }
+
+  if (previewMode) {
+    const released = comp.status === 'released_to_judge'
+    const confirmed = comp.status === 'ready_for_day_of' && !!comp.roster_confirmed_at
+    const previewRegs = [...registrations].sort(
+      (a, b) => (a.competitor_number ?? Infinity) - (b.competitor_number ?? Infinity)
+    )
+    const states = previewRegs.map((r) => judgeDancerState(r.status))
+    const countOf = (kind: string) => states.filter((st) => st.kind === kind).length
+    return (
+      <div>
+        <div className="mb-3">
+          <Link href={`/judge/${eventId}`} className="text-sm text-muted-foreground hover:text-feis-green transition-colors">
+            &larr; comps
+          </Link>
+        </div>
+
+        <div className="flex items-center justify-between border-b-2 border-border pb-3 mb-4">
+          <div>
+            {comp.code && <span className="font-mono text-sm text-muted-foreground">{comp.code}</span>}
+            <span className="text-base font-semibold ml-1">{comp.name}</span>
+          </div>
+          <span className="text-sm text-muted-foreground font-mono">
+            {previewRegs.length} dancer{previewRegs.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        <div
+          className={`mb-4 p-4 rounded-md border ${
+            released || confirmed
+              ? 'border-feis-green/30 bg-feis-green-light/30'
+              : 'border-feis-orange/30 bg-feis-orange-light'
+          }`}
+        >
+          <p className={`font-medium ${released || confirmed ? 'text-feis-green' : 'text-feis-orange-ink'}`}>
+            {released
+              ? 'Sent to you: ready to score'
+              : confirmed
+                ? 'Side-stage confirmed, waiting to be sent to you'
+                : 'Waiting for side-stage'}
+          </p>
+          {released ? (
+            <Link href={`/judge/${eventId}`}>
+              <Button className="mt-3 w-full">Go to Score Now</Button>
+            </Link>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">
+              You can look over the dancers now. Scoring opens when side-stage sends this
+              competition to you.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground font-mono mt-2">
+            {countOf('present')} checked in &middot; {countOf('awaiting')} not checked in yet
+            &middot; {countOf('out')} out
+          </p>
+        </div>
+
+        {previewRegs.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No dancers entered.</p>
+        ) : (
+          <div className="space-y-1">
+            {previewRegs.map((reg, i) => {
+              const st = states[i]
+              const isOut = st.kind === 'out'
+              return (
+                <div
+                  key={reg.id}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md bg-muted/30 ${
+                    st.kind === 'present' ? '' : 'opacity-60'
+                  }`}
+                >
+                  <span
+                    className={`font-mono text-lg font-bold w-14 text-right text-muted-foreground${isOut ? ' line-through' : ''}`}
+                  >
+                    {reg.competitor_number ?? '\u2014'}
+                  </span>
+                  <span className={`text-muted-foreground${isOut ? ' line-through' : ''}`}>
+                    {reg.dancers?.first_name} {reg.dancers?.last_name}
+                  </span>
+                  {isOut ? (
+                    <Badge variant="outline" className="text-feis-orange-ink border-feis-orange/30 text-xs ml-auto">
+                      {st.label}
+                    </Badge>
+                  ) : (
+                    <span
+                      className={`text-xs ml-auto ${st.kind === 'present' ? 'text-feis-green font-medium' : 'text-muted-foreground'}`}
+                    >
+                      {st.kind === 'present' ? '\u2713 ' : ''}
+                      {st.label}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }

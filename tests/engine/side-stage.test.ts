@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { countAwaitingSideStage, sideStageBlockReason } from '@/lib/engine/side-stage'
+import {
+  countAwaitingSideStage,
+  isAwaitingSideStage,
+  sideStageBlockReason
+} from '@/lib/engine/side-stage'
 
 describe('countAwaitingSideStage', () => {
   it('counts dancers side-stage has not marked', () => {
@@ -25,5 +29,17 @@ describe('sideStageBlockReason', () => {
       '1 dancer not checked in at side-stage yet. Mark each one Present, No Show or Scratched first.'
     )
     expect(sideStageBlockReason(['registered', 'checked_in'])).toMatch(/^2 dancers not checked in/)
+  })
+})
+
+describe('isAwaitingSideStage', () => {
+  it('is true for dancers side-stage has not marked', () => {
+    expect(isAwaitingSideStage('registered')).toBe(true)
+    expect(isAwaitingSideStage('checked_in')).toBe(true)
+  })
+
+  it('is false once marked', () => {
+    expect(isAwaitingSideStage('present')).toBe(false)
+    expect(isAwaitingSideStage('scratched')).toBe(false)
   })
 })
